@@ -105,8 +105,17 @@ class OdooClient:
             resp = self._safe_post(_payload(self.uid))
 
         if "error" in resp:
-            _LOG.error("Odoo RPC Fout in %s.%s: %r", model, method, resp["error"])
-            raise HTTPException(status_code=502, detail="Odoo verwerkingsfout.")
+            error_info = resp["error"]
+            error_message = error_info.get("message", "Onbekende fout")
+            error_data = error_info.get("data", {})
+            error_name = error_info.get("name", "OdooError")
+            
+            error_detail = f"Odoo verwerkingsfout: {error_name} - {error_message}"
+            if error_data:
+                error_detail += f" | Data: {error_data}"
+            
+            _LOG.error("Odoo RPC Fout in %s.%s: %r", model, method, error_info)
+            raise HTTPException(status_code=502, detail=error_detail)
 
         return resp.get("result")
 
