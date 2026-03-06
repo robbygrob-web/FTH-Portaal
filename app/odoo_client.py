@@ -1,4 +1,3 @@
-app/odoo_client.py
 import os
 import logging
 import requests
@@ -99,3 +98,4 @@ class OdooClient:
 @lru_cache(maxsize=1)
 def get_odoo_client() -> OdooClient:
     return OdooClient()
+
