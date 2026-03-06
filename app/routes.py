@@ -271,7 +271,7 @@ async def dashboard(request: Request):
         pos = client.execute_kw(
             "purchase.order",
             "search_read",
-            [[["partner_id", "=", False]]],
+            [["partner_id", "=", False]],
             {
                 "fields": ["id", "name", "date_order", "amount_total", "state"],
                 "order": "date_order desc",
@@ -526,7 +526,8 @@ async def claim_po(request: Request, po_id: int):
         client.execute_kw(
             "purchase.order",
             "write",
-            [[po_id], {"partner_id": partner["id"]}]
+            [po_id],
+            {"partner_id": partner["id"]}
         )
         
         return {
