@@ -28,7 +28,7 @@ async def root(request: Request):
 @app.get("/health")
 def health_check():
     """Health check endpoint voor Railway"""
-    status = {
+    status = {.\.venv\Scripts\Activate.ps1
         "status": "ok",
         "BASE_URL_gevonden": bool(os.getenv("ODOO_BASE_URL")),
         "DB_gevonden": bool(os.getenv("ODOO_DB")),
