@@ -9,16 +9,28 @@ _LOG = logging.getLogger(__name__)
 
 class OdooClient:
     def __init__(self):
-        self.url = f"{os.getenv('ODOO_URL')}/jsonrpc"
+        base_url = os.getenv("ODOO_BASE_URL")
+        self.url = f"{base_url.rstrip('/')}/jsonrpc" if base_url else None
         self.db = os.getenv("ODOO_DB")
-        self.username = os.getenv("ODOO_USER")
-        self.password = os.getenv("ODOO_PASS")
+        self.username = os.getenv("ODOO_LOGIN")
+        self.password = os.getenv("ODOO_API_KEY")
 
-        if not all([self.url, self.db, self.username, self.password]):
-            raise RuntimeError("Kritieke Odoo omgevingsvariabelen ontbreken in de configuratie.")
+        missing = []
+        if not base_url:
+            missing.append("ODOO_BASE_URL")
+        if not self.db:
+            missing.append("ODOO_DB")
+        if not self.username:
+            missing.append("ODOO_LOGIN")
+        if not self.password:
+            missing.append("ODOO_API_KEY")
+
+        if missing:
+            raise RuntimeError(
+                f"Kritieke Odoo omgevingsvariabelen ontbreken in de configuratie: {', '.join(missing)}"
+            )
 
         self.session = requests.Session()
-        # Locks voor thread-safety
         self._http_lock = threading.Lock()
         self._auth_lock = threading.Lock()
         self.uid = self._login()
@@ -54,9 +66,11 @@ class OdooClient:
 
     def _login(self) -> int:
         payload = {
-            "jsonrpc": "2.0", "method": "call",
+            "jsonrpc": "2.0",
+            "method": "call",
             "params": {
-                "service": "common", "method": "login",
+                "service": "common",
+                "method": "login",
                 "args": [self.db, self.username, self.password]
             },
             "id": 1,
@@ -70,9 +84,11 @@ class OdooClient:
     def execute_kw(self, model: str, method: str, *args, **kwargs):
         def _payload(uid: int):
             return {
-                "jsonrpc": "2.0", "method": "call",
+                "jsonrpc": "2.0",
+                "method": "call",
                 "params": {
-                    "service": "object", "method": "execute_kw",
+                    "service": "object",
+                    "method": "execute_kw",
                     "args": [self.db, uid, self.password, model, method, list(args), kwargs or {}]
                 },
                 "id": 1,
@@ -80,7 +96,6 @@ class OdooClient:
 
         resp = self._safe_post(_payload(self.uid))
 
-        # Dubbele check met lock om login-storms te voorkomen
         if "error" in resp and self._is_access_denied(resp["error"]):
             old_uid = self.uid
             with self._auth_lock:
@@ -98,4 +113,3 @@ class OdooClient:
 @lru_cache(maxsize=1)
 def get_odoo_client() -> OdooClient:
     return OdooClient()
-
