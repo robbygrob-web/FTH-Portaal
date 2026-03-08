@@ -278,7 +278,9 @@ async def dashboard(request: Request):
             "search_read",
             ["|", ["x_studio_selection_field_67u_1jj77rtf7", "=", "transfer"], ["x_studio_selection_field_67u_1jj77rtf7", "=", "beschikbaar"]],
             {
-                "fields": ["id", "name", "date_order", "amount_total", "state"],
+                "fields": ["id", "name", "date_order", "amount_total", "state", 
+                           "commitment_date", "x_studio_plaats", "x_studio_aantal_personen", 
+                           "x_studio_aantal_kinderen", "tax_totals"],
                 "order": "id desc",
                 "limit": 50
             }
