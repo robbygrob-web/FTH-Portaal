@@ -531,11 +531,22 @@ async def dashboard(request: Request):
 
 @router.post("/api/claim-po/{po_id}")
 async def claim_po(request: Request, po_id: int):
-    """Claim een inkooporder: zet partner_id naar 87 en status naar 'claimed'"""
+    """Claim een sale order: zet x_studio_contractor naar partner_id en status naar 'claimed'"""
     partner = get_partner_from_session(request)
+    partner_id = partner["id"]
+    
+    # Debug logging
+    _LOG.info(f"[DEBUG claim_po] partner_id value: {partner_id}, type: {type(partner_id)}")
     
     try:
         client = get_odoo_client()
+        
+        # Read current partner_invoice_id before write
+        current = client.execute_kw(
+            "sale.order", "read", [po_id],
+            {"fields": ["partner_invoice_id"]}
+        )
+        original_invoice_id = current[0]["partner_invoice_id"][0] if current and current[0].get("partner_invoice_id") else None
         
         # Update de sale order
         result = client.execute_kw(
@@ -543,24 +554,29 @@ async def claim_po(request: Request, po_id: int):
             "write",
             [po_id],
             {
-                "partner_id": 87
+                "x_studio_contractor": partner_id,
+                "x_studio_selection_field_67u_1jj77rtf7": "claimed"
             }
         )
         
-        if not result:
-            raise HTTPException(status_code=500, detail="Update mislukt")
+        # Restore partner_invoice_id if it was set
+        if original_invoice_id:
+            client.execute_kw(
+                "sale.order", "write", [po_id],
+                {"partner_invoice_id": original_invoice_id}
+            )
         
-        return {
-            "success": True,
-            "message": f"Inkooporder is succesvol geclaimd",
-            "po_id": po_id,
-            "partner_id": 87,
-            "status": "claimed"
-        }
+        # Debug logging
+        _LOG.info(f"[DEBUG claim_po] write result: {result}, type: {type(result)}")
+        
+        if not result:
+            return {"success": False, "error": "Update mislukt"}
+        
+        return {"success": True}
     
     except Exception as e:
         _LOG.error(f"Claim PO fout: {e}")
-        raise HTTPException(status_code=500, detail=f"Fout bij claimen van inkooporder: {str(e)}")
+        return {"success": False, "error": f"Fout bij claimen van order: {str(e)}"}
 
 @router.get("/partner-orders", response_class=HTMLResponse)
 async def partner_orders(request: Request):
