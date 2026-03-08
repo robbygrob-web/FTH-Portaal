@@ -40,5 +40,4 @@ Partner screen shows:
 
 - `id` is used for technical API operations
 - `name` is only used for display
-- business logic must always rely on `state`
-- `x_studio_selection_field_67u_1jj77rtf7 = nieuw` means record is not visible in partner screen
+- business logic must always rely on `state`- `x_studio_selection_field_67u_1jj77rtf7 = nieuw` means record is not visible in partner screen
