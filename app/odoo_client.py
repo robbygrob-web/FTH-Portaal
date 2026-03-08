@@ -1,123 +1,97 @@
-import os
 import logging
-import requests
+import xmlrpc.client
 import threading
 from fastapi import HTTPException
 from functools import lru_cache
+from app.config import ODOO_BASE_URL, ODOO_DB, ODOO_LOGIN, ODOO_API_KEY
 
 _LOG = logging.getLogger(__name__)
 
 class OdooClient:
     def __init__(self):
-        base_url = os.getenv("ODOO_BASE_URL")
-        self.url = f"{base_url.rstrip('/')}/jsonrpc" if base_url else None
-        self.db = os.getenv("ODOO_DB")
-        self.username = os.getenv("ODOO_LOGIN")
-        self.password = os.getenv("ODOO_API_KEY")
+        if not ODOO_BASE_URL:
+            raise RuntimeError("ODOO_BASE_URL is vereist maar niet ingesteld")
+        if not ODOO_DB:
+            raise RuntimeError("ODOO_DB is vereist maar niet ingesteld")
+        if not ODOO_LOGIN:
+            raise RuntimeError("ODOO_LOGIN is vereist maar niet ingesteld")
+        if not ODOO_API_KEY:
+            raise RuntimeError("ODOO_API_KEY is vereist maar niet ingesteld")
+        
+        # DEBUG: Toon ruwe ODOO_BASE_URL
+        print(f"[DEBUG OdooClient.__init__] Ruwe ODOO_BASE_URL uit .env: {ODOO_BASE_URL}")
+        
+        base_url = ODOO_BASE_URL.rstrip('/')
+        self.common_url = f"{base_url}/xmlrpc/2/common"
+        self.object_url = f"{base_url}/xmlrpc/2/object"
+        self.db = ODOO_DB
+        self.username = ODOO_LOGIN
+        self.password = ODOO_API_KEY
+        
+        # DEBUG: Toon samengestelde URL
+        print(f"[DEBUG OdooClient.__init__] XML-RPC common endpoint: {self.common_url}")
+        print(f"[DEBUG OdooClient.__init__] Protocol: XML-RPC (via xmlrpc.client)")
 
-        missing = []
-        if not base_url:
-            missing.append("ODOO_BASE_URL")
-        if not self.db:
-            missing.append("ODOO_DB")
-        if not self.username:
-            missing.append("ODOO_LOGIN")
-        if not self.password:
-            missing.append("ODOO_API_KEY")
-
-        if missing:
-            raise RuntimeError(
-                f"Kritieke Odoo omgevingsvariabelen ontbreken in de configuratie: {', '.join(missing)}"
-            )
-
-        self.session = requests.Session()
-        self._http_lock = threading.Lock()
+        self._common_proxy = xmlrpc.client.ServerProxy(self.common_url, allow_none=True)
+        self._object_proxy = xmlrpc.client.ServerProxy(self.object_url, allow_none=True)
         self._auth_lock = threading.Lock()
         self.uid = self._login()
 
-    def _safe_post(self, payload: dict, timeout: int = 20) -> dict:
+    def _login(self) -> int:
+        # DEBUG: Toon authenticatie info
+        print(f"[DEBUG _login] Authenticeren met XML-RPC authenticate()")
+        print(f"[DEBUG _login] Database: {self.db}, Username: {self.username}")
+        
         try:
-            with self._http_lock:
-                r = self.session.post(self.url, json=payload, timeout=timeout)
-                r.raise_for_status()
-                try:
-                    return r.json()
-                except ValueError:
-                    _LOG.error(
-                        "Odoo non-JSON response. status=%s ct=%s head=%r",
-                        r.status_code,
-                        r.headers.get("content-type"),
-                        (r.text or "")[:200],
-                    )
-                    raise HTTPException(status_code=502, detail="Odoo gaf een ongeldig antwoord.")
-        except requests.exceptions.Timeout:
-            raise HTTPException(status_code=504, detail="Odoo reageert te traag.")
-        except requests.exceptions.RequestException as e:
+            uid = self._common_proxy.authenticate(self.db, self.username, self.password, {})
+            
+            if not uid:
+                _LOG.error("Odoo authenticate() mislukt - geen uid in result")
+                raise RuntimeError(
+                    "Odoo authenticate() mislukt. De server reageert, maar de authenticatie is geweigerd. "
+                    "Controleer: gebruikersnaam (ODOO_LOGIN), API key (ODOO_API_KEY) en database naam (ODOO_DB)."
+                )
+            
+            print(f"[DEBUG _login] Authenticatie succesvol, UID: {uid}")
+            return uid
+            
+        except xmlrpc.client.Fault as e:
+            error_detail = f"Odoo authenticate() fout: {e.faultCode} - {e.faultString}"
+            _LOG.error("Odoo authenticate() fout: %r", e)
+            raise RuntimeError(f"Odoo authenticate() mislukt. {error_detail}")
+        except Exception as e:
             _LOG.error("Odoo verbinding fout: %s", e)
             raise HTTPException(status_code=502, detail="Odoo onbereikbaar.")
 
-    def _is_access_denied(self, err: dict) -> bool:
-        data = err.get("data") or {}
-        name = (data.get("name") or "")
-        msg = f"{err.get('message') or ''} {data.get('message') or ''}"
-        blob = str(err)
-        s = (name + " " + msg + " " + blob).lower()
-        return any(x in s for x in ["accessdenied", "access denied", "session expired"])
-
-    def _login(self) -> int:
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "call",
-            "params": {
-                "service": "common",
-                "method": "login",
-                "args": [self.db, self.username, self.password]
-            },
-            "id": 1,
-        }
-        resp = self._safe_post(payload, timeout=10)
-        uid = resp.get("result")
-        if not uid:
-            raise RuntimeError("Odoo login mislukt. Controleer credentials.")
-        return uid
-
     def execute_kw(self, model: str, method: str, *args, **kwargs):
-        def _payload(uid: int):
-            return {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "service": "object",
-                    "method": "execute_kw",
-                    "args": [self.db, uid, self.password, model, method, list(args), kwargs or {}]
-                },
-                "id": 1,
-            }
-
-        resp = self._safe_post(_payload(self.uid))
-
-        if "error" in resp and self._is_access_denied(resp["error"]):
-            old_uid = self.uid
-            with self._auth_lock:
-                if self.uid == old_uid:
-                    _LOG.info("Odoo sessie verlopen. Herlogin uitgevoerd.")
-                    self.uid = self._login()
-            resp = self._safe_post(_payload(self.uid))
-
-        if "error" in resp:
-            error_info = resp["error"]
-            error_message = error_info.get("message", "Onbekende fout")
-            error_data = error_info.get("data", {})
-            error_name = error_info.get("name", "OdooError")
+        try:
+            result = self._object_proxy.execute_kw(
+                self.db, self.uid, self.password,
+                model, method, list(args), kwargs or {}
+            )
+            return result
             
-            error_detail = f"Odoo verwerkingsfout: {error_name} - {error_message}"
-            if error_data:
-                error_detail += f" | Data: {error_data}"
-            
-            _LOG.error("Odoo RPC Fout in %s.%s: %r", model, method, error_info)
-            raise HTTPException(status_code=502, detail=error_detail)
-
-        return resp.get("result")
+        except xmlrpc.client.Fault as e:
+            # Check if it's an access denied error
+            if e.faultCode == 1 or "access" in str(e.faultString).lower() or "denied" in str(e.faultString).lower():
+                old_uid = self.uid
+                with self._auth_lock:
+                    if self.uid == old_uid:
+                        _LOG.info("Odoo sessie verlopen. Herlogin uitgevoerd.")
+                        self.uid = self._login()
+                # Retry with new UID
+                result = self._object_proxy.execute_kw(
+                    self.db, self.uid, self.password,
+                    model, method, list(args), kwargs or {}
+                )
+                return result
+            else:
+                error_detail = f"Odoo verwerkingsfout: {e.faultCode} - {e.faultString}"
+                _LOG.error("Odoo RPC Fout in %s.%s: %r", model, method, e)
+                raise HTTPException(status_code=502, detail=error_detail)
+        except Exception as e:
+            _LOG.error("Odoo verbinding fout: %s", e)
+            raise HTTPException(status_code=502, detail="Odoo onbereikbaar.")
 
 @lru_cache(maxsize=1)
 def get_odoo_client() -> OdooClient:

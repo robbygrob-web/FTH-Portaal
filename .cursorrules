@@ -1,0 +1,23 @@
+# FTH Portaal Project Rules
+
+## Technische afspraken
+- `main.py` in root is entry point
+- Applicatielogica in `app/` map
+- `load_dotenv()` alleen in `main.py`
+- Gebruik XML-RPC voor Odoo (voorlopig)
+- Schrijf synchrone code
+- Geen nieuwe libraries, frameworks of infra zonder toestemming
+- Bij grotere wijzigingen: eerst analyseren, dan pas uitvoeren na bevestiging
+
+## Huidige businesslogica
+- `x_studio_portal_status_po_` is primair statusveld (kan later uitbreiden)
+- Dashboard toont orders met status `'beschikbaar'` (huidige logica)
+- Claim-actie zet `partner_id = 87` en `x_studio_portal_status_po_ = 'claimed'` (kan later wijzigen)
+
+## Algemene richtlijnen
+- Behoud bestaande endpointnamen en flow waar mogelijk
+- Werk imports bij en voorkom circulaire imports
+- Voorkom overengineering
+- Wijzig of herschrijf bestaande code alleen wanneer de gebruiker daar expliciet om vraagt. Vermijd automatische refactors, herstructureringen of optimalisaties buiten de gevraagde wijziging.
+- Splits of herschrijf volledige bestanden alleen wanneer de gebruiker daar expliciet om vraagt. Vermijd het automatisch opsplitsen van bestanden, herstructureren van mappen of het verplaatsen van code zonder duidelijke instructie.
+- Bij grotere wijzigingen of nieuwe features: geef eerst een kort plan (welke bestanden, functies en imports worden aangepast) voordat je code schrijft. Wacht daarna op bevestiging van de gebruiker.

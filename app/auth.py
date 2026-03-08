@@ -3,6 +3,8 @@ import logging
 import requests
 from fastapi import HTTPException
 from typing import Optional
+from functools import lru_cache
+from app.config import ODOO_BASE_URL, ODOO_DB, ODOO_LOGIN, ODOO_API_KEY
 
 _LOG = logging.getLogger(__name__)
 
@@ -10,12 +12,11 @@ class PartnerAuth:
     """Authenticatie voor partners (leveranciers) via Odoo"""
     
     def __init__(self):
-        base_url = os.getenv("ODOO_BASE_URL")
-        self.url = f"{base_url.rstrip('/')}/jsonrpc" if base_url else None
-        self.db = os.getenv("ODOO_DB")
-        
-        if not base_url or not self.db:
+        if not ODOO_BASE_URL or not ODOO_DB:
             raise RuntimeError("ODOO_BASE_URL en ODOO_DB zijn vereist voor partner authenticatie")
+        
+        self.url = f"{ODOO_BASE_URL.rstrip('/')}/jsonrpc"
+        self.db = ODOO_DB
     
     def authenticate_partner(self, email: str, password: str) -> Optional[dict]:
         """
@@ -124,8 +125,8 @@ class PartnerAuth:
         Gebruikt voor verificatie zonder partner wachtwoord.
         """
         try:
-            admin_username = os.getenv("ODOO_LOGIN")
-            admin_password = os.getenv("ODOO_API_KEY")
+            admin_username = ODOO_LOGIN
+            admin_password = ODOO_API_KEY
             
             # Login als admin
             login_payload = {
@@ -179,3 +180,11 @@ class PartnerAuth:
         except Exception as e:
             _LOG.error(f"Partner ophalen fout: {e}")
             return None
+
+@lru_cache(maxsize=1)
+def get_partner_auth() -> PartnerAuth:
+    """
+    Lazy instantiatie van PartnerAuth.
+    Wordt alleen aangemaakt wanneer nodig, niet bij import.
+    """
+    return PartnerAuth()

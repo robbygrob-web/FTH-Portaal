@@ -1,0 +1,68 @@
+# Controlled Refactor Rules
+
+## Kernprincipes
+- **Eerst analyseren, dan pas uitvoeren** - Nooit direct refactoren zonder expliciete toestemming
+- **Behoud bestaande structuur en flow** waar mogelijk
+- **Voorkom overengineering** - Houd wijzigingen klein en gecontroleerd
+- **Werk imports bij** en voorkom circulaire imports
+- **Geen nieuwe frameworks** zonder expliciete vraag
+
+## Twee-Fasen Werkwijze
+
+### Fase 1: Analyse (Verplicht)
+Voordat je wijzigingen uitvoert, moet je altijd eerst:
+1. Analyseren welke bestanden aangepast moeten worden
+2. Identificeren welke bestanden verplaatst moeten worden
+3. Bepalen welke bestanden verwijderd kunnen worden
+4. Inventariseren welke imports moeten wijzigen
+5. Risico's op brekende wijzigingen beoordelen
+6. Impact op endpoints en flows evalueren
+
+**STOP na de analyse** - Wacht altijd op expliciete toestemming (bijv. "Go") voordat je doorgaat.
+
+### Fase 2: Uitvoering (Alleen na toestemming)
+Na expliciete toestemming:
+1. Voer wijzigingen uit volgens de analyse
+2. Update alle imports correct
+3. Voorkom circulaire dependencies
+4. Behoud bestaande endpointnamen en flows
+5. Rapporteer wat er is gewijzigd
+
+## Restricties
+
+### NOOIT doen zonder expliciete vraag:
+- ❌ Nieuwe frameworks toevoegen
+- ❌ XML-RPC herschrijven naar JSON-RPC
+- ❌ Async refactor uitvoeren
+- ❌ Businesslogica aanpassen buiten scope
+- ❌ Docker, CI, pytest-setup of uitgebreide loggingstructuren toevoegen
+
+### ALTIJD doen:
+- ✅ Bestaande endpointnamen behouden
+- ✅ Bestaande flow intact houden
+- ✅ Imports bijwerken
+- ✅ Circulaire imports voorkomen
+- ✅ Alleen expliciet genoemde bestanden verwijderen
+- ✅ Wijzigingen klein en uitlegbaar houden
+
+## Python/FastAPI Specifiek
+- Behoud FastAPI app structuur
+- Behoud router configuratie
+- Behoud middleware setup
+- Update imports in alle betrokken modules
+- Test dat de applicatie start zonder importfouten
+
+## Odoo/XML-RPC Specifiek
+- Behoud Odoo client structuur
+- Behoud XML-RPC/JSON-RPC implementatie
+- Behoud authenticatie flow
+- Behoud execute_kw patterns
+
+## Acceptatiecriteria Check
+Na uitvoering moet je verifiëren:
+- ✅ Applicatie start zonder importfouten
+- ✅ Configuratie wordt centraal geladen
+- ✅ Endpointnamen zijn behouden
+- ✅ Flow is intact
+- ✅ Imports zijn bijgewerkt
+- ✅ Geen circulaire imports
