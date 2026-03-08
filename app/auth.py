@@ -22,99 +22,31 @@ class PartnerAuth:
     
     def authenticate_partner(self, email: str, password: str) -> Optional[dict]:
         """
-        Authenticeer een partner met email en wachtwoord.
+        Authenticeer een partner met email en wachtwoord via res.partner search.
         Retourneert partner informatie als succesvol, anders None.
         """
         try:
-            # Login als partner
-            payload = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "service": "common",
-                    "method": "login",
-                    "args": [self.db, email, password]
-                },
-                "id": 1,
-            }
+            from app.odoo_client import get_odoo_client
             
-            resp = requests.post(self.url, json=payload, timeout=10)
-            resp.raise_for_status()
-            result = resp.json()
+            client = get_odoo_client()
             
-            uid = result.get("result")
-            if not uid:
-                return None
+            domain = [
+                ["email", "=", email],
+                ["x_studio_partner", "=", True],
+                ["x_studio_partner_portaal_wachtwoord", "=", password]
+            ]
+            options = {"fields": ["id", "name"], "limit": 1}
             
-            # Haal partner informatie op
-            partner_payload = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "service": "object",
-                    "method": "execute_kw",
-                    "args": [
-                        self.db,
-                        uid,
-                        password,
-                        "res.partner",
-                        "search_read",
-                        [[["email", "=", email]]],
-                        {"fields": ["id", "name", "email", "is_company"], "limit": 1}
-                    ]
-                },
-                "id": 2,
-            }
+            partners = client.execute_kw("res.partner", "search_read", domain, options)
             
-            partner_resp = requests.post(self.url, json=partner_payload, timeout=10)
-            partner_resp.raise_for_status()
-            partner_result = partner_resp.json()
-            
-            partners = partner_result.get("result", [])
-            
-            # Als partner niet gevonden via email, probeer via user record
-            if not partners:
-                user_payload = {
-                    "jsonrpc": "2.0",
-                    "method": "call",
-                    "params": {
-                        "service": "object",
-                        "method": "execute_kw",
-                        "args": [
-                            self.db,
-                            uid,
-                            password,
-                            "res.users",
-                            "read",
-                            [[uid]],
-                            {"fields": ["partner_id", "name"]}
-                        ]
-                    },
-                    "id": 3,
-                }
-                
-                user_resp = requests.post(self.url, json=user_payload, timeout=10)
-                user_resp.raise_for_status()
-                user_result = user_resp.json()
-                users = user_result.get("result", [])
-                
-                if users and users[0].get("partner_id"):
-                    partner_id = users[0]["partner_id"][0]
-                    partner_name = users[0]["partner_id"][1]
-                    return {
-                        "id": partner_id,
-                        "name": partner_name,
-                        "email": email,
-                        "uid": uid,
-                    }
+            if not partners or len(partners) == 0:
                 return None
             
             partner = partners[0]
             return {
                 "id": partner["id"],
                 "name": partner["name"],
-                "email": partner.get("email", email),
-                "uid": uid,
+                "email": email,
             }
             
         except Exception as e:

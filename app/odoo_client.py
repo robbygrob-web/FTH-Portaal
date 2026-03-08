@@ -70,9 +70,18 @@ class OdooClient:
 
     def execute_kw(self, model: str, method: str, domain, options=None):
         try:
+            # For write/create operations, Odoo expects [domain, values] as positional args
+            # For other methods (search_read, read, etc.), pass [domain] as args, options as kwargs
+            if method in ("write", "create"):
+                args = [domain, options] if options else [domain]
+                kwargs = {}
+            else:
+                args = [domain]
+                kwargs = options or {}
+            
             result = self._object_proxy.execute_kw(
                 self.db, self.uid, self.password,
-                model, method, [domain], options or {}
+                model, method, args, kwargs
             )
             return result
             
@@ -85,9 +94,16 @@ class OdooClient:
                         _LOG.info("Odoo sessie verlopen. Herlogin uitgevoerd.")
                         self.uid = self._login()
                 # Retry with new UID
+                if method in ("write", "create"):
+                    args = [domain, options] if options else [domain]
+                    kwargs = {}
+                else:
+                    args = [domain]
+                    kwargs = options or {}
+                
                 result = self._object_proxy.execute_kw(
                     self.db, self.uid, self.password,
-                    model, method, [domain], options or {}
+                    model, method, args, kwargs
                 )
                 return result
             else:
