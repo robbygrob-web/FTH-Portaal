@@ -276,9 +276,14 @@ async def dashboard(request: Request):
         pos = client.execute_kw(
             "sale.order",
             "search_read",
-            ["|", ["x_studio_selection_field_67u_1jj77rtf7", "=", "transfer"], ["x_studio_selection_field_67u_1jj77rtf7", "=", "beschikbaar"]],
+            ["|",
+             ["x_studio_selection_field_67u_1jj77rtf7", "=", "beschikbaar"],
+             "&",
+             ["x_studio_selection_field_67u_1jj77rtf7", "=", "transfer"],
+             ["x_studio_contractor", "!=", partner["id"]]
+            ],
             {
-                "fields": ["id", "name", "date_order", "amount_total", "state", 
+                "fields": ["id", "name", "date_order", "x_studio_inkoop_partner_incl_btw", "state", 
                            "commitment_date", "x_studio_plaats", "x_studio_aantal_personen", 
                            "x_studio_aantal_kinderen", "tax_totals"],
                 "order": "id desc",
@@ -291,13 +296,15 @@ async def dashboard(request: Request):
             "sale.order",
             "search_read",
             ["&",
+             ["x_studio_contractor", "=", partner["id"]],
+             "|",
              ["x_studio_selection_field_67u_1jj77rtf7", "=", "claimed"],
-             ["x_studio_contractor", "=", partner["id"]]
+             ["x_studio_selection_field_67u_1jj77rtf7", "=", "transfer"]
             ],
             {
-                "fields": ["id", "name", "date_order", "amount_total", "state",
+                "fields": ["id", "name", "date_order", "x_studio_inkoop_partner_incl_btw", "state",
                            "commitment_date", "x_studio_plaats", "x_studio_aantal_personen",
-                           "x_studio_aantal_kinderen"],
+                           "x_studio_aantal_kinderen", "x_studio_selection_field_67u_1jj77rtf7"],
                 "order": "id desc",
                 "limit": 50
             }
@@ -457,7 +464,7 @@ async def dashboard(request: Request):
                 po_id = po.get('id')
                 po_name = po.get('name', 'N/A')
                 po_date = po.get('date_order', '')[:10] if po.get('date_order') else 'N/A'
-                po_amount = po.get('amount_total', 0)
+                po_amount = po.get('x_studio_inkoop_partner_incl_btw', 0)
                 po_state = po.get('state', 'N/A')
                 po_commitment_date = po.get('commitment_date', 'N/A') if po.get('commitment_date') else 'N/A'
                 po_plaats = po.get('x_studio_plaats', 'N/A')
@@ -500,12 +507,21 @@ async def dashboard(request: Request):
                 po_id = po.get('id')
                 po_name = po.get('name', 'N/A')
                 po_date = po.get('date_order', '')[:10] if po.get('date_order') else 'N/A'
-                po_amount = po.get('amount_total', 0)
+                po_amount = po.get('x_studio_inkoop_partner_incl_btw', 0)
                 po_state = po.get('state', 'N/A')
                 po_commitment_date = po.get('commitment_date', 'N/A') if po.get('commitment_date') else 'N/A'
                 po_plaats = po.get('x_studio_plaats', 'N/A')
                 po_personen = po.get('x_studio_aantal_personen', 'N/A')
                 po_kinderen = po.get('x_studio_aantal_kinderen', 'N/A')
+                po_selection_status = po.get('x_studio_selection_field_67u_1jj77rtf7', 'N/A')
+                
+                # Button based on status
+                if po_selection_status == "claimed":
+                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c;">Zoek Vervanger</button>'
+                elif po_selection_status == "transfer":
+                    button_html = '<button class="claim-btn" disabled style="background: #3498db;">Beschikbaar voor transfer</button>'
+                else:
+                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c;">Zoek Vervanger</button>'
                 
                 html_content += f"""
                         <div class="po-card">
@@ -517,6 +533,7 @@ async def dashboard(request: Request):
                             <div class="po-detail">Aantal personen: {po_personen}</div>
                             <div class="po-detail">Aantal kinderen: {po_kinderen}</div>
                             <div class="po-amount">€ {po_amount:,.2f}</div>
+                            {button_html}
                         </div>
                 """
         
@@ -575,6 +592,37 @@ async def dashboard(request: Request):
                     setTimeout(() => {
                         div.remove();
                     }, 5000);
+                }
+                
+                async function releaseOrder(poId, poName) {
+                    const btn = event.target;
+                    btn.disabled = true;
+                    btn.textContent = 'Bezig met vrijgeven...';
+                    
+                    try {
+                        const response = await fetch(`/api/release-po/${poId}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (response.ok && result.success) {
+                            showMessage(`Succesvol! Order ${poName} is vrijgegeven voor vervanger.`, 'success');
+                            btn.textContent = 'Beschikbaar voor transfer';
+                            btn.style.background = '#3498db';
+                        } else {
+                            showMessage(result.error || 'Fout bij vrijgeven van order.', 'error');
+                            btn.disabled = false;
+                            btn.textContent = 'Zoek Vervanger';
+                        }
+                    } catch (error) {
+                        showMessage('Er is een fout opgetreden. Probeer het opnieuw.', 'error');
+                        btn.disabled = false;
+                        btn.textContent = 'Zoek Vervanger';
+                    }
                 }
             </script>
         </body>
@@ -635,6 +683,26 @@ async def claim_po(request: Request, po_id: int):
     except Exception as e:
         _LOG.error(f"Claim PO fout: {e}")
         return {"success": False, "error": f"Fout bij claimen van order: {str(e)}"}
+
+@router.post("/api/release-po/{po_id}")
+async def release_po(request: Request, po_id: int):
+    partner = get_partner_from_session(request)
+    try:
+        client = get_odoo_client()
+        _LOG.info(f"[DEBUG release] po_id: {po_id}, writing transfer status")
+        result = client.execute_kw(
+            "sale.order",
+            "write",
+            [po_id],
+            {"x_studio_selection_field_67u_1jj77rtf7": "transfer"}
+        )
+        _LOG.info(f"[DEBUG release] result: {result}")
+        if not result:
+            return {"success": False, "error": "Update mislukt"}
+        return {"success": True}
+    except Exception as e:
+        _LOG.error(f"Release PO fout: {e}")
+        return {"success": False, "error": str(e)}
 
 @router.get("/partner-orders", response_class=HTMLResponse)
 async def partner_orders(request: Request):
