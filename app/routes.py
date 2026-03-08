@@ -286,6 +286,23 @@ async def dashboard(request: Request):
             }
         )
         
+        # Haal geclaimte orders op voor deze partner
+        claimed = client.execute_kw(
+            "sale.order",
+            "search_read",
+            ["&",
+             ["x_studio_selection_field_67u_1jj77rtf7", "=", "claimed"],
+             ["x_studio_contractor", "=", partner["id"]]
+            ],
+            {
+                "fields": ["id", "name", "date_order", "amount_total", "state",
+                           "commitment_date", "x_studio_plaats", "x_studio_aantal_personen",
+                           "x_studio_aantal_kinderen"],
+                "order": "id desc",
+                "limit": 50
+            }
+        )
+        
         html_content = f"""
         <!DOCTYPE html>
         <html lang="nl">
@@ -464,6 +481,47 @@ async def dashboard(request: Request):
                 """
         
         html_content += """
+                </div>
+                
+                <div style="margin-top: 40px;">
+                    <h2 style="color: #333; font-size: 20px; margin-bottom: 20px;">Mijn Opdrachten</h2>
+                    <div class="po-grid">
+        """
+        
+        if not claimed:
+            html_content += """
+                        <div class="empty-state" style="grid-column: 1 / -1;">
+                            <h2>Geen opdrachten</h2>
+                            <p>U heeft momenteel geen geclaimde opdrachten.</p>
+                        </div>
+            """
+        else:
+            for po in claimed:
+                po_id = po.get('id')
+                po_name = po.get('name', 'N/A')
+                po_date = po.get('date_order', '')[:10] if po.get('date_order') else 'N/A'
+                po_amount = po.get('amount_total', 0)
+                po_state = po.get('state', 'N/A')
+                po_commitment_date = po.get('commitment_date', 'N/A') if po.get('commitment_date') else 'N/A'
+                po_plaats = po.get('x_studio_plaats', 'N/A')
+                po_personen = po.get('x_studio_aantal_personen', 'N/A')
+                po_kinderen = po.get('x_studio_aantal_kinderen', 'N/A')
+                
+                html_content += f"""
+                        <div class="po-card">
+                            <div class="po-name">{po_name}</div>
+                            <div class="po-detail">Datum: {po_date}</div>
+                            <div class="po-detail">Status: {po_state}</div>
+                            <div class="po-detail">Leverdatum: {po_commitment_date}</div>
+                            <div class="po-detail">Locatie: {po_plaats}</div>
+                            <div class="po-detail">Aantal personen: {po_personen}</div>
+                            <div class="po-detail">Aantal kinderen: {po_kinderen}</div>
+                            <div class="po-amount">€ {po_amount:,.2f}</div>
+                        </div>
+                """
+        
+        html_content += """
+                    </div>
                 </div>
             </div>
             
