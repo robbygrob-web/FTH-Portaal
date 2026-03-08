@@ -442,12 +442,20 @@ async def dashboard(request: Request):
                 po_date = po.get('date_order', '')[:10] if po.get('date_order') else 'N/A'
                 po_amount = po.get('amount_total', 0)
                 po_state = po.get('state', 'N/A')
+                po_commitment_date = po.get('commitment_date', 'N/A') if po.get('commitment_date') else 'N/A'
+                po_plaats = po.get('x_studio_plaats', 'N/A')
+                po_personen = po.get('x_studio_aantal_personen', 'N/A')
+                po_kinderen = po.get('x_studio_aantal_kinderen', 'N/A')
                 
                 html_content += f"""
                     <div class="po-card">
                         <div class="po-name">{po_name}</div>
                         <div class="po-detail">Datum: {po_date}</div>
                         <div class="po-detail">Status: {po_state}</div>
+                        <div class="po-detail">Leverdatum: {po_commitment_date}</div>
+                        <div class="po-detail">Locatie: {po_plaats}</div>
+                        <div class="po-detail">Aantal personen: {po_personen}</div>
+                        <div class="po-detail">Aantal kinderen: {po_kinderen}</div>
                         <div class="po-amount">€ {po_amount:,.2f}</div>
                         <button class="claim-btn" onclick="claimPO({po_id}, '{po_name}')">
                             Claim Inkooporder
