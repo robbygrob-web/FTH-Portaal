@@ -13,6 +13,17 @@ Fields used by the portal:
 - x_studio_contractor → assigned partner / supplier
 - x_studio_plaats → location
 - x_studio_aantal_personen → number of persons
+-  x_studio_selection_field_67u_1jj77rtf7 → platform status field
+
+## Platform Status Field
+
+Field: `x_studio_selection_field_67u_1jj77rtf7`
+
+Confirmed values:
+- `nieuw`
+- `beschikbaar`
+- `claimed`
+- `transfer`
 
 ## Logic used in the portal
 
