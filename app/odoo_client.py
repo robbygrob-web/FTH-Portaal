@@ -72,7 +72,7 @@ class OdooClient:
         try:
             result = self._object_proxy.execute_kw(
                 self.db, self.uid, self.password,
-                model, method, domain, options or {}
+                model, method, [domain], options or {}
             )
             return result
             
@@ -87,7 +87,7 @@ class OdooClient:
                 # Retry with new UID
                 result = self._object_proxy.execute_kw(
                     self.db, self.uid, self.password,
-                    model, method, domain, options or {}
+                    model, method, [domain], options or {}
                 )
                 return result
             else:

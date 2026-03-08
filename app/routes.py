@@ -276,7 +276,7 @@ async def dashboard(request: Request):
         pos = client.execute_kw(
             "sale.order",
             "search_read",
-            [],
+            ["|", ["x_studio_selection_field_67u_1jj77rtf7", "=", "transfer"], ["x_studio_selection_field_67u_1jj77rtf7", "=", "beschikbaar"]],
             {
                 "fields": ["id", "name", "date_order", "amount_total", "state"],
                 "order": "id desc",
