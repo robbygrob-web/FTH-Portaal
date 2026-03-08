@@ -3,12 +3,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
-from app.config import SESSION_SECRET, startup_validation
-from app.routes import router
 
 # Laad omgevingsvariabelen uit .env bestand VOOR andere imports
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
+
+# Import config en routes NA load_dotenv() zodat omgevingsvariabelen beschikbaar zijn
+from app.config import SESSION_SECRET, startup_validation
+from app.routes import router
 
 # Voer startup validatie uit
 startup_validation()

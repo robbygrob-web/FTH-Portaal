@@ -3,30 +3,35 @@ import xmlrpc.client
 import threading
 from fastapi import HTTPException
 from functools import lru_cache
-from app.config import ODOO_BASE_URL, ODOO_DB, ODOO_LOGIN, ODOO_API_KEY
+from app.config import get_odoo_base_url, get_odoo_db, get_odoo_login, get_odoo_api_key
 
 _LOG = logging.getLogger(__name__)
 
 class OdooClient:
     def __init__(self):
-        if not ODOO_BASE_URL:
+        odoo_base_url = get_odoo_base_url()
+        odoo_db = get_odoo_db()
+        odoo_login = get_odoo_login()
+        odoo_api_key = get_odoo_api_key()
+        
+        if not odoo_base_url:
             raise RuntimeError("ODOO_BASE_URL is vereist maar niet ingesteld")
-        if not ODOO_DB:
+        if not odoo_db:
             raise RuntimeError("ODOO_DB is vereist maar niet ingesteld")
-        if not ODOO_LOGIN:
+        if not odoo_login:
             raise RuntimeError("ODOO_LOGIN is vereist maar niet ingesteld")
-        if not ODOO_API_KEY:
+        if not odoo_api_key:
             raise RuntimeError("ODOO_API_KEY is vereist maar niet ingesteld")
         
         # DEBUG: Toon ruwe ODOO_BASE_URL
-        print(f"[DEBUG OdooClient.__init__] Ruwe ODOO_BASE_URL uit .env: {ODOO_BASE_URL}")
+        print(f"[DEBUG OdooClient.__init__] Ruwe ODOO_BASE_URL uit .env: {odoo_base_url}")
         
-        base_url = ODOO_BASE_URL.rstrip('/')
+        base_url = odoo_base_url.rstrip('/')
         self.common_url = f"{base_url}/xmlrpc/2/common"
         self.object_url = f"{base_url}/xmlrpc/2/object"
-        self.db = ODOO_DB
-        self.username = ODOO_LOGIN
-        self.password = ODOO_API_KEY
+        self.db = odoo_db
+        self.username = odoo_login
+        self.password = odoo_api_key
         
         # DEBUG: Toon samengestelde URL
         print(f"[DEBUG OdooClient.__init__] XML-RPC common endpoint: {self.common_url}")
@@ -63,11 +68,11 @@ class OdooClient:
             _LOG.error("Odoo verbinding fout: %s", e)
             raise HTTPException(status_code=502, detail="Odoo onbereikbaar.")
 
-    def execute_kw(self, model: str, method: str, *args, **kwargs):
+    def execute_kw(self, model: str, method: str, domain, options=None):
         try:
             result = self._object_proxy.execute_kw(
                 self.db, self.uid, self.password,
-                model, method, list(args), kwargs or {}
+                model, method, domain, options or {}
             )
             return result
             
@@ -82,7 +87,7 @@ class OdooClient:
                 # Retry with new UID
                 result = self._object_proxy.execute_kw(
                     self.db, self.uid, self.password,
-                    model, method, list(args), kwargs or {}
+                    model, method, domain, options or {}
                 )
                 return result
             else:
