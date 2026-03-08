@@ -48,11 +48,24 @@ def get_config_value(key: str, default: str = None) -> str:
     """
     return os.getenv(key, default)
 
-# Configuratie waarden
-ODOO_BASE_URL = get_config_value("ODOO_BASE_URL")
-ODOO_DB = get_config_value("ODOO_DB")
-ODOO_LOGIN = get_config_value("ODOO_LOGIN")
-ODOO_API_KEY = get_config_value("ODOO_API_KEY")
+# Configuratie functies - dynamisch ophalen om None-waarden te voorkomen
+def get_odoo_base_url():
+    """Haal ODOO_BASE_URL op uit omgevingsvariabelen"""
+    return os.getenv("ODOO_BASE_URL")
+
+def get_odoo_db():
+    """Haal ODOO_DB op uit omgevingsvariabelen"""
+    return os.getenv("ODOO_DB")
+
+def get_odoo_login():
+    """Haal ODOO_LOGIN op uit omgevingsvariabelen"""
+    return os.getenv("ODOO_LOGIN")
+
+def get_odoo_api_key():
+    """Haal ODOO_API_KEY op uit omgevingsvariabelen"""
+    return os.getenv("ODOO_API_KEY")
+
+# SESSION_SECRET blijft module-level constante (gebruikt in main.py)
 SESSION_SECRET = get_config_value("SESSION_SECRET", OPTIONAL_VARS["SESSION_SECRET"])
 
 def startup_validation():

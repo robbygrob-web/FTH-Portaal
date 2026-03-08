@@ -272,14 +272,14 @@ async def dashboard(request: Request):
     try:
         client = get_odoo_client()
         
-        # Haal inkooporders op waar x_studio_portal_status_po_ gelijk is aan 'beschikbaar'
+        # Haal sale orders op
         pos = client.execute_kw(
-            "purchase.order",
+            "sale.order",
             "search_read",
-            [["x_studio_portal_status_po_", "=", "beschikbaar"]],
+            [],
             {
-                "fields": ["id", "name", "date_order", "amount_total", "state", "x_studio_portal_status_po_"],
-                "order": "date_order desc",
+                "fields": ["id", "name", "date_order", "amount_total", "state"],
+                "order": "id desc",
                 "limit": 50
             }
         )
@@ -527,14 +527,13 @@ async def claim_po(request: Request, po_id: int):
     try:
         client = get_odoo_client()
         
-        # Update de purchase order: partner_id naar 87 en status naar 'claimed'
+        # Update de sale order
         result = client.execute_kw(
-            "purchase.order",
+            "sale.order",
             "write",
             [po_id],
             {
-                "partner_id": 87,
-                "x_studio_portal_status_po_": "claimed"
+                "partner_id": 87
             }
         )
         
@@ -553,19 +552,268 @@ async def claim_po(request: Request, po_id: int):
         _LOG.error(f"Claim PO fout: {e}")
         raise HTTPException(status_code=500, detail=f"Fout bij claimen van inkooporder: {str(e)}")
 
+@router.get("/partner-orders", response_class=HTMLResponse)
+async def partner_orders(request: Request):
+    """Partner view: toon relevante sale.order records"""
+    partner = get_partner_from_session(request)
+    
+    try:
+        client = get_odoo_client()
+        
+        # Domain filter: (x_studio_selection_field_67u_1jj77rtf7 = "beschikbaar" AND x_studio_contractor = 1361) 
+        # OR (x_studio_selection_field_67u_1jj77rtf7 = "transfer")
+        domain = [
+            '|',
+            '&',
+            ('x_studio_selection_field_67u_1jj77rtf7', '=', 'beschikbaar'),
+            ('x_studio_contractor', '=', 1361),
+            ('x_studio_selection_field_67u_1jj77rtf7', '=', 'transfer')
+        ]
+        
+        # Debug: print domain en modelnaam
+        print(f"[DEBUG partner-orders] Model: sale.order")
+        print(f"[DEBUG partner-orders] Domain: {domain}")
+        
+        # Haal sale.order records op
+        orders = client.execute_kw(
+            "sale.order",
+            "search_read",
+            [domain],
+            {
+                "fields": [
+                    "id",
+                    "name",
+                    "state",
+                    "type_name",
+                    "partner_id",
+                    "commitment_date",
+                    "x_studio_contractor",
+                    "x_studio_plaats",
+                    "x_studio_aantal_personen",
+                    "x_studio_selection_field_67u_1jj77rtf7"
+                ],
+                "order": "id desc",
+                "limit": 100
+            }
+        )
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>FTH Portaal - Partner Orders</title>
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                    background: #f5f5f5;
+                    min-height: 100vh;
+                    padding: 20px;
+                }}
+                .header {{
+                    background: white;
+                    padding: 20px 30px;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    margin-bottom: 30px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }}
+                .header h1 {{
+                    color: #333;
+                    font-size: 24px;
+                }}
+                .user-info {{
+                    display: flex;
+                    align-items: center;
+                    gap: 20px;
+                }}
+                .user-name {{
+                    color: #666;
+                    font-size: 14px;
+                }}
+                .logout-btn {{
+                    padding: 8px 16px;
+                    background: #dc3545;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    transition: background 0.3s;
+                }}
+                .logout-btn:hover {{
+                    background: #c82333;
+                }}
+                .container {{
+                    max-width: 1400px;
+                    margin: 0 auto;
+                }}
+                table {{
+                    width: 100%;
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    border-collapse: collapse;
+                    overflow: hidden;
+                }}
+                thead {{
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                }}
+                th {{
+                    padding: 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    font-size: 14px;
+                }}
+                td {{
+                    padding: 14px 16px;
+                    border-bottom: 1px solid #e0e0e0;
+                    font-size: 14px;
+                    color: #333;
+                }}
+                tbody tr:hover {{
+                    background: #f8f9fa;
+                }}
+                tbody tr:last-child td {{
+                    border-bottom: none;
+                }}
+                .type-badge {{
+                    display: inline-block;
+                    padding: 4px 12px;
+                    border-radius: 12px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }}
+                .type-offerte {{
+                    background: #fff3cd;
+                    color: #856404;
+                }}
+                .type-verkooporder {{
+                    background: #d4edda;
+                    color: #155724;
+                }}
+                .empty-state {{
+                    text-align: center;
+                    padding: 60px 20px;
+                    color: #666;
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }}
+                .empty-state h2 {{
+                    margin-bottom: 10px;
+                    color: #333;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Partner Orders</h1>
+                    <div class="user-info">
+                        <span class="user-name">Ingelogd als: {partner['name']}</span>
+                        <a href="/logout" class="logout-btn">Uitloggen</a>
+                    </div>
+                </div>
+        """
+        
+        if not orders:
+            html_content += """
+                <div class="empty-state">
+                    <h2>Geen orders gevonden</h2>
+                    <p>Er zijn momenteel geen relevante sale orders beschikbaar.</p>
+                </div>
+            """
+        else:
+            html_content += """
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Ordernummer</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Klant</th>
+                            <th>Leverdatum</th>
+                            <th>Contractor</th>
+                            <th>Plaats</th>
+                            <th>Aantal personen</th>
+                            <th>Selection Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            """
+            
+            for order in orders:
+                order_id = order.get('id', 'N/A')
+                order_name = order.get('name', 'N/A')
+                order_state = order.get('state', 'N/A')
+                type_name = order.get('type_name', 'N/A')
+                partner_id = order.get('partner_id')
+                partner_name = partner_id[1] if partner_id and isinstance(partner_id, (list, tuple)) and len(partner_id) > 1 else (partner_id if partner_id else 'N/A')
+                commitment_date = order.get('commitment_date', '')[:10] if order.get('commitment_date') else 'N/A'
+                contractor = order.get('x_studio_contractor')
+                contractor_name = contractor[1] if contractor and isinstance(contractor, (list, tuple)) and len(contractor) > 1 else (contractor if contractor else 'N/A')
+                plaats = order.get('x_studio_plaats', 'N/A')
+                aantal_personen = order.get('x_studio_aantal_personen', 'N/A')
+                selection_status = order.get('x_studio_selection_field_67u_1jj77rtf7', 'N/A')
+                
+                # Determine type badge class
+                type_class = 'type-offerte' if order_state == 'sent' else 'type-verkooporder'
+                
+                html_content += f"""
+                        <tr>
+                            <td>{order_id}</td>
+                            <td>{order_name}</td>
+                            <td><span class="type-badge {type_class}">{type_name}</span></td>
+                            <td>{order_state}</td>
+                            <td>{partner_name}</td>
+                            <td>{commitment_date}</td>
+                            <td>{contractor_name}</td>
+                            <td>{plaats}</td>
+                            <td>{aantal_personen}</td>
+                            <td>{selection_status}</td>
+                        </tr>
+                """
+            
+            html_content += """
+                    </tbody>
+                </table>
+            """
+        
+        html_content += """
+            </div>
+        </body>
+        </html>
+        """
+        
+        return HTMLResponse(content=html_content)
+    
+    except Exception as e:
+        _LOG.error(f"Partner orders fout: {e}")
+        raise HTTPException(status_code=500, detail=f"Fout bij ophalen van partner orders: {str(e)}")
+
 @router.get("/test-odoo-verbinding")
 async def test_odoo_verbinding_endpoint():
     """Test Odoo verbinding endpoint"""
     try:
-        from app.config import ODOO_BASE_URL, ODOO_DB, ODOO_LOGIN, ODOO_API_KEY, validate_odoo_config
+        from app.config import get_odoo_base_url, get_odoo_db, get_odoo_login, get_odoo_api_key, validate_odoo_config
         from app.odoo_client import get_odoo_client
         
         # DEBUG: Toon configuratie in endpoint
+        odoo_base_url = get_odoo_base_url()
+        odoo_db = get_odoo_db()
+        odoo_login = get_odoo_login()
+        odoo_api_key = get_odoo_api_key()
         print(f"[DEBUG test-odoo-verbinding] ===== START DEBUG OUTPUT =====")
-        print(f"[DEBUG test-odoo-verbinding] Ruwe ODOO_BASE_URL uit config: {ODOO_BASE_URL}")
-        print(f"[DEBUG test-odoo-verbinding] ODOO_DB: {ODOO_DB}")
-        print(f"[DEBUG test-odoo-verbinding] ODOO_LOGIN: {ODOO_LOGIN}")
-        print(f"[DEBUG test-odoo-verbinding] ODOO_API_KEY aanwezig: {bool(ODOO_API_KEY)}")
+        print(f"[DEBUG test-odoo-verbinding] Ruwe ODOO_BASE_URL uit config: {odoo_base_url}")
+        print(f"[DEBUG test-odoo-verbinding] ODOO_DB: {odoo_db}")
+        print(f"[DEBUG test-odoo-verbinding] ODOO_LOGIN: {odoo_login}")
+        print(f"[DEBUG test-odoo-verbinding] ODOO_API_KEY aanwezig: {bool(odoo_api_key)}")
         
         # Valideer configuratie
         is_valid, missing = validate_odoo_config()
@@ -599,10 +847,10 @@ async def test_odoo_verbinding_endpoint():
             "status": "SUCCESS",
             "message": "Odoo verbinding werkt correct",
             "config": {
-                "base_url": ODOO_BASE_URL,
-                "database": ODOO_DB,
-                "login": ODOO_LOGIN,
-                "api_key_set": bool(ODOO_API_KEY)
+                "base_url": odoo_base_url,
+                "database": odoo_db,
+                "login": odoo_login,
+                "api_key_set": bool(odoo_api_key)
             },
             "user": {
                 "id": client.uid,
