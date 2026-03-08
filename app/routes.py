@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-from app.odoo_client import OdooClient
-from app.auth import PartnerAuth
+from app.odoo_client import get_odoo_client
+from app.auth import get_partner_auth
 import logging
 
 _LOG = logging.getLogger(__name__)
 
 router = APIRouter()
-partner_auth = PartnerAuth()
 
 def get_partner_from_session(request: Request) -> dict:
     """Haal partner informatie uit de sessie"""
@@ -136,6 +135,7 @@ async def login_page(request: Request):
 @router.post("/login")
 async def login(request: Request, email: str = Form(...), password: str = Form(...)):
     """Verwerk login"""
+    partner_auth = get_partner_auth()
     partner = partner_auth.authenticate_partner(email, password)
     
     if not partner:
@@ -257,23 +257,28 @@ async def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/login", status_code=303)
 
+@router.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    """Root route - redirect naar login of dashboard"""
+    if request.session.get("partner"):
+        return RedirectResponse(url="/dashboard", status_code=303)
+    return RedirectResponse(url="/login", status_code=303)
+
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Dashboard met beschikbare inkooporders"""
     partner = get_partner_from_session(request)
     
     try:
-        client = OdooClient()
+        client = get_odoo_client()
         
-        # Haal inkooporders op die nog geen partner hebben
-        # In Odoo betekent partner_id = False dat het veld leeg is
-        # We kunnen ook zoeken naar POs in draft of sent state zonder partner
+        # Haal inkooporders op waar x_studio_portal_status_po_ gelijk is aan 'beschikbaar'
         pos = client.execute_kw(
             "purchase.order",
             "search_read",
-            [["partner_id", "=", False]],
+            [["x_studio_portal_status_po_", "=", "beschikbaar"]],
             {
-                "fields": ["id", "name", "date_order", "amount_total", "state"],
+                "fields": ["id", "name", "date_order", "amount_total", "state", "x_studio_portal_status_po_"],
                 "order": "date_order desc",
                 "limit": 50
             }
@@ -516,27 +521,102 @@ async def dashboard(request: Request):
 
 @router.post("/api/claim-po/{po_id}")
 async def claim_po(request: Request, po_id: int):
-    """Claim een inkooporder door partner_id te updaten"""
+    """Claim een inkooporder: zet partner_id naar 87 en status naar 'claimed'"""
     partner = get_partner_from_session(request)
     
     try:
-        client = OdooClient()
+        client = get_odoo_client()
         
-        # Update de purchase order met de partner_id
-        client.execute_kw(
+        # Update de purchase order: partner_id naar 87 en status naar 'claimed'
+        result = client.execute_kw(
             "purchase.order",
             "write",
             [po_id],
-            {"partner_id": partner["id"]}
+            {
+                "partner_id": 87,
+                "x_studio_portal_status_po_": "claimed"
+            }
         )
+        
+        if not result:
+            raise HTTPException(status_code=500, detail="Update mislukt")
         
         return {
             "success": True,
-            "message": f"Inkooporder is succesvol geclaimd door {partner['name']}",
+            "message": f"Inkooporder is succesvol geclaimd",
             "po_id": po_id,
-            "partner_id": partner["id"]
+            "partner_id": 87,
+            "status": "claimed"
         }
     
     except Exception as e:
         _LOG.error(f"Claim PO fout: {e}")
         raise HTTPException(status_code=500, detail=f"Fout bij claimen van inkooporder: {str(e)}")
+
+@router.get("/test-odoo-verbinding")
+async def test_odoo_verbinding_endpoint():
+    """Test Odoo verbinding endpoint"""
+    try:
+        from app.config import ODOO_BASE_URL, ODOO_DB, ODOO_LOGIN, ODOO_API_KEY, validate_odoo_config
+        from app.odoo_client import get_odoo_client
+        
+        # DEBUG: Toon configuratie in endpoint
+        print(f"[DEBUG test-odoo-verbinding] ===== START DEBUG OUTPUT =====")
+        print(f"[DEBUG test-odoo-verbinding] Ruwe ODOO_BASE_URL uit config: {ODOO_BASE_URL}")
+        print(f"[DEBUG test-odoo-verbinding] ODOO_DB: {ODOO_DB}")
+        print(f"[DEBUG test-odoo-verbinding] ODOO_LOGIN: {ODOO_LOGIN}")
+        print(f"[DEBUG test-odoo-verbinding] ODOO_API_KEY aanwezig: {bool(ODOO_API_KEY)}")
+        
+        # Valideer configuratie
+        is_valid, missing = validate_odoo_config()
+        if not is_valid:
+            print(f"[DEBUG test-odoo-verbinding] Validatie FAILED - ontbrekend: {missing}")
+            return {
+                "status": "FAIL",
+                "error": "Ontbrekende omgevingsvariabelen",
+                "missing": missing
+            }
+        
+        print(f"[DEBUG test-odoo-verbinding] Validatie PASSED - initialiseren OdooClient...")
+        
+        # Test verbinding
+        client = get_odoo_client()
+        
+        print(f"[DEBUG test-odoo-verbinding] OdooClient geïnitialiseerd")
+        print(f"[DEBUG test-odoo-verbinding] Client URL: {client.url}")
+        print(f"[DEBUG test-odoo-verbinding] Client DB: {client.db}")
+        
+        # Test query
+        user_info = client.execute_kw(
+            'res.users',
+            'read',
+            [client.uid],
+            {'fields': ['name', 'login']}
+        )
+        
+        print(f"[DEBUG test-odoo-verbinding] ===== SUCCESS =====")
+        return {
+            "status": "SUCCESS",
+            "message": "Odoo verbinding werkt correct",
+            "config": {
+                "base_url": ODOO_BASE_URL,
+                "database": ODOO_DB,
+                "login": ODOO_LOGIN,
+                "api_key_set": bool(ODOO_API_KEY)
+            },
+            "user": {
+                "id": client.uid,
+                "name": user_info[0].get('name') if user_info else None,
+                "login": user_info[0].get('login') if user_info else None
+            }
+        }
+    except Exception as e:
+        print(f"[DEBUG test-odoo-verbinding] ===== ERROR =====")
+        print(f"[DEBUG test-odoo-verbinding] Error type: {type(e).__name__}")
+        print(f"[DEBUG test-odoo-verbinding] Error message: {str(e)}")
+        _LOG.error(f"Test Odoo verbinding fout: {e}")
+        return {
+            "status": "FAIL",
+            "error": str(e),
+            "type": type(e).__name__
+        }

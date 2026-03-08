@@ -1,0 +1,146 @@
+﻿---
+alwaysApply: true
+globs: *.py,*.env,*.md
+---
+# Debugging Workflow Rule
+
+This rule enforces a strict step-by-step isolation workflow for all debugging and integration problems in the FTH Portaal project, including FastAPI startup, environment variables, Odoo API connections, and Railway deployment.
+
+## Core Principles
+
+### 1. Single Phase Execution
+- **Only one debugging phase at a time**
+- Complete the current phase before moving to the next
+- Do not jump between phases or work on multiple issues simultaneously
+
+### 2. Phase Documentation
+Each debugging phase must explicitly define:
+- **Current phase**: What layer/system is being debugged
+- **Goal**: What specific problem is being solved
+- **Success criteria**: How to verify the fix works
+- **Out-of-scope items**: What should NOT be touched during this phase
+
+### 3. File Isolation
+- **Do not modify unrelated files during debugging**
+- Only edit files directly related to the current debugging phase
+- If unsure whether a file is related, ask before modifying
+
+### 4. Freeze Successful Phases
+- **If a phase succeeds, freeze it**
+- Do not change working code unless explicitly requested
+- Document what was fixed and why it works
+
+### 5. Problem Explanation First
+- **Always explain the problem before editing code**
+- Describe what is broken, why it's broken, and what the expected behavior should be
+- Provide context about the error messages, logs, or symptoms observed
+
+### 6. Minimal Fixes
+- **Apply the smallest possible fix**
+- Avoid broad changes or refactoring
+- Target the specific issue, not the entire system
+
+### 7. Single Verification
+- **After a fix, provide a single verification command or URL**
+- One clear way to test if the fix works
+- No multiple verification steps unless necessary
+
+### 8. No Refactoring During Debugging
+- **Never refactor broadly while debugging**
+- Focus on fixing the issue, not improving code structure
+- Save improvements for after the bug is resolved
+
+### 9. Integration Debugging Order
+Integration debugging must always isolate layers in this strict order:
+
+1. **Local server startup**
+   - Can FastAPI start without errors?
+   - Are all imports resolving correctly?
+   - Success: Server starts and shows route list
+
+2. **Dependency/import errors**
+   - Are all Python packages installed?
+   - Are import paths correct?
+   - Success: No import errors in console
+
+3. **Environment variable loading**
+   - Is `.env` file being loaded correctly?
+   - Are required variables present? (Check [main.py](mdc:main.py) for `load_dotenv()` usage)
+   - Success: Variables accessible via `os.getenv()` or config module
+
+4. **External API connection (Odoo)**
+   - Can the application connect to Odoo XML-RPC?
+   - Are credentials correct?
+   - Success: Test connection returns valid response
+
+5. **Route behavior**
+   - Do routes respond correctly?
+   - Are request/response formats correct?
+   - Success: Routes return expected data/status codes
+
+6. **Deployment environment (Railway)**
+   - Are Railway environment variables set?
+   - Does the deployment build succeed?
+   - Success: Application runs in Railway environment
+
+**Critical**: Do not skip phases. Each phase must be verified before proceeding.
+
+### 10. Explanation Before Code
+- **During debugging, prefer explanation + verification before making code changes**
+- First: Explain what you think is wrong and why
+- Second: Propose the fix
+- Third: Make the change
+- Fourth: Provide verification
+
+## Debugging Checklist
+
+Before making any code changes during debugging:
+
+- [ ] Current phase identified and documented
+- [ ] Problem explained clearly
+- [ ] Success criteria defined
+- [ ] Out-of-scope items listed
+- [ ] Minimal fix proposed
+- [ ] Verification method determined
+- [ ] No unrelated files will be modified
+
+## Common Debugging Scenarios
+
+### FastAPI Startup Issues
+1. Check [main.py](mdc:main.py) for import errors
+2. Verify `load_dotenv()` is called before other imports
+3. Check `startup_validation()` output
+4. Review route registration
+
+### Environment Variable Issues
+1. Verify `.env` file exists and is in root directory
+2. Check `load_dotenv(dotenv_path=env_path)` path resolution
+3. Verify variable names match what code expects
+4. Test with `os.getenv()` in Python shell
+
+### Odoo API Connection Issues
+1. Verify Odoo URL and credentials in environment
+2. Test XML-RPC connection independently
+3. Check network/firewall settings
+4. Verify Odoo server is accessible
+
+### Railway Deployment Issues
+1. Check Railway environment variables match local `.env`
+2. Verify build logs for dependency installation
+3. Check Railway logs for runtime errors
+4. Compare local vs Railway environment differences
+
+## Enforcement
+
+This rule applies to:
+- All Python files (`*.py`)
+- Environment files (`*.env`)
+- Documentation files (`*.md`)
+
+When debugging, the AI must:
+1. Acknowledge this rule is active
+2. Follow the phase order strictly
+3. Explain before editing
+4. Apply minimal fixes
+5. Provide single verification method
+6. Freeze successful phases

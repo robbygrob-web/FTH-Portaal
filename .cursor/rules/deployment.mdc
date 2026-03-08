@@ -1,0 +1,163 @@
+﻿---
+alwaysApply: true
+globs: *.py,*.env,*.md,railway.json,Procfile
+---
+# Deployment Workflow Rule
+
+This rule enforces a strict local-first deployment workflow to prevent deployment debugging chaos in the FTH Portaal project, especially for Railway deployments.
+
+## Core Principles
+
+### 1. Local-First Deployment
+- **Deployment problems must always be solved locally first**
+- Never attempt to fix issues directly in the deployment environment
+- Local environment must be fully functional before considering deployment changes
+
+### 2. Railway Configuration Lock
+- **Railway configuration must not be changed until the local environment works**
+- Do not modify Railway settings, environment variables, or deployment configs while local issues exist
+- Railway is the last step, not the first
+
+### 3. Commit After Verification
+- **GitHub commits should only happen after local verification succeeds**
+- Code must be tested and verified locally before committing
+- Never commit broken or untested code
+
+### 4. Strict Deployment Order
+The deployment workflow must **always** follow this exact sequence:
+
+1. **Local Fix**
+   - Identify and fix the issue in the local environment
+   - Test the fix thoroughly
+   - Verify all functionality works as expected
+
+2. **Verification**
+   - Run local tests
+   - Verify the application starts correctly
+   - Check that all routes and features work
+   - Confirm environment variables are loaded correctly
+
+3. **Commit**
+   - Only after successful local verification
+   - Commit with clear message describing the fix
+   - Push to repository
+
+4. **Deploy**
+   - Railway will automatically deploy from the commit
+   - Monitor deployment logs
+   - Verify deployment success
+
+**Critical**: Do not skip steps. Each step must be completed before proceeding.
+
+### 5. No Simultaneous Fixes
+- **Never attempt to fix Railway and local code simultaneously**
+- Focus on one environment at a time
+- Complete local fixes before touching deployment configuration
+
+### 6. Environment Variable Consistency
+- **Always check environment variables consistency between `.env` and Railway variables**
+- Before deploying, verify:
+  - All required variables exist in both places
+  - Variable names match exactly (case-sensitive)
+  - Variable values are appropriate for each environment
+  - No missing variables in Railway that exist in `.env`
+  - No extra variables in Railway that don't exist in `.env` (unless intentionally different)
+
+## Deployment Checklist
+
+Before making any deployment-related changes:
+
+- [ ] Local issue identified and understood
+- [ ] Local fix implemented and tested
+- [ ] Local verification successful
+- [ ] Environment variables checked for consistency
+- [ ] Code committed to repository
+- [ ] Railway configuration unchanged (unless local is working)
+- [ ] Deployment monitored after commit
+
+## Common Deployment Scenarios
+
+### Local Works, Railway Doesn't
+1. **Check environment variables first**
+   - Compare `.env` file with Railway environment variables
+   - Verify all required variables are set in Railway
+   - Check for typos or case sensitivity issues
+
+2. **Check Railway logs**
+   - Review build logs for dependency issues
+   - Check runtime logs for errors
+   - Look for missing environment variables
+
+3. **Verify Railway configuration**
+   - Check `Procfile` or start command
+   - Verify Python version matches local
+   - Check buildpacks or deployment settings
+
+4. **Only after local verification**
+   - Make Railway-specific changes if needed
+   - Update environment variables in Railway
+   - Redeploy
+
+### Environment Variable Issues
+1. **Local verification**
+   - Test with `.env` file locally
+   - Verify `load_dotenv()` is working (check [main.py](mdc:main.py))
+   - Confirm variables are accessible
+
+2. **Railway comparison**
+   - List all variables in `.env` file
+   - Compare with Railway dashboard
+   - Document any differences
+
+3. **Synchronization**
+   - Add missing variables to Railway
+   - Remove or update incorrect variables
+   - Verify variable names match exactly
+
+### Build Failures
+1. **Reproduce locally**
+   - Try to install dependencies locally
+   - Check `requirements.txt` or `pyproject.toml`
+   - Verify Python version compatibility
+
+2. **Fix locally first**
+   - Update dependency versions if needed
+   - Test installation locally
+   - Verify application still works
+
+3. **Then deploy**
+   - Commit dependency changes
+   - Monitor Railway build logs
+   - Verify successful deployment
+
+## Enforcement
+
+This rule applies to:
+- All Python files (`*.py`)
+- Environment files (`*.env`)
+- Documentation files (`*.md`)
+- Railway configuration files (`railway.json`, `Procfile`)
+
+When working on deployment issues, the AI must:
+1. Acknowledge this rule is active
+2. Follow the strict local-first order
+3. Never modify Railway until local works
+4. Always verify environment variable consistency
+5. Complete each step before proceeding
+6. Never fix local and Railway simultaneously
+
+## Prohibited Actions
+
+**DO NOT:**
+- Modify Railway environment variables while local code is broken
+- Commit code that hasn't been verified locally
+- Skip local testing and go straight to deployment fixes
+- Make changes to both local and Railway at the same time
+- Deploy without checking environment variable consistency
+
+**DO:**
+- Fix and verify locally first
+- Check environment variables before deploying
+- Commit only after local verification
+- Monitor deployment after committing
+- Follow the strict 4-step order
