@@ -852,8 +852,16 @@ async def dashboard(request: Request):
             if not date_str or date_str == 'N/A':
                 return 'N/A'
             try:
-                date_obj = datetime.strptime(date_str[:10], '%Y-%m-%d')
-                return date_obj.strftime('%d-%m')
+                # Try parsing with time first (YYYY-MM-DD HH:MM:SS)
+                if len(date_str) >= 16:
+                    date_obj = datetime.strptime(date_str[:16], '%Y-%m-%d %H:%M')
+                    return date_obj.strftime('%d-%m %H:%M')
+                # Fallback to date only (YYYY-MM-DD)
+                elif len(date_str) >= 10:
+                    date_obj = datetime.strptime(date_str[:10], '%Y-%m-%d')
+                    return date_obj.strftime('%d-%m')
+                else:
+                    return date_str
             except:
                 return date_str[:10] if len(date_str) >= 10 else date_str
         
@@ -1123,9 +1131,9 @@ async def dashboard(request: Request):
                 elif po_selection_status == "transfer":
                     status_badge = '<span style="background:#e74c3c;color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px;">Transfer</span>'
                 
-                # Payment terms (only for b2b, exclude "Vooraf")
+                # Payment terms (exclude "Vooraf")
                 payment_terms_html = ''
-                if po_ordertype == 'b2b' and po_payment_term:
+                if po_payment_term:
                     payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) else str(po_payment_term)
                     if 'Vooraf' not in payment_term_name:
                         payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
@@ -1215,9 +1223,9 @@ async def dashboard(request: Request):
                 elif po_ordertype == 'b2c':
                     ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px;">Particulier</span>'
                 
-                # Payment terms (only for b2b, exclude "Vooraf")
+                # Payment terms (exclude "Vooraf")
                 payment_terms_html = ''
-                if po_ordertype == 'b2b' and po_payment_term:
+                if po_payment_term:
                     payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) else str(po_payment_term)
                     if 'Vooraf' not in payment_term_name:
                         payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
@@ -1299,9 +1307,9 @@ async def dashboard(request: Request):
                 elif po_ordertype == 'b2c':
                     ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px;">Particulier</span>'
                 
-                # Payment terms (only for b2b, exclude "Vooraf")
+                # Payment terms (exclude "Vooraf")
                 payment_terms_html = ''
-                if po_ordertype == 'b2b' and po_payment_term:
+                if po_payment_term:
                     payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) else str(po_payment_term)
                     if 'Vooraf' not in payment_term_name:
                         payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
