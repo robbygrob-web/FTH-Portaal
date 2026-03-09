@@ -35,11 +35,16 @@ class PartnerAuth:
                 ["x_studio_partner", "=", True],
                 ["x_studio_partner_portaal_wachtwoord", "=", password]
             ]
-            options = {"fields": ["id", "name"], "limit": 1}
+            options = {"fields": ["id", "name", "x_studio_selfbilling_compleet"], "limit": 1}
             
             partners = client.execute_kw("res.partner", "search_read", domain, options)
             
+            print(f"[AUTH DEBUG] partners result: {partners}")
+            _LOG.debug(f"[DEBUG auth] partners result: {partners}")
+            
             if not partners or len(partners) == 0:
+                print(f"[AUTH DEBUG] login failed for {email}")
+                _LOG.debug(f"[DEBUG auth] authentication failed for {email}")
                 return None
             
             partner = partners[0]
@@ -47,6 +52,7 @@ class PartnerAuth:
                 "id": partner["id"],
                 "name": partner["name"],
                 "email": email,
+                "selfbilling_compleet": partner.get("x_studio_selfbilling_compleet", False),
             }
             
         except Exception as e:
