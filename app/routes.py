@@ -461,7 +461,7 @@ async def dashboard(request: Request):
             {
                 "fields": ["id", "name", "date_order", "x_studio_inkoop_partner_incl_btw", "state", 
                            "commitment_date", "x_studio_plaats", "x_studio_aantal_personen", 
-                           "x_studio_aantal_kinderen", "tax_totals"],
+                           "x_studio_aantal_kinderen", "tax_totals", "x_studio_ordertype", "payment_term_id"],
                 "order": "id desc",
                 "limit": 50
             }
@@ -480,7 +480,7 @@ async def dashboard(request: Request):
             {
                 "fields": ["id", "name", "date_order", "x_studio_inkoop_partner_incl_btw", "state",
                            "commitment_date", "x_studio_plaats", "x_studio_aantal_personen",
-                           "x_studio_aantal_kinderen", "x_studio_selection_field_67u_1jj77rtf7"],
+                           "x_studio_aantal_kinderen", "x_studio_selection_field_67u_1jj77rtf7", "x_studio_ordertype", "payment_term_id"],
                 "order": "id desc",
                 "limit": 50
             }
@@ -652,16 +652,32 @@ async def dashboard(request: Request):
                 po_plaats = po.get('x_studio_plaats', 'N/A')
                 po_personen = po.get('x_studio_aantal_personen', 'N/A')
                 po_kinderen = po.get('x_studio_aantal_kinderen', 'N/A')
+                po_ordertype = po.get('x_studio_ordertype', '')
+                po_payment_term = po.get('payment_term_id', False)
+                
+                # Ordertype badge
+                ordertype_badge = ''
+                if po_ordertype == 'b2b':
+                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">Zakelijk</span>'
+                elif po_ordertype == 'b2c':
+                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">Particulier</span>'
+                
+                # Payment terms (only for b2b)
+                payment_terms_html = ''
+                if po_ordertype == 'b2b' and po_payment_term:
+                    payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) and len(po_payment_term) > 1 else str(po_payment_term)
+                    payment_terms_html = f'<div class="po-detail">Betaalconditie: {payment_term_name}</div>'
                 
                 html_content += f"""
                     <div class="po-card">
-                        <div class="po-name">{po_name}</div>
+                        <div class="po-name">{po_name}{ordertype_badge}</div>
                         <div class="po-detail">Datum: {po_date}</div>
                         <div class="po-detail">Status: {po_state}</div>
                         <div class="po-detail">Leverdatum: {po_commitment_date}</div>
                         <div class="po-detail">Locatie: {po_plaats}</div>
                         <div class="po-detail">Aantal personen: {po_personen}</div>
                         <div class="po-detail">Aantal kinderen: {po_kinderen}</div>
+                        {payment_terms_html}
                         <div class="po-amount">€ {po_amount:,.2f}</div>
                         <button class="claim-btn" onclick="claimPO({po_id}, '{po_name}')">
                             Claim Inkooporder
@@ -696,6 +712,21 @@ async def dashboard(request: Request):
                 po_personen = po.get('x_studio_aantal_personen', 'N/A')
                 po_kinderen = po.get('x_studio_aantal_kinderen', 'N/A')
                 po_selection_status = po.get('x_studio_selection_field_67u_1jj77rtf7', 'N/A')
+                po_ordertype = po.get('x_studio_ordertype', '')
+                po_payment_term = po.get('payment_term_id', False)
+                
+                # Ordertype badge
+                ordertype_badge = ''
+                if po_ordertype == 'b2b':
+                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">Zakelijk</span>'
+                elif po_ordertype == 'b2c':
+                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">Particulier</span>'
+                
+                # Payment terms (only for b2b)
+                payment_terms_html = ''
+                if po_ordertype == 'b2b' and po_payment_term:
+                    payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) and len(po_payment_term) > 1 else str(po_payment_term)
+                    payment_terms_html = f'<div class="po-detail">Betaalconditie: {payment_term_name}</div>'
                 
                 # Button based on status
                 if po_selection_status == "claimed":
@@ -707,13 +738,14 @@ async def dashboard(request: Request):
                 
                 html_content += f"""
                         <div class="po-card">
-                            <div class="po-name">{po_name}</div>
+                            <div class="po-name">{po_name}{ordertype_badge}</div>
                             <div class="po-detail">Datum: {po_date}</div>
                             <div class="po-detail">Status: {po_state}</div>
                             <div class="po-detail">Leverdatum: {po_commitment_date}</div>
                             <div class="po-detail">Locatie: {po_plaats}</div>
                             <div class="po-detail">Aantal personen: {po_personen}</div>
                             <div class="po-detail">Aantal kinderen: {po_kinderen}</div>
+                            {payment_terms_html}
                             <div class="po-amount">€ {po_amount:,.2f}</div>
                             {button_html}
                         </div>
