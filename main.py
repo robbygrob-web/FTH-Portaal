@@ -1,8 +1,12 @@
 import os
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Laad omgevingsvariabelen uit .env bestand VOOR andere imports
 env_path = Path(__file__).parent / '.env'

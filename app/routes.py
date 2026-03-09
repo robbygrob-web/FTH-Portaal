@@ -249,7 +249,183 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
     
     # Sla partner info op in sessie
     request.session["partner"] = partner
+    
+    # Redirect naar dashboard
     return RedirectResponse(url="/dashboard", status_code=303)
+
+@router.get("/onboarding", response_class=HTMLResponse)
+async def onboarding_get(request: Request):
+    """Onboarding form voor partner gegevens"""
+    partner = get_partner_from_session(request)
+    
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="nl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>FTH Portaal - Onboarding</title>
+    </head>
+    <body>
+        <h1>Onboarding</h1>
+        <p>Vul uw gegevens in om verder te gaan.</p>
+        <form method="post" action="/onboarding">
+            <div>
+                <label for="name">Bedrijfsnaam:</label>
+                <input type="text" id="name" name="name" autocomplete="organization" required>
+            </div>
+            <div>
+                <label for="street">Straat:</label>
+                <input type="text" id="street" name="street" autocomplete="street-address">
+            </div>
+            <div>
+                <label for="zip">Postcode:</label>
+                <input type="text" id="zip" name="zip" autocomplete="postal-code">
+            </div>
+            <div>
+                <label for="city">Stad:</label>
+                <input type="text" id="city" name="city" autocomplete="address-level2">
+            </div>
+            <div>
+                <label for="vat">BTW nummer:</label>
+                <input type="text" id="vat" name="vat" pattern="NL[0-9]{9}B[0-9]{2}" title="Voer een geldig BTW nummer in, bijv. NL123456782B90" autocomplete="off">
+                <small style="color:#999;">Bijv. NL123456782B90</small>
+            </div>
+            <div>
+                <label for="peppol_endpoint">KvK nummer:</label>
+                <input type="text" id="peppol_endpoint" name="peppol_endpoint" pattern="[0-9]{8}" title="Voer een geldig KvK nummer in" autocomplete="off">
+                <small style="color:#999;">Bijv. 12345678</small>
+            </div>
+            <div>
+                <label for="email">E-mail:</label>
+                <input type="email" id="email" name="email" autocomplete="email">
+            </div>
+            <div>
+                <label for="phone">Telefoon:</label>
+                <input type="text" id="phone" name="phone" pattern="([+]31|0)[0-9]{9}" title="Voer een geldig telefoonnummer in, bijv. 0612345678 of +31612345678" autocomplete="tel">
+                <small style="color:#999;">Bijv. 0612345678</small>
+            </div>
+            <div>
+                <label for="iban">IBAN nummer:</label>
+                <input type="text" id="iban" name="iban" pattern="[A-Z]{2}[0-9]{2}[A-Z]{4}[0-9]{10}" title="Voer een geldig IBAN in, bijv. NL91ABNA0417164300" autocomplete="off">
+                <small style="color:#999;">Bijv. NL91ABNA0417164300</small>
+            </div>
+            <div>
+                <label for="bank_ten_naamstelling">Tenaamstelling:</label>
+                <input type="text" id="bank_ten_naamstelling" name="bank_ten_naamstelling" autocomplete="name">
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" name="x_studio_selfbilling_akkoord_1" value="1">
+                    Ik ga akkoord met de voorwaarden
+                </label>
+            </div>
+            <button type="submit">Verzenden</button>
+        </form>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+@router.post("/onboarding")
+async def onboarding_post(
+    request: Request,
+    name: str = Form(...),
+    street: str = Form(None),
+    zip: str = Form(None),
+    city: str = Form(None),
+    vat: str = Form(None),
+    peppol_endpoint: str = Form(None),
+    email: str = Form(None),
+    phone: str = Form(None),
+    iban: str = Form(None),
+    bank_ten_naamstelling: str = Form(None)
+):
+    """Verwerk onboarding formulier"""
+    partner = get_partner_from_session(request)
+    partner_id = partner["id"]
+    
+    try:
+        client = get_odoo_client()
+        
+        # Prepare values dict - only include fields that are not None
+        values = {
+            "name": name,
+        }
+        
+        if street:
+            values["street"] = street
+        if zip:
+            values["zip"] = zip
+        if city:
+            values["city"] = city
+        if vat:
+            values["vat"] = vat
+        if peppol_endpoint:
+            values["peppol_endpoint"] = peppol_endpoint
+        if email:
+            values["email"] = email
+        if phone:
+            values["phone"] = phone
+        
+        # Write to res.partner
+        client.execute_kw(
+            "res.partner",
+            "write",
+            [partner_id],
+            values
+        )
+        
+        # Force recompute by writing name again
+        client.execute_kw(
+            "res.partner",
+            "write", 
+            [partner_id],
+            {"name": values.get("name") or partner["name"]}
+        )
+        
+        # Create or update res.partner.bank record if IBAN is provided
+        if iban:
+            # Check if bank account already exists
+            existing_banks = client.execute_kw(
+                "res.partner.bank",
+                "search_read",
+                [["partner_id", "=", partner_id]],
+                {"fields": ["id"], "limit": 1}
+            )
+            
+            bank_values = {
+                "partner_id": partner_id,
+                "acc_number": iban,
+            }
+            if bank_ten_naamstelling:
+                bank_values["acc_holder_name"] = bank_ten_naamstelling
+            
+            if existing_banks and len(existing_banks) > 0:
+                # Update existing bank account
+                client.execute_kw(
+                    "res.partner.bank",
+                    "write",
+                    [existing_banks[0]["id"]],
+                    bank_values
+                )
+            else:
+                # Create new bank account
+                client.execute_kw(
+                    "res.partner.bank",
+                    "create",
+                    [bank_values]
+                )
+        
+        # Update session
+        partner["selfbilling_compleet"] = True
+        request.session["partner"] = partner
+        
+        return RedirectResponse(url="/dashboard", status_code=303)
+        
+    except Exception as e:
+        _LOG.error(f"Onboarding fout: {e}")
+        raise HTTPException(status_code=500, detail=f"Fout bij opslaan van gegevens: {str(e)}")
 
 @router.get("/logout")
 async def logout(request: Request):
@@ -309,6 +485,11 @@ async def dashboard(request: Request):
                 "limit": 50
             }
         )
+        
+        # Bepaal button kleur op basis van selfbilling_compleet
+        selfbilling = partner.get('selfbilling_compleet', False)
+        button_color = '#27ae60' if selfbilling else '#e67e22'
+        mijn_gegevens_button = f'<a href="/onboarding" style="background:{button_color};color:white;padding:10px 20px;border-radius:8px;text-decoration:none;margin-left:20px;">Mijn gegevens</a>'
         
         html_content = f"""
         <!DOCTYPE html>
@@ -437,10 +618,11 @@ async def dashboard(request: Request):
                 }}
             </style>
         </head>
-        <body>
+        <body data-selfbilling-compleet="{partner.get('selfbilling_compleet', False)}">
             <div class="container">
                 <div class="header">
                     <h1>Beschikbare Inkooporders</h1>
+                    {mijn_gegevens_button}
                     <div class="user-info">
                         <span class="user-name">Ingelogd als: {partner['name']}</span>
                         <a href="/logout" class="logout-btn">Uitloggen</a>
@@ -544,6 +726,17 @@ async def dashboard(request: Request):
             
             <script>
                 async function claimPO(poId, poName) {
+                    // Check selfbilling_compleet status
+                    const selfbillingCompleet = document.body.getAttribute('data-selfbilling-compleet') === 'True';
+                    if (!selfbillingCompleet) {
+                        const message = 'Vul eerst je gegevens in om orders te kunnen claimen.';
+                        const confirmed = confirm(message + '\\n\\nWil je naar de onboarding pagina gaan?');
+                        if (confirmed) {
+                            window.location.href = '/onboarding';
+                        }
+                        return;
+                    }
+                    
                     const btn = event.target;
                     btn.disabled = true;
                     btn.textContent = 'Bezig met claimen...';
