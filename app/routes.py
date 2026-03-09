@@ -941,11 +941,12 @@ async def dashboard(request: Request):
                 .po-card-row {{
                     display: flex;
                     align-items: center;
+                    flex-wrap: wrap;
                     margin-bottom: 4px;
                     line-height: 1.4;
                 }}
                 .po-name {{
-                    font-size: 15px;
+                    font-size: 14px;
                     font-weight: 600;
                     color: #333;
                     margin: 0;
@@ -955,6 +956,18 @@ async def dashboard(request: Request):
                     font-size: 13px;
                     margin: 0;
                     line-height: 1.4;
+                }}
+                @media (max-width: 380px) {{
+                    .po-card {{
+                        padding: 10px 12px;
+                    }}
+                    .po-detail {{
+                        font-size: 12px;
+                    }}
+                    .claim-btn {{
+                        padding: 6px 12px;
+                        font-size: 11px;
+                    }}
                 }}
                 .po-amount-row {{
                     display: flex;
@@ -1040,7 +1053,7 @@ async def dashboard(request: Request):
                     <span class="stat-number">{count_geclaimd}</span>
                     <span class="stat-amount">€ {total_geclaimd:,.0f}</span>
                     <span class="stat-label">Mijn totaal</span>
-                </div>
+                    </div>
                 </div>
                 
                 <div id="message-container"></div>
@@ -1048,7 +1061,7 @@ async def dashboard(request: Request):
             <div class="toggle-container">
                 <label>
                     <input type="checkbox" id="splitToggle" checked onchange="toggleSplit()">
-                    <strong>Opdrachten splitsen</strong>
+                    <strong>Beschikbaar/Geclaimd splitsen</strong>
                 </label>
             </div>
             
@@ -1097,24 +1110,25 @@ async def dashboard(request: Request):
                 # Ordertype badge
                 ordertype_badge = ''
                 if po_ordertype == 'b2b':
-                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Zakelijk</span>'
+                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px;">Zakelijk</span>'
                 elif po_ordertype == 'b2c':
-                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Particulier</span>'
+                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px;">Particulier</span>'
                 
                 # Status badge
                 status_badge = ''
                 if po_selection_status in ("beschikbaar", "nieuw"):
-                    status_badge = '<span style="background:#e67e22;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-left:6px;">Beschikbaar</span>'
+                    status_badge = '<span style="background:#e67e22;color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px;">Beschikbaar</span>'
                 elif po_selection_status == "claimed":
-                    status_badge = '<span style="background:#3498db;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-left:6px;">Geclaimd</span>'
+                    status_badge = '<span style="background:#3498db;color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px;">Geclaimd</span>'
                 elif po_selection_status == "transfer":
-                    status_badge = '<span style="background:#e74c3c;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-left:6px;">Transfer</span>'
+                    status_badge = '<span style="background:#e74c3c;color:white;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px;">Transfer</span>'
                 
-                # Payment terms (only for b2b)
+                # Payment terms (only for b2b, exclude "Vooraf")
                 payment_terms_html = ''
                 if po_ordertype == 'b2b' and po_payment_term:
-                    payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) and len(po_payment_term) > 1 else str(po_payment_term)
-                    payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
+                    payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) else str(po_payment_term)
+                    if 'Vooraf' not in payment_term_name:
+                        payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
                 
                 # Order line descriptions
                 descriptions = lines_by_order.get(po.get('id'), [])
@@ -1123,36 +1137,30 @@ async def dashboard(request: Request):
                     desc_list = ' | '.join(descriptions)
                     desc_html = f'<div class="po-card-row"><div class="po-detail">📦 {desc_list}</div></div>'
                 
-                # Button logic - check if it's in claimed list
+                # Button logic - merged section: only show claim button, not release button
                 is_claimed = any(c.get('id') == po_id for c in claimed)
                 if is_claimed:
-                    if po_selection_status == "claimed":
-                        button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c; width:auto; padding:8px 20px;">Zoek Vervanger</button>'
-                    elif po_selection_status == "transfer":
-                        button_html = '<button class="claim-btn" disabled style="background: #3498db; width:auto; padding:8px 20px;">Transfer</button>'
-                    else:
-                        button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c; width:auto; padding:8px 20px;">Zoek Vervanger</button>'
+                    # In merged section, hide release buttons
+                    button_html = ''
                 else:
-                    button_html = f'<button class="claim-btn" onclick="claimPO({po_id}, \'{po_name}\')" style="width:auto; padding:8px 20px;">Claim</button>'
+                    button_html = f'<button class="claim-btn" onclick="claimPO({po_id}, \'{po_name}\')" style="width:auto; padding:8px 20px; margin-left:auto;">Claim</button>'
                 
                 html_content += f"""
                     <div class="po-card">
                         <div class="po-card-row">
                             <span style="color:{bullet_color};font-size:16px;">●</span>
                             <span class="po-detail" style="margin-left:4px;">{short_date}</span>
-                            <span class="po-name" style="margin-left:8px;">{po_name}</span>
+                            <span title="{po_name}" style="cursor:help; border-bottom:1px dotted #999; color:#999;" onclick="alert('{po_name}')">#</span>
                             {ordertype_badge}
                             {status_badge}
+                            <span style="font-size:14px; font-weight:600; color:#333333; margin-left:8px;">€ {po_amount:,.0f}</span>
+                            {button_html}
                         </div>
                         {desc_html}
                         <div class="po-card-row">
-                            <div class="po-detail">{po_plaats} | {po_personen}px {po_kinderen}kd</div>
+                            <div class="po-detail">{po_plaats} | {po_personen} px {po_kinderen} kd</div>
                         </div>
                         {payment_terms_html}
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; width:100%;">
-                            <span style="font-size:18px; font-weight:700; color:#333333;">€ {po_amount:,.2f}</span>
-                            {button_html}
-                        </div>
                     </div>
                 """
         
@@ -1203,15 +1211,16 @@ async def dashboard(request: Request):
                 # Ordertype badge
                 ordertype_badge = ''
                 if po_ordertype == 'b2b':
-                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Zakelijk</span>'
+                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px;">Zakelijk</span>'
                 elif po_ordertype == 'b2c':
-                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Particulier</span>'
+                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px;">Particulier</span>'
                 
-                # Payment terms (only for b2b)
+                # Payment terms (only for b2b, exclude "Vooraf")
                 payment_terms_html = ''
                 if po_ordertype == 'b2b' and po_payment_term:
-                    payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) and len(po_payment_term) > 1 else str(po_payment_term)
-                    payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
+                    payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) else str(po_payment_term)
+                    if 'Vooraf' not in payment_term_name:
+                        payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
                 
                 # Order line descriptions
                 descriptions = lines_by_order.get(po.get('id'), [])
@@ -1225,18 +1234,16 @@ async def dashboard(request: Request):
                         <div class="po-card-row">
                             <span style="color:{bullet_color};font-size:16px;">●</span>
                             <span class="po-detail" style="margin-left:4px;">{short_date}</span>
-                            <span class="po-name" style="margin-left:8px;">{po_name}</span>
+                            <span title="{po_name}" style="cursor:help; border-bottom:1px dotted #999; color:#999;" onclick="alert('{po_name}')">#</span>
                             {ordertype_badge}
+                            <span style="font-size:14px; font-weight:600; color:#333333; margin-left:8px;">€ {po_amount:,.0f}</span>
+                            <button class="claim-btn" onclick="claimPO({po_id}, '{po_name}')" style="width:auto; padding:8px 20px; margin-left:auto;">Claim</button>
                         </div>
                         {desc_html}
                         <div class="po-card-row">
-                            <div class="po-detail">{po_plaats} | {po_personen}px {po_kinderen}kd</div>
+                            <div class="po-detail">{po_plaats} | {po_personen} px {po_kinderen} kd</div>
                         </div>
                         {payment_terms_html}
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; width:100%;">
-                            <span style="font-size:18px; font-weight:700; color:#333333;">€ {po_amount:,.2f}</span>
-                            <button class="claim-btn" onclick="claimPO({po_id}, '{po_name}')" style="width:auto; padding:8px 20px;">Claim</button>
-                        </div>
                     </div>
                 """
         
@@ -1288,15 +1295,16 @@ async def dashboard(request: Request):
                 # Ordertype badge
                 ordertype_badge = ''
                 if po_ordertype == 'b2b':
-                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Zakelijk</span>'
+                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px;">Zakelijk</span>'
                 elif po_ordertype == 'b2c':
-                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Particulier</span>'
+                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 6px;">Particulier</span>'
                 
-                # Payment terms (only for b2b)
+                # Payment terms (only for b2b, exclude "Vooraf")
                 payment_terms_html = ''
                 if po_ordertype == 'b2b' and po_payment_term:
-                    payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) and len(po_payment_term) > 1 else str(po_payment_term)
-                    payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
+                    payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) else str(po_payment_term)
+                    if 'Vooraf' not in payment_term_name:
+                        payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
                 
                 # Order line descriptions
                 descriptions = lines_by_order.get(po.get('id'), [])
@@ -1307,29 +1315,27 @@ async def dashboard(request: Request):
                 
                 # Button based on status
                 if po_selection_status == "claimed":
-                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c; width:auto; padding:8px 20px;">Zoek Vervanger</button>'
+                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background:white; color:#e74c3c; border:1px solid #e74c3c; padding:6px 14px; width:auto; margin-left:auto;">Bied aan</button>'
                 elif po_selection_status == "transfer":
-                    button_html = '<button class="claim-btn" disabled style="background: #3498db; width:auto; padding:8px 20px;">Transfer</button>'
+                    button_html = '<button class="claim-btn" disabled style="background: #3498db; width:auto; padding:8px 20px; margin-left:auto;">Transfer</button>'
                 else:
-                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c; width:auto; padding:8px 20px;">Zoek Vervanger</button>'
+                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background:white; color:#e74c3c; border:1px solid #e74c3c; padding:6px 14px; width:auto; margin-left:auto;">Bied aan</button>'
                 
                 html_content += f"""
                         <div class="po-card" data-section="mijn">
                             <div class="po-card-row">
                                 <span style="color:{bullet_color};font-size:16px;">●</span>
                                 <span class="po-detail" style="margin-left:4px;">{short_date}</span>
-                                <span class="po-name" style="margin-left:8px;">{po_name}</span>
+                                <span title="{po_name}" style="cursor:help; border-bottom:1px dotted #999; color:#999;" onclick="alert('{po_name}')">#</span>
                                 {ordertype_badge}
+                                <span style="font-size:14px; font-weight:600; color:#333333; margin-left:8px;">€ {po_amount:,.0f}</span>
+                                {button_html}
                             </div>
                             {desc_html}
                             <div class="po-card-row">
-                                <div class="po-detail">{po_plaats} | {po_personen}px {po_kinderen}kd</div>
+                                <div class="po-detail">{po_plaats} | {po_personen} px {po_kinderen} kd</div>
                             </div>
                             {payment_terms_html}
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; width:100%;">
-                                <span style="font-size:18px; font-weight:700; color:#333333;">€ {po_amount:,.2f}</span>
-                                {button_html}
-                            </div>
                         </div>
                 """
         
@@ -1418,18 +1424,18 @@ async def dashboard(request: Request):
                         
                         if (response.ok && result.success) {
                             showMessage(`Succesvol! Order ${poName} is vrijgegeven voor vervanger.`, 'success');
-                            btn.textContent = 'Beschikbaar voor transfer';
+                            btn.textContent = 'Transfer';
                             btn.style.background = '#3498db';
                             btn.disabled = true;
                         } else {
                             showMessage(result.error || 'Fout bij vrijgeven van order.', 'error');
                             btn.disabled = false;
-                            btn.textContent = 'Zoek Vervanger';
+                            btn.textContent = 'Bied aan';
                         }
                     } catch (error) {
                         showMessage('Er is een fout opgetreden. Probeer het opnieuw.', 'error');
                         btn.disabled = false;
-                        btn.textContent = 'Zoek Vervanger';
+                        btn.textContent = 'Bied aan';
                     }
                 }
                 
