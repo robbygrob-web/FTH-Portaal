@@ -32,10 +32,10 @@ class PartnerAuth:
             
             domain = [
                 ["email", "=", email],
-                ["x_studio_partner", "=", True],
+                ["x_studio_portaal_partner", "=", True],
                 ["x_studio_partner_portaal_wachtwoord", "=", password]
             ]
-            options = {"fields": ["id", "name", "x_studio_selfbilling_compleet"], "limit": 1}
+            options = {"fields": ["id", "name", "x_studio_akkoord_voorwaarden_selfbillingportaal"], "limit": 1}
             
             partners = client.execute_kw("res.partner", "search_read", domain, options)
             
@@ -52,7 +52,7 @@ class PartnerAuth:
                 "id": partner["id"],
                 "name": partner["name"],
                 "email": email,
-                "selfbilling_compleet": partner.get("x_studio_selfbilling_compleet", False),
+                "selfbilling_compleet": partner.get("x_studio_akkoord_voorwaarden_selfbillingportaal", False),
             }
             
         except Exception as e:
