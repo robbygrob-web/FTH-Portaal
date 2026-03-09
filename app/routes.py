@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from app.odoo_client import get_odoo_client
 from app.auth import get_partner_auth
 import logging
+from datetime import datetime
 
 _LOG = logging.getLogger(__name__)
 
@@ -314,13 +315,8 @@ async def onboarding_get(request: Request):
                 <label for="bank_ten_naamstelling">Tenaamstelling:</label>
                 <input type="text" id="bank_ten_naamstelling" name="bank_ten_naamstelling" autocomplete="name">
             </div>
-            <div>
-                <label>
-                    <input type="checkbox" name="x_studio_selfbilling_akkoord_1" value="1">
-                    Ik ga akkoord met de voorwaarden
-                </label>
-            </div>
-            <button type="submit">Verzenden</button>
+            <input type="hidden" name="step" value="1">
+            <button type="submit">Verder →</button>
         </form>
     </body>
     </html>
@@ -330,7 +326,8 @@ async def onboarding_get(request: Request):
 @router.post("/onboarding")
 async def onboarding_post(
     request: Request,
-    name: str = Form(...),
+    step: str = Form(...),
+    name: str = Form(None),
     street: str = Form(None),
     zip: str = Form(None),
     city: str = Form(None),
@@ -339,93 +336,276 @@ async def onboarding_post(
     email: str = Form(None),
     phone: str = Form(None),
     iban: str = Form(None),
-    bank_ten_naamstelling: str = Form(None)
+    bank_ten_naamstelling: str = Form(None),
+    contract_agreed: str = Form(None)
 ):
-    """Verwerk onboarding formulier"""
+    """Verwerk onboarding formulier - 2-staps proces"""
     partner = get_partner_from_session(request)
     partner_id = partner["id"]
     
-    try:
-        client = get_odoo_client()
-        
-        # Prepare values dict - only include fields that are not None
-        values = {
+    if step == "1":
+        # Step 1: Store form data in session and show contract
+        request.session["onboarding_data"] = {
             "name": name,
+            "street": street,
+            "zip": zip,
+            "city": city,
+            "vat": vat,
+            "peppol_endpoint": peppol_endpoint,
+            "email": email,
+            "phone": phone,
+            "iban": iban,
+            "bank_ten_naamstelling": bank_ten_naamstelling
         }
         
-        if street:
-            values["street"] = street
-        if zip:
-            values["zip"] = zip
-        if city:
-            values["city"] = city
-        if vat:
-            values["vat"] = vat
-        if peppol_endpoint:
-            values["peppol_endpoint"] = peppol_endpoint
-        if email:
-            values["email"] = email
-        if phone:
-            values["phone"] = phone
+        # Show contract page
+        onboarding_data = request.session["onboarding_data"]
+        today = datetime.now().strftime("%d-%m-%Y")
         
-        # Write to res.partner
-        client.execute_kw(
-            "res.partner",
-            "write",
-            [partner_id],
-            values
-        )
+        # Build partner address string
+        partner_address_parts = []
+        if onboarding_data.get("name"):
+            partner_address_parts.append(onboarding_data["name"])
+        if onboarding_data.get("street"):
+            partner_address_parts.append(onboarding_data["street"])
+        if onboarding_data.get("zip") and onboarding_data.get("city"):
+            partner_address_parts.append(f"{onboarding_data['zip']} {onboarding_data['city']}")
+        elif onboarding_data.get("zip"):
+            partner_address_parts.append(onboarding_data["zip"])
+        elif onboarding_data.get("city"):
+            partner_address_parts.append(onboarding_data["city"])
+        partner_address = "<br>".join(partner_address_parts) if partner_address_parts else "N/A"
         
-        # Force recompute by writing name again
-        client.execute_kw(
-            "res.partner",
-            "write", 
-            [partner_id],
-            {"name": values.get("name") or partner["name"]}
-        )
+        partner_kvk = onboarding_data.get("peppol_endpoint", "")
+        partner_vat = onboarding_data.get("vat", "")
         
-        # Create or update res.partner.bank record if IBAN is provided
-        if iban:
-            # Check if bank account already exists
-            existing_banks = client.execute_kw(
-                "res.partner.bank",
-                "search_read",
-                [["partner_id", "=", partner_id]],
-                {"fields": ["id"], "limit": 1}
+        partner_name = onboarding_data.get('name', 'N/A')
+        partner_street = onboarding_data.get('street', '')
+        partner_zip = onboarding_data.get('zip', '')
+        partner_city = onboarding_data.get('city', '')
+        partner_vat = onboarding_data.get('vat', '')
+        partner_kvk = onboarding_data.get('peppol_endpoint', '')
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>FTH Portaal - Contract</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }}
+                h1 {{ text-align: center; }}
+                .checkbox-section {{ margin: 30px 0; padding: 20px; background: #f5f5f5; border-radius: 8px; }}
+                button {{ padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }}
+                button:hover {{ background: #5568d3; }}
+            </style>
+        </head>
+        <body>
+            <h1>Samenwerkingsovereenkomst Friettruckhuren.nl</h1>
+            
+            <div style="height:300px; overflow-y:scroll; border:1px solid #ccc; padding:15px; background:#f9f9f9; font-size:13px; line-height:1.6;">
+                <p><strong>Datum:</strong> {today}</p>
+                
+                <p><strong>Partijen:</strong></p>
+                <p>Friettruckhuren.nl, handelsnaam van Treatlab VOF, gevestigd te Thomas Edisonstraat 14, 3284WD Zuid-Beijerland, KvK 77075382, vertegenwoordigd door Robby Grob</p>
+                
+                <p><strong>en</strong></p>
+                
+                <p>{partner_name}, gevestigd te {partner_street}, {partner_zip} {partner_city}, KvK {partner_kvk}, BTW {partner_vat}, hierna te noemen: Partner.</p>
+                
+                <h3>Artikel 1 - Samenwerking</h3>
+                <p>• Friettruckhuren.nl exploiteert een platform waarop opdrachten voor frietcatering worden aangeboden.<br>
+                • Partner kan via het partnerportaal opdrachten claimen.<br>
+                • Partner voert geclaimde opdrachten zelfstandig uit en blijft verantwoordelijk voor de uitvoering.<br>
+                • Friettruckhuren.nl verzorgt verkoop, marketing, communicatie met klanten en administratieve afhandeling.</p>
+                
+                <h3>Artikel 2 - Vergoeding</h3>
+                <p>• Partner ontvangt een vergoeding per uitgevoerde opdracht zoals vermeld in het partnerportaal.<br>
+                • De vergoeding wordt bepaald op basis van de opdrachtgegevens en is exclusief BTW.<br>
+                • Friettruckhuren.nl behoudt zich het recht voor om vergoedingen aan te passen met voorafgaande kennisgeving.</p>
+                
+                <h3>Artikel 3 - Betaling</h3>
+                <p>• Betalingen vinden plaats volgens de betaalcondities zoals vermeld in het partnerportaal.<br>
+                • Voor zakelijke opdrachten geldt de betaaltermijn zoals overeengekomen in de opdracht.<br>
+                • Partner dient een geldig IBAN-rekeningnummer te verstrekken voor betalingen.</p>
+                
+                <h3>Artikel 4 - Self-billing</h3>
+                <p>• Friettruckhuren.nl verzorgt self-billing voor alle opdrachten.<br>
+                • Partner ontvangt automatisch gegenereerde facturen via het partnerportaal.<br>
+                • Partner dient alle benodigde gegevens correct en volledig aan te leveren voor self-billing.</p>
+                
+                <h3>Artikel 5 - No-show</h3>
+                <p>• Bij no-show of niet-naleving van de opdracht kan Friettruckhuren.nl een boete opleggen.<br>
+                • De hoogte van de boete wordt bepaald op basis van de schade die is geleden.<br>
+                • Partner is verantwoordelijk voor tijdige communicatie bij wijzigingen of annuleringen.</p>
+                
+                <h3>Artikel 6 - Algemene voorwaarden</h3>
+                <p>• Op deze overeenkomst zijn de Algemene Partnervoorwaarden van Friettruckhuren.nl van toepassing.<br>
+                • Deze voorwaarden zijn opgenomen in de bijlage en maken integraal deel uit van deze overeenkomst.</p>
+                
+                <h3>Algemene Partnervoorwaarden</h3>
+                
+                <h4>Artikel 1 - Definities</h4>
+                <p>In deze voorwaarden wordt verstaan onder: Platform: het digitale platform van Friettruckhuren.nl; Partner: de partij die via het platform opdrachten uitvoert; Opdracht: een concrete frietcatering opdracht zoals aangeboden via het platform.</p>
+                
+                <h4>Artikel 2 - Toepasselijkheid</h4>
+                <p>Deze voorwaarden zijn van toepassing op alle overeenkomsten tussen Friettruckhuren.nl en Partner, tenzij schriftelijk anders overeengekomen.</p>
+                
+                <h4>Artikel 3 - Aanmelding en account</h4>
+                <p>Partner dient zich aan te melden via het partnerportaal en een account aan te maken. Partner is verantwoordelijk voor de juistheid van de verstrekte gegevens en de vertrouwelijkheid van inloggegevens.</p>
+                
+                <h4>Artikel 4 - Claimen van opdrachten</h4>
+                <p>Partner kan opdrachten claimen via het partnerportaal. Een geclaimde opdracht is bindend en dient te worden uitgevoerd volgens de opdrachtspecificaties.</p>
+                
+                <h4>Artikel 5 - Uitvoering opdrachten</h4>
+                <p>Partner voert opdrachten zelfstandig uit en is verantwoordelijk voor de kwaliteit, veiligheid en tijdige uitvoering. Partner dient te beschikken over de benodigde vergunningen en verzekeringen.</p>
+                
+                <h4>Artikel 6 - Kwaliteitseisen</h4>
+                <p>Partner dient te voldoen aan alle geldende kwaliteitseisen en hygiënenormen. Friettruckhuren.nl behoudt zich het recht voor om kwaliteitscontroles uit te voeren.</p>
+                
+                <h4>Artikel 7 - Verzekeringen</h4>
+                <p>Partner dient te beschikken over een geldige aansprakelijkheidsverzekering en andere benodigde verzekeringen voor de uitvoering van opdrachten.</p>
+                
+                <h4>Artikel 8 - Geheimhouding</h4>
+                <p>Partner verplicht zich tot geheimhouding van alle vertrouwelijke informatie die hij in het kader van de samenwerking verwerft.</p>
+                
+                <h4>Artikel 9 - Intellectueel eigendom</h4>
+                <p>Alle intellectuele eigendomsrechten op het platform en de daarbij behorende materialen blijven eigendom van Friettruckhuren.nl.</p>
+                
+                <h4>Artikel 10 - Aansprakelijkheid</h4>
+                <p>Friettruckhuren.nl is niet aansprakelijk voor schade die Partner lijdt in verband met de uitvoering van opdrachten, tenzij sprake is van opzet of bewuste roekeloosheid.</p>
+                
+                <h4>Artikel 11 - Schadevergoeding</h4>
+                <p>Partner is aansprakelijk voor alle schade die voortvloeit uit de uitvoering van opdrachten en dient deze te vergoeden aan Friettruckhuren.nl of derden.</p>
+                
+                <h4>Artikel 12 - Opzegging</h4>
+                <p>Beide partijen kunnen deze overeenkomst opzeggen met een opzegtermijn van 30 dagen, tenzij anders overeengekomen.</p>
+                
+                <h4>Artikel 13 - Wijzigingen</h4>
+                <p>Wijzigingen in deze voorwaarden worden schriftelijk medegedeeld en treden in werking 30 dagen na kennisgeving, tenzij Partner bezwaar maakt.</p>
+                
+                <h4>Artikel 14 - Geschillen</h4>
+                <p>Geschillen worden in eerste instantie opgelost door middel van overleg. Indien dit niet tot een oplossing leidt, worden geschillen voorgelegd aan de bevoegde rechter.</p>
+                
+                <h4>Artikel 15 - Toepasselijk recht</h4>
+                <p>Op deze overeenkomst is Nederlands recht van toepassing.</p>
+                
+                <h4>Artikel 16 - Overige bepalingen</h4>
+                <p>Indien een bepaling van deze voorwaarden nietig of vernietigbaar blijkt, blijven de overige bepalingen van kracht.</p>
+            </div>
+            
+            <p style="font-size:12px;color:#666;">Scroll omhoog om de volledige overeenkomst te lezen.</p>
+            
+            <form method="post" action="/onboarding">
+                <input type="hidden" name="step" value="2">
+                <div class="checkbox-section">
+                    <label>
+                        <input type="checkbox" name="contract_agreed" value="1" required>
+                        Ik ga akkoord met de samenwerkingsovereenkomst en algemene voorwaarden
+                    </label>
+                </div>
+                <button type="submit">Bevestigen</button>
+            </form>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+    
+    elif step == "2":
+        # Step 2: Save to Odoo and redirect
+        if not contract_agreed:
+            raise HTTPException(status_code=400, detail="U moet akkoord gaan met de voorwaarden")
+        
+        onboarding_data = request.session.get("onboarding_data")
+        if not onboarding_data:
+            raise HTTPException(status_code=400, detail="Geen onboarding data gevonden")
+        
+        try:
+            client = get_odoo_client()
+            
+            # Prepare values dict
+            values = {
+                "name": onboarding_data.get("name"),
+            }
+            
+            if onboarding_data.get("street"):
+                values["street"] = onboarding_data["street"]
+            if onboarding_data.get("zip"):
+                values["zip"] = onboarding_data["zip"]
+            if onboarding_data.get("city"):
+                values["city"] = onboarding_data["city"]
+            if onboarding_data.get("vat"):
+                values["vat"] = onboarding_data["vat"]
+            if onboarding_data.get("peppol_endpoint"):
+                values["peppol_endpoint"] = onboarding_data["peppol_endpoint"]
+            if onboarding_data.get("email"):
+                values["email"] = onboarding_data["email"]
+            if onboarding_data.get("phone"):
+                values["phone"] = onboarding_data["phone"]
+            
+            # Write to res.partner
+            client.execute_kw(
+                "res.partner",
+                "write",
+                [partner_id],
+                values
             )
             
-            bank_values = {
-                "partner_id": partner_id,
-                "acc_number": iban,
-            }
-            if bank_ten_naamstelling:
-                bank_values["acc_holder_name"] = bank_ten_naamstelling
+            # Force recompute by writing name again
+            client.execute_kw(
+                "res.partner",
+                "write", 
+                [partner_id],
+                {"name": values.get("name") or partner["name"]}
+            )
             
-            if existing_banks and len(existing_banks) > 0:
-                # Update existing bank account
-                client.execute_kw(
+            # Create or update res.partner.bank record if IBAN is provided
+            if onboarding_data.get("iban"):
+                existing_banks = client.execute_kw(
                     "res.partner.bank",
-                    "write",
-                    [existing_banks[0]["id"]],
-                    bank_values
+                    "search_read",
+                    [["partner_id", "=", partner_id]],
+                    {"fields": ["id"], "limit": 1}
                 )
-            else:
-                # Create new bank account
-                client.execute_kw(
-                    "res.partner.bank",
-                    "create",
-                    [bank_values]
-                )
-        
-        # Update session
-        partner["selfbilling_compleet"] = True
-        request.session["partner"] = partner
-        
-        return RedirectResponse(url="/dashboard", status_code=303)
-        
-    except Exception as e:
-        _LOG.error(f"Onboarding fout: {e}")
-        raise HTTPException(status_code=500, detail=f"Fout bij opslaan van gegevens: {str(e)}")
+                
+                bank_values = {
+                    "partner_id": partner_id,
+                    "acc_number": onboarding_data["iban"],
+                }
+                if onboarding_data.get("bank_ten_naamstelling"):
+                    bank_values["acc_holder_name"] = onboarding_data["bank_ten_naamstelling"]
+                
+                if existing_banks and len(existing_banks) > 0:
+                    client.execute_kw(
+                        "res.partner.bank",
+                        "write",
+                        [existing_banks[0]["id"]],
+                        bank_values
+                    )
+                else:
+                    client.execute_kw(
+                        "res.partner.bank",
+                        "create",
+                        [bank_values]
+                    )
+            
+            # Clear onboarding data from session
+            if "onboarding_data" in request.session:
+                del request.session["onboarding_data"]
+            
+            # Update session
+            partner["selfbilling_compleet"] = True
+            request.session["partner"] = partner
+            
+            return RedirectResponse(url="/dashboard", status_code=303)
+            
+        except Exception as e:
+            _LOG.error(f"Onboarding fout: {e}")
+            raise HTTPException(status_code=500, detail=f"Fout bij opslaan van gegevens: {str(e)}")
+    
+    else:
+        raise HTTPException(status_code=400, detail="Ongeldige stap")
 
 @router.get("/logout")
 async def logout(request: Request):
