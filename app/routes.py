@@ -1189,8 +1189,8 @@ async def dashboard(request: Request):
         if not pos:
             html_content += """
                     <div class="empty-state">
-                        <h2>Geen beschikbare inkooporders</h2>
-                        <p>Er zijn momenteel geen inkooporders beschikbaar om te claimen.</p>
+                        <h2>Geen opdrachten</h2>
+                        <p>Er zijn momenteel geen beschikbare opdrachten.</p>
                     </div>
             """
         else:
