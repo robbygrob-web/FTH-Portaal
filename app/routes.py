@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app.odoo_client import get_odoo_client
 from app.auth import get_partner_auth
 import logging
@@ -414,7 +414,9 @@ async def onboarding_post(
     phone: str = Form(None),
     iban: str = Form(None),
     bank_ten_naamstelling: str = Form(None),
-    contract_agreed: str = Form(None)
+    contract_agreed: str = Form(None),
+    avb_akkoord: str = Form(None),
+    selfbilling_akkoord: str = Form(None)
 ):
     """Verwerk onboarding formulier - 2-staps proces"""
     partner = get_partner_from_session(request)
@@ -523,94 +525,134 @@ async def onboarding_post(
                 <h1>Samenwerkingsovereenkomst Friettruckhuren.nl</h1>
             
             <div style="height:300px; overflow-y:scroll; border:1px solid #ccc; padding:15px; background:#f9f9f9; font-size:13px; line-height:1.6;">
-                <p><strong>Datum:</strong> {today}</p>
-                
-                <p><strong>Partijen:</strong></p>
-                <p>Friettruckhuren.nl, handelsnaam van Treatlab VOF, gevestigd te Thomas Edisonstraat 14, 3284WD Zuid-Beijerland, KvK 77075382, vertegenwoordigd door Robby Grob</p>
-                
-                <p><strong>en</strong></p>
-                
-                <p>{partner_name}, gevestigd te {partner_street}, {partner_zip} {partner_city}, KvK {partner_kvk}, BTW {partner_vat}, hierna te noemen: Partner.</p>
-                
-                <h3>Artikel 1 - Samenwerking</h3>
-                <p>• Friettruckhuren.nl exploiteert een platform waarop opdrachten voor frietcatering worden aangeboden.<br>
-                • Partner kan via het partnerportaal opdrachten claimen.<br>
-                • Partner voert geclaimde opdrachten zelfstandig uit en blijft verantwoordelijk voor de uitvoering.<br>
-                • Friettruckhuren.nl verzorgt verkoop, marketing, communicatie met klanten en administratieve afhandeling.</p>
-                
-                <h3>Artikel 2 - Vergoeding</h3>
-                <p>• Partner ontvangt een vergoeding per uitgevoerde opdracht zoals vermeld in het partnerportaal.<br>
-                • De vergoeding wordt bepaald op basis van de opdrachtgegevens en is exclusief BTW.<br>
-                • Friettruckhuren.nl behoudt zich het recht voor om vergoedingen aan te passen met voorafgaande kennisgeving.</p>
-                
-                <h3>Artikel 3 - Betaling</h3>
-                <p>• Betalingen vinden plaats volgens de betaalcondities zoals vermeld in het partnerportaal.<br>
-                • Voor zakelijke opdrachten geldt de betaaltermijn zoals overeengekomen in de opdracht.<br>
-                • Partner dient een geldig IBAN-rekeningnummer te verstrekken voor betalingen.</p>
-                
-                <h3>Artikel 4 - Self-billing</h3>
-                <p>• Friettruckhuren.nl verzorgt self-billing voor alle opdrachten.<br>
-                • Partner ontvangt automatisch gegenereerde facturen via het partnerportaal.<br>
-                • Partner dient alle benodigde gegevens correct en volledig aan te leveren voor self-billing.</p>
-                
-                <h3>Artikel 5 - No-show</h3>
-                <p>• Bij no-show of niet-naleving van de opdracht kan Friettruckhuren.nl een boete opleggen.<br>
-                • De hoogte van de boete wordt bepaald op basis van de schade die is geleden.<br>
-                • Partner is verantwoordelijk voor tijdige communicatie bij wijzigingen of annuleringen.</p>
-                
-                <h3>Artikel 6 - Algemene voorwaarden</h3>
-                <p>• Op deze overeenkomst zijn de Algemene Partnervoorwaarden van Friettruckhuren.nl van toepassing.<br>
-                • Deze voorwaarden zijn opgenomen in de bijlage en maken integraal deel uit van deze overeenkomst.</p>
-                
-                <h3>Algemene Partnervoorwaarden</h3>
-                
-                <h4>Artikel 1 - Definities</h4>
-                <p>In deze voorwaarden wordt verstaan onder: Platform: het digitale platform van Friettruckhuren.nl; Partner: de partij die via het platform opdrachten uitvoert; Opdracht: een concrete frietcatering opdracht zoals aangeboden via het platform.</p>
-                
-                <h4>Artikel 2 - Toepasselijkheid</h4>
-                <p>Deze voorwaarden zijn van toepassing op alle overeenkomsten tussen Friettruckhuren.nl en Partner, tenzij schriftelijk anders overeengekomen.</p>
-                
-                <h4>Artikel 3 - Aanmelding en account</h4>
-                <p>Partner dient zich aan te melden via het partnerportaal en een account aan te maken. Partner is verantwoordelijk voor de juistheid van de verstrekte gegevens en de vertrouwelijkheid van inloggegevens.</p>
-                
-                <h4>Artikel 4 - Claimen van opdrachten</h4>
-                <p>Partner kan opdrachten claimen via het partnerportaal. Een geclaimde opdracht is bindend en dient te worden uitgevoerd volgens de opdrachtspecificaties.</p>
-                
-                <h4>Artikel 5 - Uitvoering opdrachten</h4>
-                <p>Partner voert opdrachten zelfstandig uit en is verantwoordelijk voor de kwaliteit, veiligheid en tijdige uitvoering. Partner dient te beschikken over de benodigde vergunningen en verzekeringen.</p>
-                
-                <h4>Artikel 6 - Kwaliteitseisen</h4>
-                <p>Partner dient te voldoen aan alle geldende kwaliteitseisen en hygiënenormen. Friettruckhuren.nl behoudt zich het recht voor om kwaliteitscontroles uit te voeren.</p>
-                
-                <h4>Artikel 7 - Verzekeringen</h4>
-                <p>Partner dient te beschikken over een geldige aansprakelijkheidsverzekering en andere benodigde verzekeringen voor de uitvoering van opdrachten.</p>
-                
-                <h4>Artikel 8 - Geheimhouding</h4>
-                <p>Partner verplicht zich tot geheimhouding van alle vertrouwelijke informatie die hij in het kader van de samenwerking verwerft.</p>
-                
-                <h4>Artikel 9 - Intellectueel eigendom</h4>
-                <p>Alle intellectuele eigendomsrechten op het platform en de daarbij behorende materialen blijven eigendom van Friettruckhuren.nl.</p>
-                
-                <h4>Artikel 10 - Aansprakelijkheid</h4>
-                <p>Friettruckhuren.nl is niet aansprakelijk voor schade die Partner lijdt in verband met de uitvoering van opdrachten, tenzij sprake is van opzet of bewuste roekeloosheid.</p>
-                
-                <h4>Artikel 11 - Schadevergoeding</h4>
-                <p>Partner is aansprakelijk voor alle schade die voortvloeit uit de uitvoering van opdrachten en dient deze te vergoeden aan Friettruckhuren.nl of derden.</p>
-                
-                <h4>Artikel 12 - Opzegging</h4>
-                <p>Beide partijen kunnen deze overeenkomst opzeggen met een opzegtermijn van 30 dagen, tenzij anders overeengekomen.</p>
-                
-                <h4>Artikel 13 - Wijzigingen</h4>
-                <p>Wijzigingen in deze voorwaarden worden schriftelijk medegedeeld en treden in werking 30 dagen na kennisgeving, tenzij Partner bezwaar maakt.</p>
-                
-                <h4>Artikel 14 - Geschillen</h4>
-                <p>Geschillen worden in eerste instantie opgelost door middel van overleg. Indien dit niet tot een oplossing leidt, worden geschillen voorgelegd aan de bevoegde rechter.</p>
-                
-                <h4>Artikel 15 - Toepasselijk recht</h4>
-                <p>Op deze overeenkomst is Nederlands recht van toepassing.</p>
-                
-                <h4>Artikel 16 - Overige bepalingen</h4>
-                <p>Indien een bepaling van deze voorwaarden nietig of vernietigbaar blijkt, blijven de overige bepalingen van kracht.</p>
+                <p><strong>Samenwerkingsovereenkomst Friettruckhuren.nl – Partner</strong></p>
+
+                <p>Datum: {today}</p>
+
+                <p><strong>Partijen</strong></p>
+                <p>Friettruckhuren.nl, handelsnaam van Treatlab VOF, gevestigd te Thomas 
+                Edisonstraat 14, 3284WD Zuid-Beijerland, ingeschreven bij de Kamer van Koophandel 
+                onder nummer 77075382, vertegenwoordigd door Robby Grob, hierna te noemen: 
+                "Friettruckhuren.nl",</p>
+                <p>en</p>
+                <p>{partner_name}, handelend onder de naam {partner_name}, gevestigd te {partner_street}, {partner_zip} {partner_city}, 
+                ingeschreven bij de Kamer van Koophandel onder nummer {partner_kvk}, 
+                hierna te noemen: "Partner".</p>
+
+                <p><strong>Artikel 1 – Doel van de samenwerking</strong></p>
+                <p>Friettruckhuren.nl exploiteert een platform waarop opdrachten voor mobiele 
+                frietcatering worden aangeboden. Friettruckhuren.nl verzorgt verkoop, marketing, 
+                communicatie met klanten en administratieve en financiële afhandeling. Partner kan 
+                via het partnerportaal opdrachten claimen en voert deze opdrachten zelfstandig uit. 
+                Partner blijft zelfstandig ondernemer en is verantwoordelijk voor zijn eigen 
+                bedrijfsvoering. Friettruckhuren.nl kan daarnaast opdrachten uitvoeren met eigen 
+                frietwagens.</p>
+
+                <p><strong>Artikel 2 – Duur van de overeenkomst</strong></p>
+                <p>Deze overeenkomst treedt in werking op {today} en geldt voor onbepaalde tijd. 
+                Beide partijen kunnen de overeenkomst schriftelijk opzeggen met een opzegtermijn 
+                van één maand. Lopende en bevestigde opdrachten worden bij beëindiging correct 
+                uitgevoerd.</p>
+
+                <p><strong>Artikel 3 – Opdrachten via het platform</strong></p>
+                <p>Opdrachten worden zichtbaar gemaakt in het Friettruckhuren.nl partnerportaal. 
+                Een opdracht met de status "Offerte" is nog niet definitief; pas na bevestiging 
+                door de klant wordt de opdracht omgezet naar een bindende order. Op het moment van 
+                bevestiging door de klant is de opdracht gegarandeerd voor de Partner die deze heeft 
+                geclaimd. Vanaf dat moment is Partner verantwoordelijk voor de uitvoering van de 
+                opdracht.</p>
+
+                <p><strong>Artikel 4 – Vergoeding</strong></p>
+                <p>Voor iedere opdracht wordt in het partnerportaal het bedrag weergegeven waarvoor 
+                de opdracht kan worden geclaimd. Door het claimen van de opdracht accepteert Partner 
+                deze vergoeding. De weergegeven vergoeding is inclusief btw.</p>
+
+                <p><strong>Artikel 5 – Betaling</strong></p>
+                <p>Particuliere klanten betalen opdrachten vooraf aan Friettruckhuren.nl. Voor 
+                zakelijke klanten kan een afwijkende betaaltermijn gelden. Deze betaaltermijn wordt 
+                weergegeven bij de opdracht in het partnerportaal. Door het claimen van een opdracht 
+                accepteert Partner de weergegeven betaaltermijn. Uitbetaling aan Partner vindt plaats 
+                nadat de betaling van de klant is ontvangen en wordt meegenomen in de eerstvolgende 
+                reguliere uitbetalingsronde. Friettruckhuren.nl spant zich in om betalingen van 
+                klanten tijdig te innen.</p>
+
+                <p><strong>Artikel 6 – Self-billing</strong></p>
+                <p>Friettruckhuren.nl werkt met een self-billingsysteem om administratieve verwerking 
+                te automatiseren. Facturen worden namens Partner opgesteld door Friettruckhuren.nl. 
+                Partner gaat door deelname aan deze overeenkomst akkoord met deze werkwijze. 
+                Self-billing facturen worden automatisch gegenereerd en verzonden op de ochtend twee 
+                nachten na de uitvoerdatum van de opdracht.</p>
+
+                <p><strong>Artikel 7 – Uitvoering van opdrachten</strong></p>
+                <p>Partner voert opdrachten zelf uit of met eigen personeel. Partner is 
+                verantwoordelijk voor: voedselveiligheid, naleving van HACCP, personeel en gedrag 
+                van personeel, apparatuur en voertuigen, naleving van relevante wet- en regelgeving. 
+                Partner zorgt voor een representatieve uitstraling van frietwagen en personeel.</p>
+
+                <p><strong>Artikel 8 – Verzekeringen</strong></p>
+                <p>Partner beschikt over een geldige bedrijfsaansprakelijkheidsverzekering (AVB). 
+                Op verzoek van Friettruckhuren.nl kan Partner een bewijs van verzekering 
+                overleggen.</p>
+
+                <p><strong>Artikel 9 – Vrijwaring</strong></p>
+                <p>Partner vrijwaart Friettruckhuren.nl volledig tegen alle aanspraken van derden 
+                die voortvloeien uit de uitvoering van de opdracht door Partner. Dit omvat onder 
+                andere schade door: voedselvergiftiging, brand, letselschade, materiële schade.</p>
+
+                <p><strong>Artikel 10 – Overdracht van opdrachten</strong></p>
+                <p>Partner blijft verantwoordelijk voor een geclaimde opdracht. Zolang een opdracht 
+                de status "Offerte" heeft, kan Partner de opdracht vrijgeven via het partnerportaal 
+                waarna deze direct weer beschikbaar wordt voor andere partners. Indien een opdracht 
+                de status "Order" heeft, kan Partner de opdracht via het portaal vrijgeven voor 
+                transfer, waarna andere partners deze kunnen claimen. Totdat een andere partner de 
+                opdracht heeft geclaimd of Friettruckhuren.nl de overdracht schriftelijk bevestigt, 
+                blijft Partner verantwoordelijk voor de opdracht. Indien Partner zonder geldige reden 
+                niet verschijnt bij een bevestigde opdracht met status "Order" geldt de boeteregeling 
+                uit Artikel 11.</p>
+
+                <p><strong>Artikel 11 – Niet-nakoming</strong></p>
+                <p>Indien Partner zonder geldige reden niet verschijnt bij een bevestigde opdracht 
+                geldt een direct opeisbare boete van €250 per incident. Eventuele aanvullende schade 
+                kan aanvullend worden verhaald.</p>
+
+                <p><strong>Artikel 12 – Klantrelatie</strong></p>
+                <p>Klantgegevens die via Friettruckhuren.nl worden verkregen blijven eigendom van 
+                Friettruckhuren.nl. Partner gebruikt klantgegevens uitsluitend voor de uitvoering 
+                van de betreffende opdracht. Het is Partner niet toegestaan om klanten die via 
+                Friettruckhuren.nl zijn verkregen rechtstreeks te benaderen met als doel toekomstige 
+                opdrachten buiten Friettruckhuren.nl om te laten plaatsvinden. Deze bepaling geldt 
+                zowel tijdens de looptijd van de samenwerking als gedurende 12 maanden na beëindiging 
+                van de overeenkomst. Bij overtreding van dit artikel is Partner een direct opeisbare 
+                boete van €1.000 per overtreding verschuldigd aan Friettruckhuren.nl, onverminderd 
+                het recht op aanvullende schadevergoeding.</p>
+
+                <p><strong>Artikel 13 – Privacy</strong></p>
+                <p>Partner verwerkt persoonsgegevens conform de Algemene Verordening 
+                Gegevensbescherming (AVG). Klantgegevens mogen niet worden gebruikt voor eigen 
+                marketingdoeleinden.</p>
+
+                <p><strong>Artikel 14 – Overmacht</strong></p>
+                <p>Onder overmacht wordt verstaan omstandigheden buiten de redelijke controle van 
+                partijen. Technische problemen aan voertuigen of apparatuur van Partner gelden niet 
+                als overmacht. Partner dient Friettruckhuren.nl bij overmacht zo spoedig mogelijk 
+                te informeren.</p>
+
+                <p><strong>Artikel 15 – Aansprakelijkheid</strong></p>
+                <p>Friettruckhuren.nl is niet aansprakelijk voor schade veroorzaakt tijdens 
+                uitvoering van opdrachten door Partner. De aansprakelijkheid van Friettruckhuren.nl 
+                jegens Partner is beperkt tot het bedrag dat door haar verzekering wordt uitgekeerd. 
+                Aansprakelijkheid voor indirecte schade, gevolgschade of gederfde winst is 
+                uitgesloten.</p>
+
+                <p><strong>Artikel 16 – Toepasselijk recht</strong></p>
+                <p>Op deze overeenkomst is Nederlands recht van toepassing. Geschillen worden 
+                voorgelegd aan de bevoegde rechter te Rotterdam.</p>
+
+                <p><strong>Ondertekening</strong></p>
+                <p>Namens Friettruckhuren.nl: Robby Grob</p>
+                <p>Namens Partner: {partner_name}</p>
+                <p>Bedrijfsnaam: {partner_name}</p>
+                <p>Datum: {today}</p>
             </div>
             
                 <p style="font-size:12px;color:#666;">Scroll omhoog om de volledige overeenkomst te lezen.</p>
@@ -623,6 +665,23 @@ async def onboarding_post(
                             Ik ga akkoord met de samenwerkingsovereenkomst en algemene voorwaarden
                         </label>
                     </div>
+                    <div style="margin:16px 0;">
+                        <label>
+                            <input type="checkbox" name="avb_akkoord" required>
+                            Ik beschik over een geldige bedrijfsaansprakelijkheidsverzekering (AVB). 
+                            Op verzoek van Friettruckhuren.nl kan ik een bewijs van verzekering overleggen. 
+                            (Artikel 8)
+                            <span style="color:red;">*</span>
+                        </label>
+                    </div>
+                    <div style="margin:16px 0;">
+                        <label>
+                            <input type="checkbox" name="selfbilling_akkoord" required>
+                            Ik ga akkoord met het self-billingsysteem waarbij facturen namens mij worden 
+                            opgesteld door Friettruckhuren.nl. (Artikel 6)
+                            <span style="color:red;">*</span>
+                        </label>
+                    </div>
                     <button type="submit">Bevestigen</button>
                 </form>
             </div>
@@ -632,9 +691,11 @@ async def onboarding_post(
         return HTMLResponse(content=html_content)
     
     elif step == "2":
+        # Step 2: Validate checkboxes
+        if not contract_agreed or not avb_akkoord or not selfbilling_akkoord:
+            return HTMLResponse("Beide verklaringen zijn verplicht.", status_code=400)
+        
         # Step 2: Save to Odoo and redirect
-        if not contract_agreed:
-            raise HTTPException(status_code=400, detail="U moet akkoord gaan met de voorwaarden")
         
         onboarding_data = request.session.get("onboarding_data")
         if not onboarding_data:
@@ -751,7 +812,9 @@ async def dashboard(request: Request):
         pos = client.execute_kw(
             "sale.order",
             "search_read",
-            ["|",
+            ["&",
+             ["state", "in", ["sent", "sale"]],
+             "|",
              ["x_studio_selection_field_67u_1jj77rtf7", "=", "beschikbaar"],
              "&",
              ["x_studio_selection_field_67u_1jj77rtf7", "=", "transfer"],
@@ -771,6 +834,8 @@ async def dashboard(request: Request):
             "sale.order",
             "search_read",
             ["&",
+             ["state", "in", ["sent", "sale"]],
+             "&",
              ["x_studio_contractor", "=", partner["id"]],
              "|",
              ["x_studio_selection_field_67u_1jj77rtf7", "=", "claimed"],
@@ -1321,13 +1386,18 @@ async def dashboard(request: Request):
                     desc_list = ' | '.join(descriptions)
                     desc_html = f'<div class="po-card-row"><div class="po-detail">📦 {desc_list}</div></div>'
                 
-                # Button based on status
-                if po_selection_status == "claimed":
-                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background:white; color:#e74c3c; border:1px solid #e74c3c; padding:6px 14px; width:auto; margin-left:auto;">Bied aan</button>'
-                elif po_selection_status == "transfer":
-                    button_html = '<button class="claim-btn" disabled style="background: #3498db; width:auto; padding:8px 20px; margin-left:auto;">Transfer</button>'
+                # Button based on order state
+                if po_state == "sent":
+                    # Offerte: Annuleren button - sets status back to "beschikbaar"
+                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background:white; color:#e74c3c; border:1px solid #e74c3c; padding:6px 14px; width:auto; margin-left:auto;">Annuleren</button>'
+                elif po_state == "sale":
+                    # Order: Zoek Vervanger button - sets status to "transfer"
+                    if po_selection_status == "transfer":
+                        button_html = '<button class="claim-btn" disabled style="background: #3498db; width:auto; padding:8px 20px; margin-left:auto;">Transfer</button>'
+                    else:
+                        button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background:white; color:#e74c3c; border:1px solid #e74c3c; padding:6px 14px; width:auto; margin-left:auto;">Zoek Vervanger</button>'
                 else:
-                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background:white; color:#e74c3c; border:1px solid #e74c3c; padding:6px 14px; width:auto; margin-left:auto;">Bied aan</button>'
+                    button_html = ''
                 
                 html_content += f"""
                         <div class="po-card" data-section="mijn">
@@ -1491,6 +1561,20 @@ async def claim_po(request: Request, po_id: int):
     try:
         client = get_odoo_client()
         
+        # Check if partner has bank account before allowing claim
+        banks = client.execute_kw(
+            "res.partner.bank",
+            "search_read",
+            [["partner_id", "=", partner_id]],
+            {"fields": ["id"], "limit": 1}
+        )
+        
+        if not banks or len(banks) == 0:
+            return JSONResponse(
+                {"success": False, "error": "Vul eerst je bankgegevens in via 'Mijn gegevens' voordat je opdrachten kunt claimen. Self-billing vereist een geregistreerde bankrekening (Artikel 4.5)."},
+                status_code=400
+            )
+        
         # Read current partner_invoice_id before write
         current = client.execute_kw(
             "sale.order", "read", [po_id],
@@ -1533,20 +1617,46 @@ async def release_po(request: Request, po_id: int):
     partner = get_partner_from_session(request)
     try:
         client = get_odoo_client()
-        _LOG.info(f"[DEBUG release] po_id: {po_id}, writing transfer status")
+        
+        # Read current order state before updating
+        current = client.execute_kw(
+            "sale.order",
+            "read",
+            [po_id],
+            {"fields": ["state"]}
+        )
+        order_state = current[0]["state"] if current and len(current) > 0 else None
+        
+        _LOG.info(f"[DEBUG release] po_id: {po_id}, order_state: {order_state}")
+        
+        # Determine update values based on state
+        if order_state == "sent":
+            # Offerte: set back to "beschikbaar" and clear contractor
+            update_values = {
+                "x_studio_selection_field_67u_1jj77rtf7": "beschikbaar",
+                "x_studio_contractor": False
+            }
+        elif order_state == "sale":
+            # Order: set to "transfer", keep contractor
+            update_values = {
+                "x_studio_selection_field_67u_1jj77rtf7": "transfer"
+            }
+        else:
+            return JSONResponse({"success": False, "error": "Onbekende order status"}, status_code=400)
+        
         result = client.execute_kw(
             "sale.order",
             "write",
             [po_id],
-            {"x_studio_selection_field_67u_1jj77rtf7": "transfer"}
+            update_values
         )
         _LOG.info(f"[DEBUG release] result: {result}")
         if not result:
-            return {"success": False, "error": "Update mislukt"}
-        return {"success": True}
+            return JSONResponse({"success": False, "error": "Update mislukt"}, status_code=400)
+        return JSONResponse({"success": True})
     except Exception as e:
         _LOG.error(f"Release PO fout: {e}")
-        return {"success": False, "error": str(e)}
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 @router.get("/partner-orders", response_class=HTMLResponse)
 async def partner_orders(request: Request):
