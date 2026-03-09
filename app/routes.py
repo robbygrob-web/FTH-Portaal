@@ -760,7 +760,7 @@ async def dashboard(request: Request):
             {
                 "fields": ["id", "name", "date_order", "x_studio_inkoop_partner_incl_btw", "state", 
                            "commitment_date", "x_studio_plaats", "x_studio_aantal_personen", 
-                           "x_studio_aantal_kinderen", "tax_totals", "x_studio_ordertype", "payment_term_id", "order_line"],
+                           "x_studio_aantal_kinderen", "tax_totals", "x_studio_ordertype", "payment_term_id", "order_line", "x_studio_selection_field_67u_1jj77rtf7"],
                 "order": "id desc",
                 "limit": 50
             }
@@ -862,15 +862,14 @@ async def dashboard(request: Request):
         button_color = '#27ae60' if selfbilling else '#e67e22'
         mijn_gegevens_button = f'<a href="/onboarding" style="background:{button_color};color:white;padding:10px 20px;border-radius:8px;text-decoration:none;margin-left:20px;">Mijn gegevens</a>'
         
-        # Calculate stats
-        all_orders = pos + claimed
-        count_offertes = sum(1 for po in all_orders if po.get('state') == 'sent')
-        count_orders = sum(1 for po in all_orders if po.get('state') == 'sale')
+        # Calculate stats (only claimed orders)
+        count_offertes = sum(1 for po in claimed if po.get('state') == 'sent')
+        count_orders = sum(1 for po in claimed if po.get('state') == 'sale')
         count_geclaimd = len(claimed)
         
         # Calculate amount totals
-        total_offertes = sum(po.get('x_studio_inkoop_partner_incl_btw', 0) or 0 for po in all_orders if po.get('state') == 'sent')
-        total_orders = sum(po.get('x_studio_inkoop_partner_incl_btw', 0) or 0 for po in all_orders if po.get('state') == 'sale')
+        total_offertes = sum(po.get('x_studio_inkoop_partner_incl_btw', 0) or 0 for po in claimed if po.get('state') == 'sent')
+        total_orders = sum(po.get('x_studio_inkoop_partner_incl_btw', 0) or 0 for po in claimed if po.get('state') == 'sale')
         total_geclaimd = sum(po.get('x_studio_inkoop_partner_incl_btw', 0) or 0 for po in claimed)
         
         html_content = f"""
@@ -1030,18 +1029,18 @@ async def dashboard(request: Request):
                 <div class="stat">
                     <span class="stat-number">{count_offertes}</span>
                     <span class="stat-amount">€ {total_offertes:,.0f}</span>
-                    <span class="stat-label">Offertes</span>
+                    <span class="stat-label">Mijn offertes</span>
                 </div>
                 <div class="stat">
                     <span class="stat-number">{count_orders}</span>
                     <span class="stat-amount">€ {total_orders:,.0f}</span>
-                    <span class="stat-label">Orders</span>
+                    <span class="stat-label">Mijn orders</span>
                 </div>
                 <div class="stat">
                     <span class="stat-number">{count_geclaimd}</span>
                     <span class="stat-amount">€ {total_geclaimd:,.0f}</span>
-                    <span class="stat-label">Mijn opdrachten</span>
-                    </div>
+                    <span class="stat-label">Mijn totaal</span>
+                </div>
                 </div>
                 
                 <div id="message-container"></div>
@@ -1102,6 +1101,15 @@ async def dashboard(request: Request):
                 elif po_ordertype == 'b2c':
                     ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Particulier</span>'
                 
+                # Status badge
+                status_badge = ''
+                if po_selection_status in ("beschikbaar", "nieuw"):
+                    status_badge = '<span style="background:#e67e22;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-left:6px;">Beschikbaar</span>'
+                elif po_selection_status == "claimed":
+                    status_badge = '<span style="background:#3498db;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-left:6px;">Geclaimd</span>'
+                elif po_selection_status == "transfer":
+                    status_badge = '<span style="background:#e74c3c;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-left:6px;">Transfer</span>'
+                
                 # Payment terms (only for b2b)
                 payment_terms_html = ''
                 if po_ordertype == 'b2b' and po_payment_term:
@@ -1134,6 +1142,7 @@ async def dashboard(request: Request):
                             <span class="po-detail" style="margin-left:4px;">{short_date}</span>
                             <span class="po-name" style="margin-left:8px;">{po_name}</span>
                             {ordertype_badge}
+                            {status_badge}
                         </div>
                         {desc_html}
                         <div class="po-card-row">
@@ -1326,7 +1335,7 @@ async def dashboard(request: Request):
         
         html_content += """
                 </div>
-            </div>
+                </div>
             </div>
             
             <script>
