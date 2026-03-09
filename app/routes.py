@@ -30,27 +30,35 @@ async def login_page(request: Request):
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>FTH Portaal - Inloggen</title>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                font-family: 'Montserrat', sans-serif;
+                background: #fffdf2;
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 padding: 20px;
             }
+            .logo {
+                font-size: 24px;
+                font-weight: 900;
+                color: #333333;
+                text-align: center;
+                margin-bottom: 30px;
+            }
             .login-container {
                 background: white;
                 border-radius: 12px;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
                 padding: 40px;
                 width: 100%;
                 max-width: 400px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             }
             h1 {
-                color: #333;
+                color: #333333;
                 margin-bottom: 10px;
                 font-size: 28px;
             }
@@ -65,7 +73,7 @@ async def login_page(request: Request):
             label {
                 display: block;
                 margin-bottom: 8px;
-                color: #333;
+                color: #333333;
                 font-weight: 500;
                 font-size: 14px;
             }
@@ -81,26 +89,18 @@ async def login_page(request: Request):
             input[type="email"]:focus,
             input[type="password"]:focus {
                 outline: none;
-                border-color: #667eea;
+                border-color: #e2af13;
             }
             button {
                 width: 100%;
                 padding: 14px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
+                background: #fec82a;
+                color: #333333;
                 border: none;
                 border-radius: 8px;
                 font-size: 16px;
-                font-weight: 600;
+                font-weight: 700;
                 cursor: pointer;
-                transition: transform 0.2s, box-shadow 0.2s;
-            }
-            button:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-            }
-            button:active {
-                transform: translateY(0);
             }
             .error {
                 background: #fee;
@@ -114,6 +114,7 @@ async def login_page(request: Request):
     </head>
     <body>
         <div class="login-container">
+            <div class="logo">FRIETTRUCKHUREN.NL</div>
             <h1>FTH Portaal</h1>
             <p class="subtitle">Inloggen voor leveranciers</p>
             <form method="post" action="/login">
@@ -266,58 +267,134 @@ async def onboarding_get(request: Request):
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>FTH Portaal - Onboarding</title>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Montserrat', sans-serif;
+                background: #fffdf2;
+                min-height: 100vh;
+                padding: 20px;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+            }
+            .logo {
+                font-size: 24px;
+                font-weight: 900;
+                color: #333333;
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .form-container {
+                background: white;
+                max-width: 600px;
+                width: 100%;
+                padding: 30px;
+                border-radius: 12px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            h1 {
+                color: #333333;
+                margin-bottom: 20px;
+            }
+            .form-group {
+                margin-bottom: 20px;
+            }
+            label {
+                display: block;
+                margin-bottom: 8px;
+                color: #333333;
+                font-weight: 500;
+                font-size: 14px;
+            }
+            input[type="text"],
+            input[type="email"] {
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e0e0e0;
+                border-radius: 8px;
+                font-size: 16px;
+                transition: border-color 0.3s;
+            }
+            input[type="text"]:focus,
+            input[type="email"]:focus {
+                outline: none;
+                border-color: #e2af13;
+            }
+            small {
+                display: block;
+                color: #999;
+                font-size: 12px;
+                margin-top: 4px;
+            }
+            button {
+                width: 100%;
+                padding: 14px;
+                background: #fec82a;
+                color: #333333;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 700;
+                cursor: pointer;
+                margin-top: 20px;
+            }
+        </style>
     </head>
     <body>
-        <h1>Onboarding</h1>
-        <p>Vul uw gegevens in om verder te gaan.</p>
-        <form method="post" action="/onboarding">
-            <div>
-                <label for="name">Bedrijfsnaam:</label>
-                <input type="text" id="name" name="name" autocomplete="organization" required>
-            </div>
-            <div>
-                <label for="street">Straat:</label>
-                <input type="text" id="street" name="street" autocomplete="street-address">
-            </div>
-            <div>
-                <label for="zip">Postcode:</label>
-                <input type="text" id="zip" name="zip" autocomplete="postal-code">
-            </div>
-            <div>
-                <label for="city">Stad:</label>
-                <input type="text" id="city" name="city" autocomplete="address-level2">
-            </div>
-            <div>
-                <label for="vat">BTW nummer:</label>
-                <input type="text" id="vat" name="vat" pattern="NL[0-9]{9}B[0-9]{2}" title="Voer een geldig BTW nummer in, bijv. NL123456782B90" autocomplete="off">
-                <small style="color:#999;">Bijv. NL123456782B90</small>
-            </div>
-            <div>
-                <label for="peppol_endpoint">KvK nummer:</label>
-                <input type="text" id="peppol_endpoint" name="peppol_endpoint" pattern="[0-9]{8}" title="Voer een geldig KvK nummer in" autocomplete="off">
-                <small style="color:#999;">Bijv. 12345678</small>
-            </div>
-            <div>
-                <label for="email">E-mail:</label>
-                <input type="email" id="email" name="email" autocomplete="email">
-            </div>
-            <div>
-                <label for="phone">Telefoon:</label>
-                <input type="text" id="phone" name="phone" pattern="([+]31|0)[0-9]{9}" title="Voer een geldig telefoonnummer in, bijv. 0612345678 of +31612345678" autocomplete="tel">
-                <small style="color:#999;">Bijv. 0612345678</small>
-            </div>
-            <div>
-                <label for="iban">IBAN nummer:</label>
-                <input type="text" id="iban" name="iban" pattern="[A-Z]{2}[0-9]{2}[A-Z]{4}[0-9]{10}" title="Voer een geldig IBAN in, bijv. NL91ABNA0417164300" autocomplete="off">
-                <small style="color:#999;">Bijv. NL91ABNA0417164300</small>
-            </div>
-            <div>
-                <label for="bank_ten_naamstelling">Tenaamstelling:</label>
-                <input type="text" id="bank_ten_naamstelling" name="bank_ten_naamstelling" autocomplete="name">
-            </div>
-            <input type="hidden" name="step" value="1">
-            <button type="submit">Verder →</button>
-        </form>
+        <div class="form-container">
+            <div class="logo">FRIETTRUCKHUREN.NL</div>
+            <h1>Onboarding</h1>
+            <p>Vul uw gegevens in om verder te gaan.</p>
+            <form method="post" action="/onboarding">
+                <div class="form-group">
+                    <label for="name">Bedrijfsnaam:</label>
+                    <input type="text" id="name" name="name" autocomplete="organization" required>
+                </div>
+                <div class="form-group">
+                    <label for="street">Straat:</label>
+                    <input type="text" id="street" name="street" autocomplete="street-address">
+                </div>
+                <div class="form-group">
+                    <label for="zip">Postcode:</label>
+                    <input type="text" id="zip" name="zip" autocomplete="postal-code">
+                </div>
+                <div class="form-group">
+                    <label for="city">Stad:</label>
+                    <input type="text" id="city" name="city" autocomplete="address-level2">
+                </div>
+                <div class="form-group">
+                    <label for="vat">BTW nummer:</label>
+                    <input type="text" id="vat" name="vat" pattern="NL[0-9]{9}B[0-9]{2}" title="Voer een geldig BTW nummer in, bijv. NL123456782B90" autocomplete="off">
+                    <small>Bijv. NL123456782B90</small>
+                </div>
+                <div class="form-group">
+                    <label for="peppol_endpoint">KvK nummer:</label>
+                    <input type="text" id="peppol_endpoint" name="peppol_endpoint" pattern="[0-9]{8}" title="Voer een geldig KvK nummer in" autocomplete="off">
+                    <small>Bijv. 12345678</small>
+                </div>
+                <div class="form-group">
+                    <label for="email">E-mail:</label>
+                    <input type="email" id="email" name="email" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="phone">Telefoon:</label>
+                    <input type="text" id="phone" name="phone" pattern="([+]31|0)[0-9]{9}" title="Voer een geldig telefoonnummer in, bijv. 0612345678 of +31612345678" autocomplete="tel">
+                    <small>Bijv. 0612345678</small>
+                </div>
+                <div class="form-group">
+                    <label for="iban">IBAN nummer:</label>
+                    <input type="text" id="iban" name="iban" pattern="[A-Z]{2}[0-9]{2}[A-Z]{4}[0-9]{10}" title="Voer een geldig IBAN in, bijv. NL91ABNA0417164300" autocomplete="off">
+                    <small>Bijv. NL91ABNA0417164300</small>
+                </div>
+                <div class="form-group">
+                    <label for="bank_ten_naamstelling">Tenaamstelling:</label>
+                    <input type="text" id="bank_ten_naamstelling" name="bank_ten_naamstelling" autocomplete="name">
+                </div>
+                <input type="hidden" name="step" value="1">
+                <button type="submit">Verder →</button>
+            </form>
     </body>
     </html>
     """
@@ -393,16 +470,57 @@ async def onboarding_post(
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>FTH Portaal - Contract</title>
+            <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
             <style>
-                body {{ font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }}
-                h1 {{ text-align: center; }}
-                .checkbox-section {{ margin: 30px 0; padding: 20px; background: #f5f5f5; border-radius: 8px; }}
-                button {{ padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }}
-                button:hover {{ background: #5568d3; }}
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{ 
+                    font-family: 'Montserrat', sans-serif;
+                    background: #fffdf2;
+                    padding: 20px;
+                    max-width: 600px;
+                    margin: 0 auto;
+                }}
+                .logo {{
+                    font-size: 24px;
+                    font-weight: 900;
+                    color: #333333;
+                    text-align: center;
+                    margin-bottom: 20px;
+                }}
+                .contract-container {{
+                    background: white;
+                    padding: 30px;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }}
+                h1 {{ 
+                    color: #333333;
+                    text-align: center;
+                    margin-bottom: 20px;
+                }}
+                .checkbox-section {{ 
+                    margin: 30px 0; 
+                    padding: 20px; 
+                    background: #f5f5f5; 
+                    border-radius: 8px; 
+                }}
+                button {{ 
+                    width: 100%;
+                    padding: 14px; 
+                    background: #fec82a; 
+                    color: #333333; 
+                    border: none; 
+                    border-radius: 8px; 
+                    font-size: 16px; 
+                    font-weight: 700;
+                    cursor: pointer; 
+                }}
             </style>
         </head>
         <body>
-            <h1>Samenwerkingsovereenkomst Friettruckhuren.nl</h1>
+            <div class="logo">FRIETTRUCKHUREN.NL</div>
+            <div class="contract-container">
+                <h1>Samenwerkingsovereenkomst Friettruckhuren.nl</h1>
             
             <div style="height:300px; overflow-y:scroll; border:1px solid #ccc; padding:15px; background:#f9f9f9; font-size:13px; line-height:1.6;">
                 <p><strong>Datum:</strong> {today}</p>
@@ -495,18 +613,19 @@ async def onboarding_post(
                 <p>Indien een bepaling van deze voorwaarden nietig of vernietigbaar blijkt, blijven de overige bepalingen van kracht.</p>
             </div>
             
-            <p style="font-size:12px;color:#666;">Scroll omhoog om de volledige overeenkomst te lezen.</p>
-            
-            <form method="post" action="/onboarding">
-                <input type="hidden" name="step" value="2">
-                <div class="checkbox-section">
-                    <label>
-                        <input type="checkbox" name="contract_agreed" value="1" required>
-                        Ik ga akkoord met de samenwerkingsovereenkomst en algemene voorwaarden
-                    </label>
-                </div>
-                <button type="submit">Bevestigen</button>
-            </form>
+                <p style="font-size:12px;color:#666;">Scroll omhoog om de volledige overeenkomst te lezen.</p>
+                
+                <form method="post" action="/onboarding">
+                    <input type="hidden" name="step" value="2">
+                    <div class="checkbox-section">
+                        <label>
+                            <input type="checkbox" name="contract_agreed" value="1" required>
+                            Ik ga akkoord met de samenwerkingsovereenkomst en algemene voorwaarden
+                        </label>
+                    </div>
+                    <button type="submit">Bevestigen</button>
+                </form>
+            </div>
         </body>
         </html>
         """
@@ -641,7 +760,7 @@ async def dashboard(request: Request):
             {
                 "fields": ["id", "name", "date_order", "x_studio_inkoop_partner_incl_btw", "state", 
                            "commitment_date", "x_studio_plaats", "x_studio_aantal_personen", 
-                           "x_studio_aantal_kinderen", "tax_totals", "x_studio_ordertype", "payment_term_id"],
+                           "x_studio_aantal_kinderen", "tax_totals", "x_studio_ordertype", "payment_term_id", "order_line"],
                 "order": "id desc",
                 "limit": 50
             }
@@ -660,11 +779,35 @@ async def dashboard(request: Request):
             {
                 "fields": ["id", "name", "date_order", "x_studio_inkoop_partner_incl_btw", "state",
                            "commitment_date", "x_studio_plaats", "x_studio_aantal_personen",
-                           "x_studio_aantal_kinderen", "x_studio_selection_field_67u_1jj77rtf7", "x_studio_ordertype", "payment_term_id"],
+                           "x_studio_aantal_kinderen", "x_studio_selection_field_67u_1jj77rtf7", "x_studio_ordertype", "payment_term_id", "order_line"],
                 "order": "id desc",
                 "limit": 50
             }
         )
+        
+        # Collect all order_line IDs
+        all_line_ids = []
+        for po in pos + claimed:
+            order_lines = po.get('order_line', [])
+            if order_lines:
+                all_line_ids.extend(order_lines)
+        
+        # Fetch order lines if IDs exist
+        lines_by_order = {}
+        if all_line_ids:
+            lines = client.execute_kw(
+                "sale.order.line",
+                "read",
+                all_line_ids,
+                {"fields": ["order_id", "name"]}
+            )
+            
+            # Build lookup dictionary
+            for line in lines:
+                order_id = line['order_id'][0] if isinstance(line['order_id'], (list, tuple)) else line['order_id']
+                if order_id not in lines_by_order:
+                    lines_by_order[order_id] = []
+                lines_by_order[order_id].append(line['name'])
         
         # Filter orders: keep only those with commitment_date >= today or False/None
         today = date.today()
@@ -700,6 +843,20 @@ async def dashboard(request: Request):
         pos = pos_filtered
         claimed = claimed_filtered
         
+        # Sort both lists by commitment_date ascending
+        pos.sort(key=lambda x: x.get('commitment_date') or '9999')
+        claimed.sort(key=lambda x: x.get('commitment_date') or '9999')
+        
+        # Helper function to format date as DD-MM
+        def format_short_date(date_str):
+            if not date_str or date_str == 'N/A':
+                return 'N/A'
+            try:
+                date_obj = datetime.strptime(date_str[:10], '%Y-%m-%d')
+                return date_obj.strftime('%d-%m')
+            except:
+                return date_str[:10] if len(date_str) >= 10 else date_str
+        
         # Bepaal button kleur op basis van selfbilling_compleet
         selfbilling = partner.get('selfbilling_compleet', False)
         button_color = '#27ae60' if selfbilling else '#e67e22'
@@ -723,195 +880,290 @@ async def dashboard(request: Request):
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>FTH Portaal - Dashboard</title>
+            <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
             <style>
                 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
                 body {{
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                    background: #f5f5f5;
-                    min-height: 100vh;
-                    padding: 20px;
-                }}
-                .header {{
-                    background: white;
-                    padding: 20px 30px;
-                    border-radius: 12px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    margin-bottom: 30px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }}
-                .header h1 {{
-                    color: #333;
-                    font-size: 24px;
-                }}
-                .user-info {{
-                    display: flex;
-                    align-items: center;
-                    gap: 20px;
-                }}
-                .user-name {{
-                    color: #666;
-                    font-size: 14px;
-                }}
-                .logout-btn {{
-                    padding: 8px 16px;
-                    background: #dc3545;
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 6px;
-                    font-size: 14px;
-                    transition: background 0.3s;
-                }}
-                .logout-btn:hover {{
-                    background: #c82333;
-                }}
-                .container {{
-                    max-width: 1200px;
+                    font-family: 'Montserrat', sans-serif;
+                    background: #fffdf2;
+                    max-width: 600px;
                     margin: 0 auto;
+                    padding: 16px;
+                    padding-bottom: 70px;
                 }}
-                .po-grid {{
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-                    gap: 20px;
+                .stats-bar {{
+                    display: flex;
+                    gap: 12px;
+                    margin-bottom: 16px;
+                }}
+                .stat {{
+                    flex: 1;
+                    background: white;
+                    padding: 16px;
+                    border-radius: 12px;
+                    text-align: center;
+                }}
+                .stat-number {{
+                    display: block;
+                    font-size: 24px;
+                    font-weight: 700;
+                    color: #fec82a;
+                    margin-bottom: 4px;
+                }}
+                .stat-label {{
+                    display: block;
+                    font-size: 12px;
+                    color: #666;
+                }}
+                .stat-amount {{
+                    display: block;
+                    font-size: 12px;
+                    color: #27ae60;
+                    font-weight: 600;
+                    margin-bottom: 4px;
+                }}
+                .legend {{
+                    background: white;
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    margin-bottom: 12px;
+                    font-size: 13px;
+                    color: #666;
                 }}
                 .po-card {{
                     background: white;
                     border-radius: 12px;
-                    padding: 24px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    transition: transform 0.2s, box-shadow 0.2s;
+                    padding: 12px 16px;
+                    margin-bottom: 6px;
+                    width: 100%;
+                    box-sizing: border-box;
+                    overflow: hidden;
                 }}
-                .po-card:hover {{
-                    transform: translateY(-4px);
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                .po-card-row {{
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 4px;
+                    line-height: 1.4;
                 }}
                 .po-name {{
-                    font-size: 18px;
+                    font-size: 15px;
                     font-weight: 600;
                     color: #333;
-                    margin-bottom: 8px;
+                    margin: 0;
                 }}
                 .po-detail {{
                     color: #666;
-                    font-size: 14px;
-                    margin-bottom: 4px;
+                    font-size: 13px;
+                    margin: 0;
+                    line-height: 1.4;
+                }}
+                .po-amount-row {{
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-top: 8px;
                 }}
                 .po-amount {{
-                    font-size: 20px;
+                    font-size: 18px;
                     font-weight: 700;
-                    color: #667eea;
-                    margin: 12px 0;
+                    color: #333333;
+                    margin: 0;
                 }}
                 .claim-btn {{
-                    width: 100%;
-                    padding: 12px;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
+                    width: auto;
+                    padding: 8px 20px;
+                    background: #fec82a;
+                    color: #333333;
                     border: none;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: 600;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: 700;
                     cursor: pointer;
-                    transition: transform 0.2s, box-shadow 0.2s;
-                    margin-top: 12px;
-                }}
-                .claim-btn:hover {{
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 15px rgba(102, 126, 234, 0.4);
+                    margin: 0;
                 }}
                 .claim-btn:disabled {{
                     background: #ccc;
                     cursor: not-allowed;
-                    transform: none;
                 }}
                 .success-message {{
                     background: #d4edda;
                     color: #155724;
                     padding: 12px;
                     border-radius: 8px;
-                    margin-bottom: 20px;
+                    margin-bottom: 16px;
                 }}
                 .empty-state {{
                     text-align: center;
-                    padding: 60px 20px;
+                    padding: 40px 20px;
                     color: #666;
                 }}
-                .empty-state h2 {{
-                    margin-bottom: 10px;
-                    color: #333;
-                }}
-                .stats-bar {{
-                    display: flex;
-                    gap: 20px;
-                    margin-bottom: 30px;
-                }}
-                .stat {{
-                    flex: 1;
-                    background: white;
-                    padding: 20px;
-                    border-radius: 12px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    text-align: center;
-                }}
-                .stat-number {{
-                    display: block;
-                    font-size: 32px;
+                .section-header {{
+                    font-size: 20px;
                     font-weight: 700;
-                    color: #667eea;
-                    margin-bottom: 8px;
+                    color: #333;
+                    margin: 24px 0 16px 0;
                 }}
-                .stat-label {{
-                    display: block;
-                    font-size: 14px;
-                    color: #666;
+                .toggle-container {{
+                    margin-bottom: 16px;
                 }}
-                .stat-amount {{
-                    display: block;
+                .toggle-container label {{
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
                     font-size: 14px;
-                    color: #27ae60;
-                    font-weight: 600;
-                    margin-bottom: 8px;
+                    color: #333;
+                    cursor: pointer;
+                }}
+                .toggle-container input[type="checkbox"] {{
+                    width: 18px;
+                    height: 18px;
+                    cursor: pointer;
                 }}
             </style>
         </head>
         <body data-selfbilling-compleet="{partner.get('selfbilling_compleet', False)}">
-            <div class="container">
-                <div class="header">
-                    <h1>Beschikbare Inkooporders</h1>
-                    {mijn_gegevens_button}
-                    <div class="user-info">
-                        <span class="user-name">Ingelogd als: {partner['name']}</span>
-                        <a href="/logout" class="logout-btn">Uitloggen</a>
-                    </div>
+            <div style="text-align:center; padding:8px 0 16px 0;">
+                <span style="font-family:'Montserrat',sans-serif; font-weight:900; font-size:14px; color:#333333; letter-spacing:1px;">FRIETTRUCKHUREN.NL</span>
+            </div>
+            
+            <div class="stats-bar">
+                <div class="stat">
+                    <span class="stat-number">{count_offertes}</span>
+                    <span class="stat-amount">€ {total_offertes:,.0f}</span>
+                    <span class="stat-label">Offertes</span>
                 </div>
-                
-                <div class="stats-bar">
-                    <div class="stat">
-                        <span class="stat-number">{count_offertes}</span>
-                        <span class="stat-amount">€ {total_offertes:,.0f}</span>
-                        <span class="stat-label">Offertes</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-number">{count_orders}</span>
-                        <span class="stat-amount">€ {total_orders:,.0f}</span>
-                        <span class="stat-label">Orders</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-number">{count_geclaimd}</span>
-                        <span class="stat-amount">€ {total_geclaimd:,.0f}</span>
-                        <span class="stat-label">Mijn opdrachten</span>
+                <div class="stat">
+                    <span class="stat-number">{count_orders}</span>
+                    <span class="stat-amount">€ {total_orders:,.0f}</span>
+                    <span class="stat-label">Orders</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">{count_geclaimd}</span>
+                    <span class="stat-amount">€ {total_geclaimd:,.0f}</span>
+                    <span class="stat-label">Mijn opdrachten</span>
                     </div>
                 </div>
                 
                 <div id="message-container"></div>
                 
-                <div class="po-grid">
+            <div class="toggle-container">
+                <label>
+                    <input type="checkbox" id="splitToggle" checked onchange="toggleSplit()">
+                    <strong>Opdrachten splitsen</strong>
+                </label>
+            </div>
+            
+            <div id="merged-section" style="display:none;">
+                <div class="legend">
+                    <span style="color:#e67e22;">●</span> Beschikbaar &nbsp;
+                    <span style="color:#3498db;">●</span> Offerte &nbsp;
+                    <span style="color:#27ae60;">●</span> Order
+                </div>
+                <div id="merged-cards">
+        """
+        
+        # Render all cards in merged section (pos + claimed combined)
+        all_orders_merged = pos + claimed
+        if not all_orders_merged:
+            html_content += """
+                    <div class="empty-state">
+                        <h2>Geen opdrachten</h2>
+                        <p>Er zijn momenteel geen opdrachten beschikbaar.</p>
+                    </div>
+            """
+        else:
+            for po in all_orders_merged:
+                po_id = po.get('id')
+                po_name = po.get('name', 'N/A')
+                po_date = po.get('date_order', '')[:10] if po.get('date_order') else 'N/A'
+                po_amount = po.get('x_studio_inkoop_partner_incl_btw', 0)
+                po_state = po.get('state', 'N/A')
+                po_commitment_date = po.get('commitment_date', 'N/A') if po.get('commitment_date') else 'N/A'
+                short_date = format_short_date(po_commitment_date)
+                po_plaats = po.get('x_studio_plaats', 'N/A')
+                po_personen = po.get('x_studio_aantal_personen', 'N/A')
+                po_kinderen = po.get('x_studio_aantal_kinderen', 'N/A')
+                po_ordertype = po.get('x_studio_ordertype', '')
+                po_payment_term = po.get('payment_term_id', False)
+                po_selection_status = po.get('x_studio_selection_field_67u_1jj77rtf7', 'N/A')
+                
+                # Status bullet
+                if po_state == 'sent':
+                    bullet_color = '#3498db'
+                elif po_state == 'sale':
+                    bullet_color = '#27ae60'
+                else:
+                    bullet_color = '#e67e22'
+                
+                # Ordertype badge
+                ordertype_badge = ''
+                if po_ordertype == 'b2b':
+                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Zakelijk</span>'
+                elif po_ordertype == 'b2c':
+                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Particulier</span>'
+                
+                # Payment terms (only for b2b)
+                payment_terms_html = ''
+                if po_ordertype == 'b2b' and po_payment_term:
+                    payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) and len(po_payment_term) > 1 else str(po_payment_term)
+                    payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
+                
+                # Order line descriptions
+                descriptions = lines_by_order.get(po.get('id'), [])
+                desc_html = ''
+                if descriptions:
+                    desc_list = ' | '.join(descriptions)
+                    desc_html = f'<div class="po-card-row"><div class="po-detail">📦 {desc_list}</div></div>'
+                
+                # Button logic - check if it's in claimed list
+                is_claimed = any(c.get('id') == po_id for c in claimed)
+                if is_claimed:
+                    if po_selection_status == "claimed":
+                        button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c; width:auto; padding:8px 20px;">Zoek Vervanger</button>'
+                    elif po_selection_status == "transfer":
+                        button_html = '<button class="claim-btn" disabled style="background: #3498db; width:auto; padding:8px 20px;">Transfer</button>'
+                    else:
+                        button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c; width:auto; padding:8px 20px;">Zoek Vervanger</button>'
+                else:
+                    button_html = f'<button class="claim-btn" onclick="claimPO({po_id}, \'{po_name}\')" style="width:auto; padding:8px 20px;">Claim</button>'
+                
+                html_content += f"""
+                    <div class="po-card">
+                        <div class="po-card-row">
+                            <span style="color:{bullet_color};font-size:16px;">●</span>
+                            <span class="po-detail" style="margin-left:4px;">{short_date}</span>
+                            <span class="po-name" style="margin-left:8px;">{po_name}</span>
+                            {ordertype_badge}
+                        </div>
+                        {desc_html}
+                        <div class="po-card-row">
+                            <div class="po-detail">{po_plaats} | {po_personen}px {po_kinderen}kd</div>
+                        </div>
+                        {payment_terms_html}
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; width:100%;">
+                            <span style="font-size:18px; font-weight:700; color:#333333;">€ {po_amount:,.2f}</span>
+                            {button_html}
+                        </div>
+                    </div>
+                """
+        
+        html_content += """
+                </div>
+            </div>
+            
+            <div id="beschikbaar-section">
+                <h2 class="section-header">Beschikbare orders</h2>
+                <div class="legend">
+                    <span style="color:#e67e22;">●</span> Beschikbaar &nbsp;
+                    <span style="color:#3498db;">●</span> Offerte &nbsp;
+                    <span style="color:#27ae60;">●</span> Order
+                </div>
+                <div id="beschikbaar-cards">
         """
         
         if not pos:
             html_content += """
-                    <div class="empty-state" style="grid-column: 1 / -1;">
+                    <div class="empty-state">
                         <h2>Geen beschikbare inkooporders</h2>
                         <p>Er zijn momenteel geen inkooporders beschikbaar om te claimen.</p>
                     </div>
@@ -924,53 +1176,78 @@ async def dashboard(request: Request):
                 po_amount = po.get('x_studio_inkoop_partner_incl_btw', 0)
                 po_state = po.get('state', 'N/A')
                 po_commitment_date = po.get('commitment_date', 'N/A') if po.get('commitment_date') else 'N/A'
+                short_date = format_short_date(po_commitment_date)
                 po_plaats = po.get('x_studio_plaats', 'N/A')
                 po_personen = po.get('x_studio_aantal_personen', 'N/A')
                 po_kinderen = po.get('x_studio_aantal_kinderen', 'N/A')
                 po_ordertype = po.get('x_studio_ordertype', '')
                 po_payment_term = po.get('payment_term_id', False)
                 
+                # Status bullet
+                if po_state == 'sent':
+                    bullet_color = '#3498db'
+                elif po_state == 'sale':
+                    bullet_color = '#27ae60'
+                else:
+                    bullet_color = '#e67e22'
+                
                 # Ordertype badge
                 ordertype_badge = ''
                 if po_ordertype == 'b2b':
-                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">Zakelijk</span>'
+                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Zakelijk</span>'
                 elif po_ordertype == 'b2c':
-                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">Particulier</span>'
+                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Particulier</span>'
                 
                 # Payment terms (only for b2b)
                 payment_terms_html = ''
                 if po_ordertype == 'b2b' and po_payment_term:
                     payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) and len(po_payment_term) > 1 else str(po_payment_term)
-                    payment_terms_html = f'<div class="po-detail">Betaalconditie: {payment_term_name}</div>'
+                    payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
+                
+                # Order line descriptions
+                descriptions = lines_by_order.get(po.get('id'), [])
+                desc_html = ''
+                if descriptions:
+                    desc_list = ' | '.join(descriptions)
+                    desc_html = f'<div class="po-card-row"><div class="po-detail">📦 {desc_list}</div></div>'
                 
                 html_content += f"""
-                    <div class="po-card">
-                        <div class="po-name">{po_name}{ordertype_badge}</div>
-                        <div class="po-detail">Datum: {po_date}</div>
-                        <div class="po-detail">Status: {po_state}</div>
-                        <div class="po-detail">Leverdatum: {po_commitment_date}</div>
-                        <div class="po-detail">Locatie: {po_plaats}</div>
-                        <div class="po-detail">Aantal personen: {po_personen}</div>
-                        <div class="po-detail">Aantal kinderen: {po_kinderen}</div>
+                    <div class="po-card" data-section="beschikbaar">
+                        <div class="po-card-row">
+                            <span style="color:{bullet_color};font-size:16px;">●</span>
+                            <span class="po-detail" style="margin-left:4px;">{short_date}</span>
+                            <span class="po-name" style="margin-left:8px;">{po_name}</span>
+                            {ordertype_badge}
+                        </div>
+                        {desc_html}
+                        <div class="po-card-row">
+                            <div class="po-detail">{po_plaats} | {po_personen}px {po_kinderen}kd</div>
+                        </div>
                         {payment_terms_html}
-                        <div class="po-amount">€ {po_amount:,.2f}</div>
-                        <button class="claim-btn" onclick="claimPO({po_id}, '{po_name}')">
-                            Claim Inkooporder
-                        </button>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; width:100%;">
+                            <span style="font-size:18px; font-weight:700; color:#333333;">€ {po_amount:,.2f}</span>
+                            <button class="claim-btn" onclick="claimPO({po_id}, '{po_name}')" style="width:auto; padding:8px 20px;">Claim</button>
+                        </div>
                     </div>
                 """
         
         html_content += """
                 </div>
-                
-                <div style="margin-top: 40px;">
-                    <h2 style="color: #333; font-size: 20px; margin-bottom: 20px;">Mijn Opdrachten</h2>
-                    <div class="po-grid">
+            </div>
+            
+            <div id="mijn-section">
+                <h2 class="section-header">Mijn Opdrachten</h2>
+                <div class="legend">
+                    <span style="color:#e67e22;">●</span> Beschikbaar &nbsp;
+                    <span style="color:#3498db;">●</span> Offerte &nbsp;
+                    <span style="color:#27ae60;">●</span> Order
+                </div>
+                <div id="mijn-cards">
         """
         
         if not claimed:
             html_content += """
-                        <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div class="empty-state">
                             <h2>Geen opdrachten</h2>
                             <p>U heeft momenteel geen geclaimde opdrachten.</p>
                         </div>
@@ -983,6 +1260,7 @@ async def dashboard(request: Request):
                 po_amount = po.get('x_studio_inkoop_partner_incl_btw', 0)
                 po_state = po.get('state', 'N/A')
                 po_commitment_date = po.get('commitment_date', 'N/A') if po.get('commitment_date') else 'N/A'
+                short_date = format_short_date(po_commitment_date)
                 po_plaats = po.get('x_studio_plaats', 'N/A')
                 po_personen = po.get('x_studio_aantal_personen', 'N/A')
                 po_kinderen = po.get('x_studio_aantal_kinderen', 'N/A')
@@ -990,45 +1268,65 @@ async def dashboard(request: Request):
                 po_ordertype = po.get('x_studio_ordertype', '')
                 po_payment_term = po.get('payment_term_id', False)
                 
+                # Status bullet
+                if po_state == 'sent':
+                    bullet_color = '#3498db'
+                elif po_state == 'sale':
+                    bullet_color = '#27ae60'
+                else:
+                    bullet_color = '#e67e22'
+                
                 # Ordertype badge
                 ordertype_badge = ''
                 if po_ordertype == 'b2b':
-                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">Zakelijk</span>'
+                    ordertype_badge = '<span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Zakelijk</span>'
                 elif po_ordertype == 'b2c':
-                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">Particulier</span>'
+                    ordertype_badge = '<span style="background: #95a5a6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">Particulier</span>'
                 
                 # Payment terms (only for b2b)
                 payment_terms_html = ''
                 if po_ordertype == 'b2b' and po_payment_term:
                     payment_term_name = po_payment_term[1] if isinstance(po_payment_term, (list, tuple)) and len(po_payment_term) > 1 else str(po_payment_term)
-                    payment_terms_html = f'<div class="po-detail">Betaalconditie: {payment_term_name}</div>'
+                    payment_terms_html = f'<div class="po-card-row"><div class="po-detail">Betaalconditie: {payment_term_name}</div></div>'
+                
+                # Order line descriptions
+                descriptions = lines_by_order.get(po.get('id'), [])
+                desc_html = ''
+                if descriptions:
+                    desc_list = ' | '.join(descriptions)
+                    desc_html = f'<div class="po-card-row"><div class="po-detail">📦 {desc_list}</div></div>'
                 
                 # Button based on status
                 if po_selection_status == "claimed":
-                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c;">Zoek Vervanger</button>'
+                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c; width:auto; padding:8px 20px;">Zoek Vervanger</button>'
                 elif po_selection_status == "transfer":
-                    button_html = '<button class="claim-btn" disabled style="background: #3498db;">Beschikbaar voor transfer</button>'
+                    button_html = '<button class="claim-btn" disabled style="background: #3498db; width:auto; padding:8px 20px;">Transfer</button>'
                 else:
-                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c;">Zoek Vervanger</button>'
+                    button_html = f'<button class="claim-btn" onclick="releaseOrder({po_id}, \'{po_name}\')" style="background: #e74c3c; width:auto; padding:8px 20px;">Zoek Vervanger</button>'
                 
                 html_content += f"""
-                        <div class="po-card">
-                            <div class="po-name">{po_name}{ordertype_badge}</div>
-                            <div class="po-detail">Datum: {po_date}</div>
-                            <div class="po-detail">Status: {po_state}</div>
-                            <div class="po-detail">Leverdatum: {po_commitment_date}</div>
-                            <div class="po-detail">Locatie: {po_plaats}</div>
-                            <div class="po-detail">Aantal personen: {po_personen}</div>
-                            <div class="po-detail">Aantal kinderen: {po_kinderen}</div>
+                        <div class="po-card" data-section="mijn">
+                            <div class="po-card-row">
+                                <span style="color:{bullet_color};font-size:16px;">●</span>
+                                <span class="po-detail" style="margin-left:4px;">{short_date}</span>
+                                <span class="po-name" style="margin-left:8px;">{po_name}</span>
+                                {ordertype_badge}
+                            </div>
+                            {desc_html}
+                            <div class="po-card-row">
+                                <div class="po-detail">{po_plaats} | {po_personen}px {po_kinderen}kd</div>
+                            </div>
                             {payment_terms_html}
-                            <div class="po-amount">€ {po_amount:,.2f}</div>
-                            {button_html}
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; width:100%;">
+                                <span style="font-size:18px; font-weight:700; color:#333333;">€ {po_amount:,.2f}</span>
+                                {button_html}
+                            </div>
                         </div>
                 """
         
         html_content += """
-                    </div>
                 </div>
+            </div>
             </div>
             
             <script>
@@ -1113,6 +1411,7 @@ async def dashboard(request: Request):
                             showMessage(`Succesvol! Order ${poName} is vrijgegeven voor vervanger.`, 'success');
                             btn.textContent = 'Beschikbaar voor transfer';
                             btn.style.background = '#3498db';
+                            btn.disabled = true;
                         } else {
                             showMessage(result.error || 'Fout bij vrijgeven van order.', 'error');
                             btn.disabled = false;
@@ -1124,7 +1423,29 @@ async def dashboard(request: Request):
                         btn.textContent = 'Zoek Vervanger';
                     }
                 }
+                
+                function toggleSplit() {
+                    const toggle = document.getElementById('splitToggle');
+                    const beschikbaarSection = document.getElementById('beschikbaar-section');
+                    const mijnSection = document.getElementById('mijn-section');
+                    const mergedSection = document.getElementById('merged-section');
+                    
+                    if (toggle.checked) {
+                        beschikbaarSection.style.display = 'block';
+                        mijnSection.style.display = 'block';
+                        mergedSection.style.display = 'none';
+                    } else {
+                        beschikbaarSection.style.display = 'none';
+                        mijnSection.style.display = 'none';
+                        mergedSection.style.display = 'block';
+                    }
+                }
             </script>
+            <div style="position:fixed; bottom:0; left:0; right:0; background:#333333; padding:10px 16px; display:flex; justify-content:space-between; align-items:center; z-index:100;">
+                {mijn_gegevens_button}
+                <span style="color:#999; font-size:13px;">{partner['name']}</span>
+                <a href="/logout" style="background:#dc3545; color:white; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:13px;">Uitloggen</a>
+            </div>
         </body>
         </html>
         """
