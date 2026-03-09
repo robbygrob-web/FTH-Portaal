@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from app.odoo_client import get_odoo_client
 from app.auth import get_partner_auth
 import logging
-from datetime import datetime
+from datetime import datetime, date, date
 
 _LOG = logging.getLogger(__name__)
 
@@ -666,10 +666,55 @@ async def dashboard(request: Request):
             }
         )
         
+        # Filter orders: keep only those with commitment_date >= today or False/None
+        today = date.today()
+        pos_filtered = []
+        for po in pos:
+            commitment_date = po.get('commitment_date')
+            if not commitment_date:
+                pos_filtered.append(po)
+            else:
+                try:
+                    # Parse date string (format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+                    po_date = datetime.strptime(commitment_date[:10], '%Y-%m-%d').date()
+                    if po_date >= today:
+                        pos_filtered.append(po)
+                except:
+                    # If parsing fails, keep the order
+                    pos_filtered.append(po)
+        
+        claimed_filtered = []
+        for po in claimed:
+            commitment_date = po.get('commitment_date')
+            if not commitment_date:
+                claimed_filtered.append(po)
+            else:
+                try:
+                    po_date = datetime.strptime(commitment_date[:10], '%Y-%m-%d').date()
+                    if po_date >= today:
+                        claimed_filtered.append(po)
+                except:
+                    claimed_filtered.append(po)
+        
+        # Update pos and claimed with filtered lists
+        pos = pos_filtered
+        claimed = claimed_filtered
+        
         # Bepaal button kleur op basis van selfbilling_compleet
         selfbilling = partner.get('selfbilling_compleet', False)
         button_color = '#27ae60' if selfbilling else '#e67e22'
         mijn_gegevens_button = f'<a href="/onboarding" style="background:{button_color};color:white;padding:10px 20px;border-radius:8px;text-decoration:none;margin-left:20px;">Mijn gegevens</a>'
+        
+        # Calculate stats
+        all_orders = pos + claimed
+        count_offertes = sum(1 for po in all_orders if po.get('state') == 'sent')
+        count_orders = sum(1 for po in all_orders if po.get('state') == 'sale')
+        count_geclaimd = len(claimed)
+        
+        # Calculate amount totals
+        total_offertes = sum(po.get('x_studio_inkoop_partner_incl_btw', 0) or 0 for po in all_orders if po.get('state') == 'sent')
+        total_orders = sum(po.get('x_studio_inkoop_partner_incl_btw', 0) or 0 for po in all_orders if po.get('state') == 'sale')
+        total_geclaimd = sum(po.get('x_studio_inkoop_partner_incl_btw', 0) or 0 for po in claimed)
         
         html_content = f"""
         <!DOCTYPE html>
@@ -796,6 +841,38 @@ async def dashboard(request: Request):
                     margin-bottom: 10px;
                     color: #333;
                 }}
+                .stats-bar {{
+                    display: flex;
+                    gap: 20px;
+                    margin-bottom: 30px;
+                }}
+                .stat {{
+                    flex: 1;
+                    background: white;
+                    padding: 20px;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    text-align: center;
+                }}
+                .stat-number {{
+                    display: block;
+                    font-size: 32px;
+                    font-weight: 700;
+                    color: #667eea;
+                    margin-bottom: 8px;
+                }}
+                .stat-label {{
+                    display: block;
+                    font-size: 14px;
+                    color: #666;
+                }}
+                .stat-amount {{
+                    display: block;
+                    font-size: 14px;
+                    color: #27ae60;
+                    font-weight: 600;
+                    margin-bottom: 8px;
+                }}
             </style>
         </head>
         <body data-selfbilling-compleet="{partner.get('selfbilling_compleet', False)}">
@@ -806,6 +883,24 @@ async def dashboard(request: Request):
                     <div class="user-info">
                         <span class="user-name">Ingelogd als: {partner['name']}</span>
                         <a href="/logout" class="logout-btn">Uitloggen</a>
+                    </div>
+                </div>
+                
+                <div class="stats-bar">
+                    <div class="stat">
+                        <span class="stat-number">{count_offertes}</span>
+                        <span class="stat-amount">€ {total_offertes:,.0f}</span>
+                        <span class="stat-label">Offertes</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">{count_orders}</span>
+                        <span class="stat-amount">€ {total_orders:,.0f}</span>
+                        <span class="stat-label">Orders</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">{count_geclaimd}</span>
+                        <span class="stat-amount">€ {total_geclaimd:,.0f}</span>
+                        <span class="stat-label">Mijn opdrachten</span>
                     </div>
                 </div>
                 
