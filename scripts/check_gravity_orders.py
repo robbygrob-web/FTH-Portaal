@@ -59,12 +59,12 @@ def check_gravity_orders():
         cur = conn.cursor(cursor_factory=RealDictCursor)
         print("   [OK] Verbonden")
         
-        # Haal laatste 3 orders op
-        print("\n[2/4] Ophalen laatste 3 orders...")
+        # Haal laatste 5 orders op
+        print("\n[2/4] Ophalen laatste 5 orders...")
         cur.execute("""
             SELECT * FROM orders 
             ORDER BY created_at DESC 
-            LIMIT 3
+            LIMIT 5
         """)
         orders = cur.fetchall()
         print(f"   [OK] {len(orders)} order(s) gevonden")
@@ -81,7 +81,7 @@ def check_gravity_orders():
         
         # Toon orders
         print("\n" + "="*80)
-        print("LAATSTE 3 ORDERS")
+        print("LAATSTE 5 ORDERS")
         print("="*80)
         
         if not orders:
