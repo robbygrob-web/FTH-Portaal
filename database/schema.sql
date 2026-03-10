@@ -189,11 +189,22 @@ CREATE TABLE mail_logs (
     ontvanger_id UUID REFERENCES contacten(id) ON DELETE SET NULL,
     gerelateerd_model VARCHAR(100), -- res.partner, sale.order, etc.
     gerelateerd_id INTEGER, -- ID van gerelateerd record
+    order_id UUID REFERENCES orders(id) ON DELETE SET NULL, -- Gerelateerde order
+    
+    -- Richting en kanaal
+    richting VARCHAR(20), -- inkomend of uitgaand
+    kanaal VARCHAR(20), -- mail of whatsapp
+    naar VARCHAR(255), -- ontvanger emailadres
     
     -- Status
     bericht_type VARCHAR(50), -- email_outgoing, email_incoming, notification
+    status VARCHAR(20), -- verzonden, mislukt, ontvangen
     heeft_fout BOOLEAN DEFAULT FALSE,
     heeft_sms_fout BOOLEAN DEFAULT FALSE,
+    
+    -- Template en timing
+    template_naam VARCHAR(100), -- welke template gebruikt
+    verzonden_op TIMESTAMP WITH TIME ZONE, -- wanneer verzonden
     
     -- Metadata
     preview TEXT, -- Eerste regels van bericht
