@@ -283,16 +283,20 @@ def get_or_create_contact(gravity_data: dict, cur, conn) -> str:
         raise ValueError("Email ontbreekt in Gravity Forms data")
     
     # Check of contact al bestaat
-    cur.execute(
-        "SELECT id FROM contacten WHERE email = %s",
-        (email,)
-    )
-    existing = cur.fetchone()
-    
-    if existing:
-        contact_id = existing[0]
-        _LOG.info(f"Bestaand contact gevonden: {contact_id} (email: {email})")
-        return contact_id
+    try:
+        cur.execute(
+            "SELECT id FROM contacten WHERE email = %s",
+            (email,)
+        )
+        existing = cur.fetchone()
+        
+        if existing:
+            contact_id = existing[0]
+            _LOG.info(f"Bestaand contact gevonden: {contact_id} (email: {email})")
+            return contact_id
+    except psycopg2.Error as e:
+        _LOG.error(f"Database fout bij zoeken contact: {e}")
+        raise
     
     # Maak nieuw contact aan
     naam = gravity_data.get("name") or gravity_data.get("Name") or gravity_data.get("bedrijfsnaam") or email.split("@")[0]
@@ -304,29 +308,48 @@ def get_or_create_contact(gravity_data: dict, cur, conn) -> str:
     # Bepaal bedrijfstype (standaard 'company' voor nieuwe aanvragen)
     bedrijfstype = "company"
     
-    cur.execute("""
-        INSERT INTO contacten (
-            naam, email, telefoon, straat, postcode, stad,
-            land_code, bedrijfstype, actief
-        ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s
-        ) RETURNING id
-    """, (
-        naam,
-        email,
-        telefoon,
-        straat,
-        postcode,
-        stad,
-        "NL",  # Default land_code
-        bedrijfstype,
-        True  # actief
-    ))
-    
-    contact_id = cur.fetchone()[0]
-    conn.commit()
-    _LOG.info(f"Nieuw contact aangemaakt: {contact_id} (email: {email})")
-    return contact_id
+    try:
+        cur.execute("""
+            INSERT INTO contacten (
+                naam, email, telefoon, straat, postcode, stad,
+                land_code, bedrijfstype, actief
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s
+            ) RETURNING id
+        """, (
+            naam,
+            email,
+            telefoon,
+            straat,
+            postcode,
+            stad,
+            "NL",  # Default land_code
+            bedrijfstype,
+            True  # actief
+        ))
+        
+        result = cur.fetchone()
+        if not result:
+            raise ValueError("Kon contact ID niet ophalen na insert")
+        
+        contact_id = result[0]
+        conn.commit()
+        _LOG.info(f"Nieuw contact aangemaakt: {contact_id} (email: {email})")
+        return contact_id
+    except psycopg2.IntegrityError as e:
+        # Mogelijk duplicate email, probeer opnieuw op te halen
+        conn.rollback()
+        _LOG.warning(f"Integriteit fout bij contact aanmaken (mogelijk duplicate): {e}, probeer opnieuw op te halen...")
+        cur.execute(
+            "SELECT id FROM contacten WHERE email = %s",
+            (email,)
+        )
+        existing = cur.fetchone()
+        if existing:
+            contact_id = existing[0]
+            _LOG.info(f"Contact gevonden na duplicate error: {contact_id} (email: {email})")
+            return contact_id
+        raise
 
 
 def generate_ordernummer() -> str:
@@ -365,23 +388,52 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
         _LOG.warning("Gravity Forms webhook call met ongeldige token")
         raise HTTPException(status_code=401, detail="Ongeldige webhook token")
     
+    conn = None
+    cur = None
+    
     try:
         # Parse request body
-        body = await request.json()
+        try:
+            body = await request.json()
+        except Exception as e:
+            _LOG.error(f"Fout bij parsen JSON body: {e}")
+            raise HTTPException(status_code=400, detail=f"Ongeldig JSON formaat: {str(e)}")
+        
         _LOG.info(f"Gravity Forms webhook ontvangen: {body}")
         
         # Haal database connectie
-        database_url = get_database_url()
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
+        try:
+            database_url = get_database_url()
+        except ValueError as e:
+            _LOG.error(f"DATABASE_URL niet gevonden: {e}")
+            raise HTTPException(status_code=500, detail="Database configuratie ontbreekt")
+        
+        try:
+            conn = psycopg2.connect(database_url)
+            cur = conn.cursor()
+        except psycopg2.Error as e:
+            _LOG.error(f"Database connectie fout: {e}")
+            raise HTTPException(status_code=500, detail=f"Database verbinding gefaald: {str(e)}")
         
         # Stap 1: Haal contact op of maak aan
         try:
             contact_id = get_or_create_contact(body, cur, conn)
         except ValueError as e:
-            cur.close()
-            conn.close()
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+            _LOG.error(f"Contact validatie fout: {e}")
             raise HTTPException(status_code=400, detail=str(e))
+        except psycopg2.Error as e:
+            if conn:
+                conn.rollback()
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+            _LOG.error(f"Database fout bij contact aanmaken: {e}")
+            raise HTTPException(status_code=500, detail=f"Database fout: {str(e)}")
         
         # Stap 2: Maak order aan
         # Parse datum/tijd evenement
@@ -392,7 +444,7 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 # Probeer verschillende datum formaten
                 for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%d-%m-%Y %H:%M", "%d-%m-%Y"]:
                     try:
-                        leverdatum = datetime.strptime(event_date_str, fmt)
+                        leverdatum = datetime.strptime(str(event_date_str), fmt)
                         break
                     except ValueError:
                         continue
@@ -425,41 +477,59 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
         opmerkingen = body.get("opmerkingen") or body.get("Opmerkingen") or body.get("notes") or body.get("Notes") or body.get("message") or ""
         
         # Maak order aan
-        cur.execute("""
-            INSERT INTO orders (
-                ordernummer, order_datum, leverdatum,
-                status, portaal_status, type_naam,
-                klant_id, plaats, aantal_personen, aantal_kinderen,
-                ordertype, opmerkingen,
-                totaal_bedrag, bedrag_excl_btw, bedrag_btw
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-            ) RETURNING id
-        """, (
-            ordernummer,
-            datetime.now(),  # order_datum
-            leverdatum,  # leverdatum
-            "draft",  # status (nieuwe aanvraag)
-            "nieuw",  # portaal_status
-            "Aanvraag",  # type_naam
-            contact_id,  # klant_id
-            plaats,
-            aantal_personen,
-            aantal_kinderen,
-            "b2c",  # ordertype (standaard b2c voor Gravity Forms)
-            opmerkingen,
-            0.00,  # totaal_bedrag (nog niet berekend)
-            0.00,  # bedrag_excl_btw
-            0.00   # bedrag_btw
-        ))
-        
-        order_id = cur.fetchone()[0]
-        conn.commit()
-        
-        _LOG.info(f"Order aangemaakt: {order_id} (ordernummer: {ordernummer}, contact: {contact_id})")
-        
-        cur.close()
-        conn.close()
+        try:
+            cur.execute("""
+                INSERT INTO orders (
+                    ordernummer, order_datum, leverdatum,
+                    status, portaal_status, type_naam,
+                    klant_id, plaats, aantal_personen, aantal_kinderen,
+                    ordertype, opmerkingen,
+                    totaal_bedrag, bedrag_excl_btw, bedrag_btw
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                ) RETURNING id
+            """, (
+                ordernummer,
+                datetime.now(),  # order_datum
+                leverdatum,  # leverdatum
+                "draft",  # status (nieuwe aanvraag)
+                "nieuw",  # portaal_status
+                "Aanvraag",  # type_naam
+                contact_id,  # klant_id
+                plaats,
+                aantal_personen,
+                aantal_kinderen,
+                "b2c",  # ordertype (standaard b2c voor Gravity Forms)
+                opmerkingen,
+                0.00,  # totaal_bedrag (nog niet berekend)
+                0.00,  # bedrag_excl_btw
+                0.00   # bedrag_btw
+            ))
+            
+            result = cur.fetchone()
+            if not result:
+                raise HTTPException(status_code=500, detail="Kon order ID niet ophalen na insert")
+            
+            order_id = result[0]
+            conn.commit()
+            
+            _LOG.info(f"Order aangemaakt: {order_id} (ordernummer: {ordernummer}, contact: {contact_id})")
+            
+        except psycopg2.IntegrityError as e:
+            if conn:
+                conn.rollback()
+            _LOG.error(f"Database integriteit fout bij order aanmaken: {e}")
+            raise HTTPException(status_code=400, detail=f"Order kon niet worden aangemaakt: {str(e)}")
+        except psycopg2.Error as e:
+            if conn:
+                conn.rollback()
+            _LOG.error(f"Database fout bij order aanmaken: {e}")
+            raise HTTPException(status_code=500, detail=f"Database fout: {str(e)}")
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
         
         return JSONResponse({
             "status": "success",
@@ -472,5 +542,17 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
     except HTTPException:
         raise
     except Exception as e:
+        # Cleanup bij onverwachte fouten
+        if cur:
+            try:
+                cur.close()
+            except:
+                pass
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
         _LOG.error(f"Fout bij Gravity Forms webhook verwerking: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Interne server fout: {str(e)}")
