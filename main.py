@@ -15,6 +15,7 @@ load_dotenv(dotenv_path=env_path)
 # Import config en routes NA load_dotenv() zodat omgevingsvariabelen beschikbaar zijn
 from app.config import SESSION_SECRET, startup_validation
 from app.routes import router
+from app.webhooks import router as webhooks_router
 
 # Voer startup validatie uit
 startup_validation()
@@ -29,6 +30,7 @@ app.add_middleware(
 
 # Include routes
 app.include_router(router)
+app.include_router(webhooks_router)
 
 # DEBUG: Print alle geregistreerde routes bij startup
 def print_routes():
