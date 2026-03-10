@@ -5,6 +5,7 @@ FLOW 1: Odoo → eigen DB
 import os
 import logging
 import uuid
+import json
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Request, HTTPException, Header, Query
 from fastapi.responses import JSONResponse
@@ -568,6 +569,57 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
             ""
         )
         
+        # Haal UTM tracking data op (AFL UTM Tracker plugin)
+        # Veld '7' en '10' bevatten UTM data volgens context
+        # Probeer verschillende mogelijke veldnamen/nummers
+        utm_source = (
+            body.get("utm_source") or
+            body.get("7") or  # Mogelijk UTM source veld
+            body.get("utm_source_field") or
+            None
+        )
+        utm_medium = (
+            body.get("utm_medium") or
+            body.get("utm_medium_field") or
+            None
+        )
+        utm_campaign = (
+            body.get("utm_campaign") or
+            body.get("utm_campaign_field") or
+            None
+        )
+        utm_content = (
+            body.get("utm_content") or
+            body.get("10") or  # Mogelijk UTM content veld
+            body.get("utm_content_field") or
+            None
+        )
+        
+        # Als veld '7' of '10' een JSON string is, parse deze
+        if isinstance(utm_source, str) and (utm_source.startswith("{") or utm_source.startswith("[")):
+            try:
+                import json
+                utm_data = json.loads(utm_source)
+                if isinstance(utm_data, dict):
+                    utm_source = utm_data.get("source") or utm_source
+                    utm_medium = utm_data.get("medium") or utm_medium
+                    utm_campaign = utm_data.get("campaign") or utm_campaign
+                    utm_content = utm_data.get("content") or utm_content
+            except:
+                pass
+        
+        if isinstance(utm_content, str) and (utm_content.startswith("{") or utm_content.startswith("[")):
+            try:
+                import json
+                utm_data = json.loads(utm_content)
+                if isinstance(utm_data, dict):
+                    utm_source = utm_data.get("source") or utm_source
+                    utm_medium = utm_data.get("medium") or utm_medium
+                    utm_campaign = utm_data.get("campaign") or utm_campaign
+                    utm_content = utm_data.get("content") or utm_content
+            except:
+                pass
+        
         # Maak order aan
         try:
             cur.execute("""
@@ -576,9 +628,10 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     status, portaal_status, type_naam,
                     klant_id, plaats, aantal_personen, aantal_kinderen,
                     ordertype, opmerkingen,
+                    utm_source, utm_medium, utm_campaign, utm_content,
                     totaal_bedrag, bedrag_excl_btw, bedrag_btw
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 ) RETURNING id
             """, (
                 ordernummer,
@@ -593,6 +646,10 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 aantal_kinderen,
                 "b2c",  # ordertype (standaard b2c voor Gravity Forms)
                 opmerkingen,
+                utm_source,  # utm_source
+                utm_medium,  # utm_medium
+                utm_campaign,  # utm_campaign
+                utm_content,  # utm_content
                 0.00,  # totaal_bedrag (nog niet berekend)
                 0.00,  # bedrag_excl_btw
                 0.00   # bedrag_btw

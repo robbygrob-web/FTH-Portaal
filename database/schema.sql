@@ -101,6 +101,12 @@ CREATE TABLE orders (
     -- Extra
     opmerkingen TEXT,
     
+    -- UTM Tracking (AFL UTM Tracker)
+    utm_source VARCHAR(255),
+    utm_medium VARCHAR(255),
+    utm_campaign VARCHAR(255),
+    utm_content VARCHAR(255),
+    
     -- Odoo sync (tijdelijk)
     odoo_id INTEGER UNIQUE,
     
