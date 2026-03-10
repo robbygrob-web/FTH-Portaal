@@ -1,6 +1,5 @@
 """
-Webhook endpoints voor Odoo synchronisatie.
-FLOW 1: Odoo → eigen DB
+Webhook endpoints voor externe systemen.
 """
 import os
 import logging
@@ -25,10 +24,7 @@ async def test_webhook():
     """
     return JSONResponse({
         "status": "success",
-        "message": "Webhook endpoint is bereikbaar",
-        "endpoint": "/webhooks/odoo/contact",
-        "method": "POST",
-        "required_header": "X-Odoo-Webhook-Token"
+        "message": "Webhook endpoint is bereikbaar"
     })
 
 
