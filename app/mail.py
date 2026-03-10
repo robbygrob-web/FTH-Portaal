@@ -1,44 +1,71 @@
 """
-Mail verzending functionaliteit via Gmail SMTP.
+Mail verzending functionaliteit via Gmail API (OAuth2).
 Ondersteunt mail verzending en automatische logging in mail_logs tabel.
 """
 import os
 import logging
-import smtplib
 import uuid
+import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from typing import Optional
 import psycopg2
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 _LOG = logging.getLogger(__name__)
 
-# Gmail SMTP configuratie
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-SMTP_FROM_EMAIL = "info@friettruck-huren.nl"
-SMTP_FROM_NAME = "FTH Portaal"
+# Gmail API configuratie
+GMAIL_FROM_EMAIL = "info@friettruck-huren.nl"
+GMAIL_FROM_NAME = "FTH Portaal"
+SCOPES = ['https://www.googleapis.com/auth/gmail.send']
 
 
-def get_smtp_config():
-    """Haal SMTP configuratie op uit environment"""
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
+def get_gmail_credentials():
+    """
+    Haal Gmail OAuth2 credentials op uit environment variabelen.
+    Gebruikt refresh token flow voor service-to-service authenticatie.
+    """
+    client_id = os.getenv("GMAIL_CLIENT_ID")
+    client_secret = os.getenv("GMAIL_CLIENT_SECRET")
+    refresh_token = os.getenv("GMAIL_REFRESH_TOKEN")
     
-    if not smtp_user:
-        raise ValueError("SMTP_USER niet gevonden in environment variabelen")
-    if not smtp_password:
-        raise ValueError("SMTP_PASSWORD niet gevonden in environment variabelen")
+    if not client_id:
+        raise ValueError("GMAIL_CLIENT_ID niet gevonden in environment variabelen")
+    if not client_secret:
+        raise ValueError("GMAIL_CLIENT_SECRET niet gevonden in environment variabelen")
+    if not refresh_token:
+        raise ValueError("GMAIL_REFRESH_TOKEN niet gevonden in environment variabelen")
     
-    return {
-        "user": smtp_user,
-        "password": smtp_password,
-        "server": SMTP_SERVER,
-        "port": SMTP_PORT,
-        "from_email": SMTP_FROM_EMAIL,
-        "from_name": SMTP_FROM_NAME
-    }
+    # Maak credentials object met refresh token
+    credentials = Credentials(
+        token=None,  # Wordt automatisch ververst
+        refresh_token=refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=client_id,
+        client_secret=client_secret,
+        scopes=SCOPES
+    )
+    
+    # Verfris token als nodig
+    if not credentials.valid:
+        if credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
+    
+    return credentials
+
+
+def get_gmail_service():
+    """
+    Maak Gmail API service object met OAuth2 credentials.
+    """
+    credentials = get_gmail_credentials()
+    service = build('gmail', 'v1', credentials=credentials)
+    return service
 
 
 def get_database_url():
@@ -71,7 +98,7 @@ def log_mail_to_db(
         status: 'verzonden', 'mislukt', 'ontvangen'
         order_id: Optionele UUID van gerelateerde order
         template_naam: Optionele naam van gebruikte template
-        email_van: Email adres afzender (default: SMTP_FROM_EMAIL)
+        email_van: Email adres afzender (default: GMAIL_FROM_EMAIL)
         message_id: Optionele Message-ID header
         heeft_fout: Of er een fout is opgetreden
         preview: Eerste regels van bericht voor preview
@@ -94,7 +121,7 @@ def log_mail_to_db(
         
         # Bepaal email_van
         if not email_van:
-            email_van = SMTP_FROM_EMAIL
+            email_van = GMAIL_FROM_EMAIL
         
         # Bepaal verzonden_op op basis van status
         verzonden_op = datetime.now() if status == "verzonden" else None
@@ -139,6 +166,43 @@ def log_mail_to_db(
         return None
 
 
+def create_message(to: str, subject: str, body: str, html: bool = True) -> dict:
+    """
+    Maak een Gmail API message object.
+    
+    Args:
+        to: Email adres ontvanger
+        subject: Email onderwerp
+        body: Email inhoud (HTML of tekst)
+        html: Of de inhoud HTML is (default: True)
+    
+    Returns:
+        dict met 'raw' key die base64 encoded message bevat
+    """
+    message_id = f"<{uuid.uuid4()}@friettruck-huren.nl>"
+    
+    # Maak email bericht
+    msg = MIMEMultipart('alternative')
+    msg['From'] = f"{GMAIL_FROM_NAME} <{GMAIL_FROM_EMAIL}>"
+    msg['To'] = to
+    msg['Subject'] = subject
+    msg['Message-ID'] = message_id
+    
+    # Voeg inhoud toe
+    if html:
+        msg.attach(MIMEText(body, 'html', 'utf-8'))
+    else:
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+    
+    # Encode naar base64url format (Gmail API vereist)
+    raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')
+    
+    return {
+        'raw': raw_message,
+        'message_id': message_id
+    }
+
+
 def stuur_mail(
     naar: str,
     onderwerp: str,
@@ -148,7 +212,7 @@ def stuur_mail(
     html: bool = True
 ) -> dict:
     """
-    Stuur een email via Gmail SMTP en log in mail_logs tabel.
+    Stuur een email via Gmail API (OAuth2) en log in mail_logs tabel.
     
     Args:
         naar: Email adres ontvanger
@@ -167,32 +231,26 @@ def stuur_mail(
             "error": str (als success=False)
         }
     """
-    config = get_smtp_config()
-    message_id = f"<{uuid.uuid4()}@friettruck-huren.nl>"
+    message_id = None
     
     try:
-        # Maak email bericht
-        msg = MIMEMultipart('alternative')
-        msg['From'] = f"{config['from_name']} <{config['from_email']}>"
-        msg['To'] = naar
-        msg['Subject'] = onderwerp
-        msg['Message-ID'] = message_id
+        # Maak Gmail service
+        service = get_gmail_service()
         
-        # Voeg inhoud toe
-        if html:
-            msg.attach(MIMEText(inhoud, 'html', 'utf-8'))
-        else:
-            msg.attach(MIMEText(inhoud, 'plain', 'utf-8'))
+        # Maak email message
+        message_data = create_message(naar, onderwerp, inhoud, html)
+        message_id = message_data['message_id']
         
-        # Verzend via SMTP
-        _LOG.info(f"Verzenden mail naar {naar} via {config['server']}:{config['port']}")
+        # Verzend via Gmail API
+        _LOG.info(f"Verzenden mail naar {naar} via Gmail API")
         
-        with smtplib.SMTP(config['server'], config['port']) as server:
-            server.starttls()  # Start TLS encryptie
-            server.login(config['user'], config['password'])
-            server.send_message(msg)
+        message = service.users().messages().send(
+            userId='me',
+            body={'raw': message_data['raw']}
+        ).execute()
         
-        _LOG.info(f"Mail succesvol verzonden naar {naar}")
+        gmail_message_id = message.get('id')
+        _LOG.info(f"Mail succesvol verzonden naar {naar} (Gmail ID: {gmail_message_id})")
         
         # Log succesvolle verzending in database
         log_id = log_mail_to_db(
@@ -202,7 +260,7 @@ def stuur_mail(
             status="verzonden",
             order_id=order_id,
             template_naam=template_naam,
-            email_van=config['from_email'],
+            email_van=GMAIL_FROM_EMAIL,
             message_id=message_id,
             heeft_fout=False
         )
@@ -214,8 +272,8 @@ def stuur_mail(
             "error": None
         }
         
-    except smtplib.SMTPException as e:
-        error_msg = f"SMTP fout: {str(e)}"
+    except HttpError as e:
+        error_msg = f"Gmail API fout: {str(e)}"
         _LOG.error(f"Mail verzending gefaald naar {naar}: {error_msg}")
         
         # Log gefaalde verzending in database
@@ -226,7 +284,7 @@ def stuur_mail(
             status="mislukt",
             order_id=order_id,
             template_naam=template_naam,
-            email_van=config.get('from_email'),
+            email_van=GMAIL_FROM_EMAIL,
             message_id=message_id,
             heeft_fout=True
         )
@@ -250,7 +308,7 @@ def stuur_mail(
             status="mislukt",
             order_id=order_id,
             template_naam=template_naam,
-            email_van=config.get('from_email'),
+            email_van=GMAIL_FROM_EMAIL,
             message_id=message_id,
             heeft_fout=True
         )
