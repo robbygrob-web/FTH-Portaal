@@ -91,8 +91,7 @@ def print_routes():
     print("=" * 60 + "\n")
 
 # Print routes bij startup (alleen in development)
-if __name__ != "__main__" or True:  # Altijd printen voor debugging
-    print_routes()
+# Verplaatst naar startup event zodat alle routers geregistreerd zijn
 
 
 # Achtergrondtaak voor inkomende mail polling
