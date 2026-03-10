@@ -48,6 +48,17 @@ except Exception as e:
     traceback.print_exc()
     raise
 
+# Include mail routes
+try:
+    from app.mail_routes import router as mail_router
+    app.include_router(mail_router)
+    print(f"[DEBUG] Mail router geregistreerd in app")
+except Exception as e:
+    print(f"[ERROR] Mail router registratie gefaald: {e}")
+    import traceback
+    traceback.print_exc()
+    # Mail router is optioneel, niet kritiek voor startup
+
 # DEBUG: Print alle geregistreerde routes bij startup
 def print_routes():
     """Print alle geregistreerde routes voor debugging"""
