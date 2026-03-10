@@ -26,6 +26,16 @@ except Exception as e:
     traceback.print_exc()
     raise
 
+# Import mail router met error handling voor debugging
+try:
+    from app.mail_routes import router as mail_router
+    print(f"[DEBUG] Mail router geïmporteerd: {len(mail_router.routes)} routes")
+except Exception as e:
+    print(f"[ERROR] Mail router import gefaald: {e}")
+    import traceback
+    traceback.print_exc()
+    # Mail router is optioneel, niet kritiek voor startup
+
 # Voer startup validatie uit
 startup_validation()
 
@@ -50,7 +60,6 @@ except Exception as e:
 
 # Include mail routes
 try:
-    from app.mail_routes import router as mail_router
     app.include_router(mail_router)
     print(f"[DEBUG] Mail router geregistreerd in app")
 except Exception as e:
