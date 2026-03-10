@@ -1,0 +1,184 @@
+[
+  {
+    "id": 2,
+    "naam": "Vul leverdatum op factuur",
+    "model": "Journal Entry",
+    "model_id": 443,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 3,
+    "naam": "Vind partner bij offerte",
+    "model": "Sales Order",
+    "model_id": 610,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 4,
+    "naam": "Offertesjabloon = prive",
+    "model": "Sales Order",
+    "model_id": 610,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 5,
+    "naam": "Offertesjabloon = zakelijk",
+    "model": "Sales Order",
+    "model_id": 610,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 6,
+    "naam": "Offertesjabloon = uitvaart",
+    "model": "Sales Order",
+    "model_id": 610,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 8,
+    "naam": "Set dropship route on b2b order confirmation",
+    "model": "Sales Order",
+    "model_id": 610,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 9,
+    "naam": "Maak commissiefactuur",
+    "model": "Journal Entry",
+    "model_id": 443,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 10,
+    "naam": "Verwijder inkooporder als verkoop particulier is",
+    "model": "Purchase Order",
+    "model_id": 950,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 11,
+    "naam": "Kopie van order",
+    "model": "Sales Order",
+    "model_id": 610,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 12,
+    "naam": "NH - Auto send order confirmation email",
+    "model": "Sales Order",
+    "model_id": 610,
+    "trigger": "on_state_set",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 13,
+    "naam": "Formulieren Rijnmond-overkapping",
+    "model": "Lead",
+    "model_id": 683,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 15,
+    "naam": "WhatsApp feedback na levering test",
+    "model": "Sales Order",
+    "model_id": 610,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 17,
+    "naam": "whatsapp bevallen>ja>review plaatsen > ja",
+    "model": "WhatsApp Messages",
+    "model_id": 1089,
+    "trigger": "on_time_created",
+    "trg_date_id": [
+      14096,
+      "Created on (WhatsApp Messages)"
+    ],
+    "trg_date_range": 0,
+    "trg_date_range_type": "minutes",
+    "actief": true
+  },
+  {
+    "id": 18,
+    "naam": "Whatssapp >bevallen?> ja? >review?> ja >bedankt Link",
+    "model": "WhatsApp Messages",
+    "model_id": 1089,
+    "trigger": "on_time_created",
+    "trg_date_id": [
+      14096,
+      "Created on (WhatsApp Messages)"
+    ],
+    "trg_date_range": 0,
+    "trg_date_range_type": "minutes",
+    "actief": true
+  },
+  {
+    "id": 19,
+    "naam": "WhatsApp – Review knop Ja",
+    "model": "Discussion Channel",
+    "model_id": 209,
+    "trigger": "on_message_received",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  },
+  {
+    "id": 20,
+    "naam": "contact portal",
+    "model": "Contact",
+    "model_id": 86,
+    "trigger": "on_create_or_write",
+    "trg_date_id": false,
+    "trg_date_range": 0,
+    "trg_date_range_type": false,
+    "actief": true
+  }
+]
