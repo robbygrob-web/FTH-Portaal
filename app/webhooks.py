@@ -277,10 +277,17 @@ def get_or_create_contact(gravity_data: dict, cur, conn) -> str:
     Haal contact op of maak aan op basis van email.
     Retourneert contact UUID.
     """
-    email = gravity_data.get("email") or gravity_data.get("Email") or gravity_data.get("email_address")
+    # Gravity Forms gebruikt veldnummers als keys
+    # Probeer eerst veldnummers, dan fallback naar oude namen
+    email = (
+        gravity_data.get("21") or  # Email veld
+        gravity_data.get("email") or 
+        gravity_data.get("Email") or 
+        gravity_data.get("email_address")
+    )
     
     if not email:
-        raise ValueError("Email ontbreekt in Gravity Forms data")
+        raise ValueError("Email ontbreekt in Gravity Forms data (veld 21)")
     
     # Check of contact al bestaat
     try:
@@ -299,11 +306,56 @@ def get_or_create_contact(gravity_data: dict, cur, conn) -> str:
         raise
     
     # Maak nieuw contact aan
-    naam = gravity_data.get("name") or gravity_data.get("Name") or gravity_data.get("bedrijfsnaam") or email.split("@")[0]
-    telefoon = gravity_data.get("phone") or gravity_data.get("Phone") or gravity_data.get("telefoon")
-    straat = gravity_data.get("street") or gravity_data.get("Street") or gravity_data.get("straat") or gravity_data.get("address")
-    postcode = gravity_data.get("zip") or gravity_data.get("Zip") or gravity_data.get("postcode") or gravity_data.get("postal_code")
-    stad = gravity_data.get("city") or gravity_data.get("City") or gravity_data.get("stad")
+    # Gravity Forms veld mapping:
+    # - Email: veld '21'
+    # - Telefoon: veld '24'
+    # - Naam: combineer voornaam/achternaam of zoek op naam veld
+    # - Locatie: veld '29.3' (stad)
+    
+    telefoon = (
+        gravity_data.get("24") or  # Telefoon veld
+        gravity_data.get("phone") or 
+        gravity_data.get("Phone") or 
+        gravity_data.get("telefoon")
+    )
+    
+    # Probeer naam te vinden (kan verschillende velden zijn)
+    naam = (
+        gravity_data.get("name") or 
+        gravity_data.get("Name") or 
+        gravity_data.get("bedrijfsnaam") or
+        gravity_data.get("voornaam") or
+        gravity_data.get("achternaam") or
+        email.split("@")[0]  # Fallback naar email prefix
+    )
+    
+    # Combineer voornaam + achternaam als beide beschikbaar zijn
+    voornaam = gravity_data.get("voornaam") or gravity_data.get("Voornaam")
+    achternaam = gravity_data.get("achternaam") or gravity_data.get("Achternaam")
+    if voornaam and achternaam:
+        naam = f"{voornaam} {achternaam}"
+    
+    # Adres velden (mogelijk niet allemaal beschikbaar)
+    straat = (
+        gravity_data.get("street") or 
+        gravity_data.get("Street") or 
+        gravity_data.get("straat") or 
+        gravity_data.get("address")
+    )
+    postcode = (
+        gravity_data.get("zip") or 
+        gravity_data.get("Zip") or 
+        gravity_data.get("postcode") or 
+        gravity_data.get("postal_code")
+    )
+    
+    # Stad kan uit locatie veld komen (veld 29.3)
+    stad = (
+        gravity_data.get("29.3") or  # Locatie stad veld
+        gravity_data.get("city") or 
+        gravity_data.get("City") or 
+        gravity_data.get("stad")
+    )
     
     # Bepaal bedrijfstype (standaard 'company' voor nieuwe aanvragen)
     bedrijfstype = "company"
@@ -436,8 +488,19 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
             raise HTTPException(status_code=500, detail=f"Database fout: {str(e)}")
         
         # Stap 2: Maak order aan
-        # Parse datum/tijd evenement
-        event_date_str = body.get("event_date") or body.get("Event Date") or body.get("datum") or body.get("Datum")
+        # Gravity Forms veld mapping:
+        # - Datum: veld '48'
+        # - Locatie: veld '29.3' (stad)
+        # - Aantal personen: veld '68'
+        
+        # Parse datum/tijd evenement (veld 48)
+        event_date_str = (
+            body.get("48") or  # Datum veld
+            body.get("event_date") or 
+            body.get("Event Date") or 
+            body.get("datum") or 
+            body.get("Datum")
+        )
         leverdatum = None
         if event_date_str:
             try:
@@ -461,20 +524,49 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
         ordernummer = generate_ordernummer()
         
         # Haal order data op
-        plaats = body.get("location") or body.get("Location") or body.get("locatie") or body.get("Locatie") or "Onbekend"
-        aantal_personen = body.get("aantal_personen") or body.get("Aantal personen") or body.get("personen") or body.get("Personen") or 0
+        # Locatie: veld '29.3' (stad)
+        plaats = (
+            body.get("29.3") or  # Locatie stad veld
+            body.get("location") or 
+            body.get("Location") or 
+            body.get("locatie") or 
+            body.get("Locatie") or 
+            "Onbekend"
+        )
+        
+        # Aantal personen: veld '68'
+        aantal_personen = (
+            body.get("68") or  # Aantal personen veld
+            body.get("aantal_personen") or 
+            body.get("Aantal personen") or 
+            body.get("personen") or 
+            body.get("Personen") or 
+            0
+        )
         try:
             aantal_personen = int(aantal_personen)
         except (ValueError, TypeError):
             aantal_personen = 0
         
-        aantal_kinderen = body.get("aantal_kinderen") or body.get("Aantal kinderen") or body.get("kinderen") or 0
+        aantal_kinderen = (
+            body.get("aantal_kinderen") or 
+            body.get("Aantal kinderen") or 
+            body.get("kinderen") or 
+            0
+        )
         try:
             aantal_kinderen = int(aantal_kinderen)
         except (ValueError, TypeError):
             aantal_kinderen = 0
         
-        opmerkingen = body.get("opmerkingen") or body.get("Opmerkingen") or body.get("notes") or body.get("Notes") or body.get("message") or ""
+        opmerkingen = (
+            body.get("opmerkingen") or 
+            body.get("Opmerkingen") or 
+            body.get("notes") or 
+            body.get("Notes") or 
+            body.get("message") or 
+            ""
+        )
         
         # Maak order aan
         try:
