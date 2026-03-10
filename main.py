@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -92,3 +93,29 @@ def print_routes():
 # Print routes bij startup (alleen in development)
 if __name__ != "__main__" or True:  # Altijd printen voor debugging
     print_routes()
+
+
+# Achtergrondtaak voor inkomende mail polling
+async def poll_inkomende_mails():
+    """Poll elke 60 seconden voor nieuwe inkomende mails"""
+    while True:
+        try:
+            if mail_router is not None:
+                from app.mail import haal_inkomende_mails
+                result = haal_inkomende_mails()
+                if result["success"] and result["aantal_verwerkt"] > 0:
+                    print(f"[MAIL POLL] {result['aantal_verwerkt']} nieuwe mails verwerkt")
+        except Exception as e:
+            print(f"[MAIL POLL ERROR] Fout bij ophalen inkomende mails: {e}")
+        
+        await asyncio.sleep(60)  # Wacht 60 seconden
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Start achtergrondtaak voor mail polling bij startup"""
+    if mail_router is not None:
+        print("[STARTUP] Start achtergrondtaak voor inkomende mail polling")
+        asyncio.create_task(poll_inkomende_mails())
+    else:
+        print("[STARTUP] Mail router niet beschikbaar - skip mail polling")

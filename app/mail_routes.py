@@ -3,7 +3,7 @@ Mail routes voor test endpoints.
 """
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from app.mail import stuur_mail
+from app.mail import stuur_mail, haal_inkomende_mails
 import logging
 
 _LOG = logging.getLogger(__name__)
@@ -61,6 +61,42 @@ async def test_mail():
             {
                 "status": "error",
                 "message": f"Fout bij verzenden test email: {str(e)}"
+            },
+            status_code=500
+        )
+
+
+@router.get("/inkomend")
+async def haal_inkomende_mails_endpoint():
+    """
+    Endpoint om nieuwe inkomende mails op te halen via Gmail API.
+    Haalt ongelezen mails op en logt ze in mail_logs met richting='inkomend'.
+    """
+    try:
+        result = haal_inkomende_mails()
+        
+        if result["success"]:
+            return JSONResponse({
+                "status": "success",
+                "message": f"{result['aantal_verwerkt']} nieuwe mails verwerkt",
+                "aantal_verwerkt": result["aantal_verwerkt"]
+            })
+        else:
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "message": f"Kon inkomende mails niet ophalen: {result['error']}",
+                    "error": result["error"]
+                },
+                status_code=500
+            )
+            
+    except Exception as e:
+        _LOG.error(f"Fout bij inkomende mails endpoint: {e}", exc_info=True)
+        return JSONResponse(
+            {
+                "status": "error",
+                "message": f"Fout bij ophalen inkomende mails: {str(e)}"
             },
             status_code=500
         )

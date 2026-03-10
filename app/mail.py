@@ -22,7 +22,10 @@ _LOG = logging.getLogger(__name__)
 # Gmail API configuratie
 GMAIL_FROM_EMAIL = "info@friettruck-huren.nl"
 GMAIL_FROM_NAME = "FTH Portaal"
-SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.readonly'
+]
 
 
 def get_gmail_credentials():
@@ -86,10 +89,11 @@ def log_mail_to_db(
     email_van: Optional[str] = None,
     message_id: Optional[str] = None,
     heeft_fout: bool = False,
-    preview: Optional[str] = None
+    preview: Optional[str] = None,
+    richting: str = "uitgaand"
 ):
     """
-    Log mail verzending in mail_logs tabel.
+    Log mail verzending of ontvangst in mail_logs tabel.
     
     Args:
         naar: Email adres ontvanger
@@ -102,6 +106,7 @@ def log_mail_to_db(
         message_id: Optionele Message-ID header
         heeft_fout: Of er een fout is opgetreden
         preview: Eerste regels van bericht voor preview
+        richting: 'inkomend' of 'uitgaand' (default: 'uitgaand')
     """
     try:
         database_url = get_database_url()
@@ -123,8 +128,11 @@ def log_mail_to_db(
         if not email_van:
             email_van = GMAIL_FROM_EMAIL
         
-        # Bepaal verzonden_op op basis van status
-        verzonden_op = datetime.now() if status == "verzonden" else None
+        # Bepaal verzonden_op op basis van status en richting
+        verzonden_op = datetime.now() if (status == "verzonden" and richting == "uitgaand") else None
+        
+        # Bepaal bericht_type op basis van richting
+        bericht_type = "email_incoming" if richting == "inkomend" else "email_outgoing"
         
         cur.execute("""
             INSERT INTO mail_logs (
@@ -135,7 +143,7 @@ def log_mail_to_db(
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             ) RETURNING id
         """, (
-            "uitgaand",  # richting
+            richting,  # richting
             "mail",  # kanaal
             naar,
             onderwerp,
@@ -145,7 +153,7 @@ def log_mail_to_db(
             order_id,
             template_naam,
             status,
-            "email_outgoing",  # bericht_type
+            bericht_type,  # bericht_type
             heeft_fout,
             preview,
             verzonden_op
@@ -262,7 +270,8 @@ def stuur_mail(
             template_naam=template_naam,
             email_van=GMAIL_FROM_EMAIL,
             message_id=message_id,
-            heeft_fout=False
+            heeft_fout=False,
+            richting="uitgaand"
         )
         
         return {
@@ -286,7 +295,8 @@ def stuur_mail(
             template_naam=template_naam,
             email_van=GMAIL_FROM_EMAIL,
             message_id=message_id,
-            heeft_fout=True
+            heeft_fout=True,
+            richting="uitgaand"
         )
         
         return {
@@ -310,7 +320,8 @@ def stuur_mail(
             template_naam=template_naam,
             email_van=GMAIL_FROM_EMAIL,
             message_id=message_id,
-            heeft_fout=True
+            heeft_fout=True,
+            richting="uitgaand"
         )
         
         return {
