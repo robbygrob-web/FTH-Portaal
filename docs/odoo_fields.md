@@ -13,25 +13,31 @@ Fields used by the portal:
 - x_studio_contractor → assigned partner / supplier
 - x_studio_plaats → location
 - x_studio_aantal_personen → number of persons
--  x_studio_selection_field_67u_1jj77rtf7 → platform status field
-
-## Platform Status Field
-
-Field: `x_studio_selection_field_67u_1jj77rtf7`
-
-Confirmed values:
-- `nieuw`
-- `beschikbaar`
-- `claimed`
-- `transfer`
+- x_studio_selection_field_67u_1jj77rtf7 → platform status field
 
 ## Logic used in the portal
 
 state = sent  → offerte  
 state = sale  → verkooporder
 
+## Platform Status Field
+
+Field: `x_studio_selection_field_67u_1jj77rtf7`
+
+Confirmed values:
+- `nieuw` (default) - not yet visible in partner screen
+- `beschikbaar` - available for claiming
+- `claimed` - claimed by a partner
+- `transfer` - transferred status
+
+## Partner Screen Logic
+
+Partner screen shows:
+- Records with status `beschikbaar` AND `x_studio_contractor = 1361`
+- Records with status `transfer` (regardless of contractor)
+
 ## Notes
 
 - `id` is used for technical API operations
 - `name` is only used for display
-- business logic must always rely on `state`
+- business logic must always rely on `state`- `x_studio_selection_field_67u_1jj77rtf7 = nieuw` means record is not visible in partner screen

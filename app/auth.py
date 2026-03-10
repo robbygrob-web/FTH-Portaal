@@ -4,7 +4,7 @@ import requests
 from fastapi import HTTPException
 from typing import Optional
 from functools import lru_cache
-from app.config import ODOO_BASE_URL, ODOO_DB, ODOO_LOGIN, ODOO_API_KEY
+from app.config import get_odoo_base_url, get_odoo_db, get_odoo_login, get_odoo_api_key
 
 _LOG = logging.getLogger(__name__)
 
@@ -12,107 +12,47 @@ class PartnerAuth:
     """Authenticatie voor partners (leveranciers) via Odoo"""
     
     def __init__(self):
-        if not ODOO_BASE_URL or not ODOO_DB:
+        odoo_base_url = get_odoo_base_url()
+        odoo_db = get_odoo_db()
+        if not odoo_base_url or not odoo_db:
             raise RuntimeError("ODOO_BASE_URL en ODOO_DB zijn vereist voor partner authenticatie")
         
-        self.url = f"{ODOO_BASE_URL.rstrip('/')}/jsonrpc"
-        self.db = ODOO_DB
+        self.url = f"{odoo_base_url.rstrip('/')}/jsonrpc"
+        self.db = odoo_db
     
     def authenticate_partner(self, email: str, password: str) -> Optional[dict]:
         """
-        Authenticeer een partner met email en wachtwoord.
+        Authenticeer een partner met email en wachtwoord via res.partner search.
         Retourneert partner informatie als succesvol, anders None.
         """
         try:
-            # Login als partner
-            payload = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "service": "common",
-                    "method": "login",
-                    "args": [self.db, email, password]
-                },
-                "id": 1,
-            }
+            from app.odoo_client import get_odoo_client
             
-            resp = requests.post(self.url, json=payload, timeout=10)
-            resp.raise_for_status()
-            result = resp.json()
+            client = get_odoo_client()
             
-            uid = result.get("result")
-            if not uid:
-                return None
+            domain = [
+                ["email", "=", email],
+                ["x_studio_portaal_partner", "=", True],
+                ["x_studio_partner_portaal_wachtwoord", "=", password]
+            ]
+            options = {"fields": ["id", "name", "x_studio_akkoord_voorwaarden_selfbillingportaal"], "limit": 1}
             
-            # Haal partner informatie op
-            partner_payload = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "service": "object",
-                    "method": "execute_kw",
-                    "args": [
-                        self.db,
-                        uid,
-                        password,
-                        "res.partner",
-                        "search_read",
-                        [[["email", "=", email]]],
-                        {"fields": ["id", "name", "email", "is_company"], "limit": 1}
-                    ]
-                },
-                "id": 2,
-            }
+            partners = client.execute_kw("res.partner", "search_read", domain, options)
             
-            partner_resp = requests.post(self.url, json=partner_payload, timeout=10)
-            partner_resp.raise_for_status()
-            partner_result = partner_resp.json()
+            print(f"[AUTH DEBUG] partners result: {partners}")
+            _LOG.debug(f"[DEBUG auth] partners result: {partners}")
             
-            partners = partner_result.get("result", [])
-            
-            # Als partner niet gevonden via email, probeer via user record
-            if not partners:
-                user_payload = {
-                    "jsonrpc": "2.0",
-                    "method": "call",
-                    "params": {
-                        "service": "object",
-                        "method": "execute_kw",
-                        "args": [
-                            self.db,
-                            uid,
-                            password,
-                            "res.users",
-                            "read",
-                            [[uid]],
-                            {"fields": ["partner_id", "name"]}
-                        ]
-                    },
-                    "id": 3,
-                }
-                
-                user_resp = requests.post(self.url, json=user_payload, timeout=10)
-                user_resp.raise_for_status()
-                user_result = user_resp.json()
-                users = user_result.get("result", [])
-                
-                if users and users[0].get("partner_id"):
-                    partner_id = users[0]["partner_id"][0]
-                    partner_name = users[0]["partner_id"][1]
-                    return {
-                        "id": partner_id,
-                        "name": partner_name,
-                        "email": email,
-                        "uid": uid,
-                    }
+            if not partners or len(partners) == 0:
+                print(f"[AUTH DEBUG] login failed for {email}")
+                _LOG.debug(f"[DEBUG auth] authentication failed for {email}")
                 return None
             
             partner = partners[0]
             return {
                 "id": partner["id"],
                 "name": partner["name"],
-                "email": partner.get("email", email),
-                "uid": uid,
+                "email": email,
+                "selfbilling_compleet": partner.get("x_studio_akkoord_voorwaarden_selfbillingportaal", False),
             }
             
         except Exception as e:
@@ -125,8 +65,8 @@ class PartnerAuth:
         Gebruikt voor verificatie zonder partner wachtwoord.
         """
         try:
-            admin_username = ODOO_LOGIN
-            admin_password = ODOO_API_KEY
+            admin_username = get_odoo_login()
+            admin_password = get_odoo_api_key()
             
             # Login als admin
             login_payload = {
