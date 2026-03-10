@@ -4,7 +4,9 @@ FLOW 1: Odoo → eigen DB
 """
 import os
 import logging
-from fastapi import APIRouter, Request, HTTPException, Header
+import uuid
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Request, HTTPException, Header, Query
 from fastapi.responses import JSONResponse
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -12,6 +14,21 @@ from psycopg2.extras import RealDictCursor
 _LOG = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+
+
+@router.get("/test")
+async def test_webhook():
+    """
+    Test endpoint om te controleren of webhook connectie werkt.
+    Retourneert basis informatie zonder authenticatie.
+    """
+    return JSONResponse({
+        "status": "success",
+        "message": "Webhook endpoint is bereikbaar",
+        "endpoint": "/webhooks/odoo/contact",
+        "method": "POST",
+        "required_header": "X-Odoo-Webhook-Token"
+    })
 
 
 def get_database_url():
@@ -252,4 +269,208 @@ async def odoo_contact_webhook(
         raise
     except Exception as e:
         _LOG.error(f"Fout bij webhook verwerking: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Interne server fout: {str(e)}")
+
+
+def get_or_create_contact(gravity_data: dict, cur, conn) -> str:
+    """
+    Haal contact op of maak aan op basis van email.
+    Retourneert contact UUID.
+    """
+    email = gravity_data.get("email") or gravity_data.get("Email") or gravity_data.get("email_address")
+    
+    if not email:
+        raise ValueError("Email ontbreekt in Gravity Forms data")
+    
+    # Check of contact al bestaat
+    cur.execute(
+        "SELECT id FROM contacten WHERE email = %s",
+        (email,)
+    )
+    existing = cur.fetchone()
+    
+    if existing:
+        contact_id = existing[0]
+        _LOG.info(f"Bestaand contact gevonden: {contact_id} (email: {email})")
+        return contact_id
+    
+    # Maak nieuw contact aan
+    naam = gravity_data.get("name") or gravity_data.get("Name") or gravity_data.get("bedrijfsnaam") or email.split("@")[0]
+    telefoon = gravity_data.get("phone") or gravity_data.get("Phone") or gravity_data.get("telefoon")
+    straat = gravity_data.get("street") or gravity_data.get("Street") or gravity_data.get("straat") or gravity_data.get("address")
+    postcode = gravity_data.get("zip") or gravity_data.get("Zip") or gravity_data.get("postcode") or gravity_data.get("postal_code")
+    stad = gravity_data.get("city") or gravity_data.get("City") or gravity_data.get("stad")
+    
+    # Bepaal bedrijfstype (standaard 'company' voor nieuwe aanvragen)
+    bedrijfstype = "company"
+    
+    cur.execute("""
+        INSERT INTO contacten (
+            naam, email, telefoon, straat, postcode, stad,
+            land_code, bedrijfstype, actief
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s
+        ) RETURNING id
+    """, (
+        naam,
+        email,
+        telefoon,
+        straat,
+        postcode,
+        stad,
+        "NL",  # Default land_code
+        bedrijfstype,
+        True  # actief
+    ))
+    
+    contact_id = cur.fetchone()[0]
+    conn.commit()
+    _LOG.info(f"Nieuw contact aangemaakt: {contact_id} (email: {email})")
+    return contact_id
+
+
+def generate_ordernummer() -> str:
+    """Genereer uniek ordernummer"""
+    # Format: GF-YYYYMMDD-HHMMSS-UUID(8)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    short_uuid = str(uuid.uuid4())[:8].upper()
+    return f"GF-{timestamp}-{short_uuid}"
+
+
+@router.post("/gravity/aanvraag")
+async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., description="Webhook secret token")):
+    """
+    Webhook endpoint voor Gravity Forms aanvragen.
+    Ontvangt nieuwe aanvragen van Gravity Forms en maakt contact + order aan in eigen DB.
+    
+    Query Parameters:
+        token: Webhook secret voor verificatie (verplicht)
+    
+    Body:
+        Gravity Forms webhook data (formulier specifiek)
+        Verwacht minimaal:
+        - email (of Email of email_address)
+        - name (of Name of bedrijfsnaam)
+        - event_date (datum/tijd evenement)
+        - location (locatie)
+        - aantal_personen (aantal personen)
+        - opmerkingen (opmerkingen/notities)
+    """
+    # Verifieer token uit query parameter
+    if not token:
+        _LOG.warning("Gravity Forms webhook call zonder token")
+        raise HTTPException(status_code=401, detail="Token parameter ontbreekt")
+    
+    if not verify_webhook_token(token):
+        _LOG.warning("Gravity Forms webhook call met ongeldige token")
+        raise HTTPException(status_code=401, detail="Ongeldige webhook token")
+    
+    try:
+        # Parse request body
+        body = await request.json()
+        _LOG.info(f"Gravity Forms webhook ontvangen: {body}")
+        
+        # Haal database connectie
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        # Stap 1: Haal contact op of maak aan
+        try:
+            contact_id = get_or_create_contact(body, cur, conn)
+        except ValueError as e:
+            cur.close()
+            conn.close()
+            raise HTTPException(status_code=400, detail=str(e))
+        
+        # Stap 2: Maak order aan
+        # Parse datum/tijd evenement
+        event_date_str = body.get("event_date") or body.get("Event Date") or body.get("datum") or body.get("Datum")
+        leverdatum = None
+        if event_date_str:
+            try:
+                # Probeer verschillende datum formaten
+                for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%d-%m-%Y %H:%M", "%d-%m-%Y"]:
+                    try:
+                        leverdatum = datetime.strptime(event_date_str, fmt)
+                        break
+                    except ValueError:
+                        continue
+                if not leverdatum:
+                    _LOG.warning(f"Kon datum niet parsen: {event_date_str}")
+            except Exception as e:
+                _LOG.warning(f"Fout bij parsen datum: {e}")
+        
+        # Als geen leverdatum, gebruik huidige datum + 7 dagen
+        if not leverdatum:
+            leverdatum = datetime.now() + timedelta(days=7)
+        
+        # Genereer uniek ordernummer
+        ordernummer = generate_ordernummer()
+        
+        # Haal order data op
+        plaats = body.get("location") or body.get("Location") or body.get("locatie") or body.get("Locatie") or "Onbekend"
+        aantal_personen = body.get("aantal_personen") or body.get("Aantal personen") or body.get("personen") or body.get("Personen") or 0
+        try:
+            aantal_personen = int(aantal_personen)
+        except (ValueError, TypeError):
+            aantal_personen = 0
+        
+        aantal_kinderen = body.get("aantal_kinderen") or body.get("Aantal kinderen") or body.get("kinderen") or 0
+        try:
+            aantal_kinderen = int(aantal_kinderen)
+        except (ValueError, TypeError):
+            aantal_kinderen = 0
+        
+        opmerkingen = body.get("opmerkingen") or body.get("Opmerkingen") or body.get("notes") or body.get("Notes") or body.get("message") or ""
+        
+        # Maak order aan
+        cur.execute("""
+            INSERT INTO orders (
+                ordernummer, order_datum, leverdatum,
+                status, portaal_status, type_naam,
+                klant_id, plaats, aantal_personen, aantal_kinderen,
+                ordertype, opmerkingen,
+                totaal_bedrag, bedrag_excl_btw, bedrag_btw
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            ) RETURNING id
+        """, (
+            ordernummer,
+            datetime.now(),  # order_datum
+            leverdatum,  # leverdatum
+            "draft",  # status (nieuwe aanvraag)
+            "nieuw",  # portaal_status
+            "Aanvraag",  # type_naam
+            contact_id,  # klant_id
+            plaats,
+            aantal_personen,
+            aantal_kinderen,
+            "b2c",  # ordertype (standaard b2c voor Gravity Forms)
+            opmerkingen,
+            0.00,  # totaal_bedrag (nog niet berekend)
+            0.00,  # bedrag_excl_btw
+            0.00   # bedrag_btw
+        ))
+        
+        order_id = cur.fetchone()[0]
+        conn.commit()
+        
+        _LOG.info(f"Order aangemaakt: {order_id} (ordernummer: {ordernummer}, contact: {contact_id})")
+        
+        cur.close()
+        conn.close()
+        
+        return JSONResponse({
+            "status": "success",
+            "message": "Aanvraag verwerkt",
+            "contact_id": str(contact_id),
+            "order_id": str(order_id),
+            "ordernummer": ordernummer
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        _LOG.error(f"Fout bij Gravity Forms webhook verwerking: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Interne server fout: {str(e)}")
