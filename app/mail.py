@@ -330,3 +330,181 @@ def stuur_mail(
             "log_id": str(log_id) if log_id else None,
             "error": error_msg
         }
+
+
+def haal_inkomende_mails() -> dict:
+    """
+    Haal nieuwe inkomende mails op via Gmail API en log in mail_logs tabel.
+    
+    Returns:
+        dict met status en details:
+        {
+            "success": bool,
+            "aantal_verwerkt": int,
+            "error": str (als success=False)
+        }
+    """
+    try:
+        import email
+        from email.utils import parsedate_to_datetime
+        
+        service = get_gmail_service()
+        
+        # Haal alleen ongelezen mails op
+        query = 'is:unread'
+        
+        _LOG.info(f"Ophalen nieuwe inkomende mails via Gmail API (query: {query})")
+        
+        # Zoek naar ongelezen berichten
+        results = service.users().messages().list(
+            userId='me',
+            q=query,
+            maxResults=50
+        ).execute()
+        
+        messages = results.get('messages', [])
+        
+        if not messages:
+            _LOG.info("Geen nieuwe inkomende mails gevonden")
+            return {
+                "success": True,
+                "aantal_verwerkt": 0,
+                "error": None
+            }
+        
+        aantal_verwerkt = 0
+        
+        for msg_item in messages:
+            try:
+                # Haal volledige message op
+                message = service.users().messages().get(
+                    userId='me',
+                    id=msg_item['id'],
+                    format='full'
+                ).execute()
+                
+                # Parse headers
+                headers = message['payload'].get('headers', [])
+                header_dict = {h['name']: h['value'] for h in headers}
+                
+                # Haal email velden op
+                email_van = header_dict.get('From', '')
+                onderwerp = header_dict.get('Subject', '(Geen onderwerp)')
+                message_id_header = header_dict.get('Message-ID', '')
+                date_header = header_dict.get('Date', '')
+                naar_header = header_dict.get('To', GMAIL_FROM_EMAIL)
+                
+                # Parse datum
+                try:
+                    if date_header:
+                        ontvangen_datum = parsedate_to_datetime(date_header)
+                    else:
+                        ontvangen_datum = datetime.now()
+                except:
+                    ontvangen_datum = datetime.now()
+                
+                # Haal body op
+                body = ""
+                payload = message['payload']
+                
+                if 'parts' in payload:
+                    # Multipart message
+                    for part in payload['parts']:
+                        if part['mimeType'] == 'text/plain':
+                            data = part['body'].get('data')
+                            if data:
+                                body = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                                break
+                        elif part['mimeType'] == 'text/html' and not body:
+                            data = part['body'].get('data')
+                            if data:
+                                body = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                else:
+                    # Single part message
+                    if payload['mimeType'] in ['text/plain', 'text/html']:
+                        data = payload['body'].get('data')
+                        if data:
+                            body = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                
+                if not body:
+                    body = "(Geen inhoud)"
+                
+                # Check of deze mail al gelogd is (op basis van message_id)
+                database_url = get_database_url()
+                conn = psycopg2.connect(database_url)
+                cur = conn.cursor()
+                
+                cur.execute("""
+                    SELECT id FROM mail_logs 
+                    WHERE message_id = %s
+                """, (message_id_header,))
+                
+                if cur.fetchone():
+                    _LOG.info(f"Mail al gelogd: {message_id_header}")
+                    cur.close()
+                    conn.close()
+                    # Markeer als gelezen ook al is het al gelogd
+                    try:
+                        service.users().messages().modify(
+                            userId='me',
+                            id=msg_item['id'],
+                            body={'removeLabelIds': ['UNREAD']}
+                        ).execute()
+                    except:
+                        pass
+                    continue
+                
+                cur.close()
+                conn.close()
+                
+                # Log inkomende mail in database
+                log_id = log_mail_to_db(
+                    naar=naar_header,
+                    onderwerp=onderwerp,
+                    inhoud=body,
+                    status="ontvangen",
+                    email_van=email_van,
+                    message_id=message_id_header,
+                    richting="inkomend"
+                )
+                
+                if log_id:
+                    aantal_verwerkt += 1
+                    _LOG.info(f"Inkomende mail gelogd: {log_id} (van: {email_van}, onderwerp: {onderwerp[:50]})")
+                
+                # Markeer als gelezen in Gmail
+                service.users().messages().modify(
+                    userId='me',
+                    id=msg_item['id'],
+                    body={'removeLabelIds': ['UNREAD']}
+                ).execute()
+                
+            except Exception as e:
+                _LOG.error(f"Fout bij verwerken mail {msg_item.get('id')}: {e}", exc_info=True)
+                continue
+        
+        _LOG.info(f"Verwerkt {aantal_verwerkt} nieuwe inkomende mails")
+        
+        return {
+            "success": True,
+            "aantal_verwerkt": aantal_verwerkt,
+            "error": None
+        }
+        
+    except HttpError as e:
+        error_msg = f"Gmail API fout: {str(e)}"
+        _LOG.error(f"Fout bij ophalen inkomende mails: {error_msg}")
+        return {
+            "success": False,
+            "aantal_verwerkt": 0,
+            "error": error_msg
+        }
+        
+    except Exception as e:
+        error_msg = f"Onverwachte fout: {str(e)}"
+        _LOG.error(f"Fout bij ophalen inkomende mails: {error_msg}", exc_info=True)
+        return {
+            "success": False,
+            "aantal_verwerkt": 0,
+            "error": error_msg
+        }
