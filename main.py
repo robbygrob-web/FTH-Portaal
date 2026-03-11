@@ -16,6 +16,7 @@ load_dotenv(dotenv_path=env_path)
 # Import config en routes NA load_dotenv() zodat omgevingsvariabelen beschikbaar zijn
 from app.config import SESSION_SECRET, startup_validation
 from app.routes import router
+from app.templates import router as templates_router
 
 # Import webhooks router met error handling voor debugging
 try:
@@ -75,6 +76,8 @@ if mail_router is not None:
         # Mail router is optioneel, niet kritiek voor startup
 else:
     print(f"[WARNING] Mail router niet beschikbaar - skip registratie")
+
+app.include_router(templates_router)
 
 # DEBUG: Print alle geregistreerde routes bij startup
 def print_routes():
