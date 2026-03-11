@@ -17,15 +17,24 @@ PROJECT_ROOT = Path(__file__).parent.parent
 ODOO_TEMPLATES_FILE = PROJECT_ROOT / "docs" / "odoo_mail_templates.json"
 TEMPLATES_FILE = PROJECT_ROOT / "docs" / "templates.json"
 
+# FTH template namen die behouden moeten worden (ID: 32, 38, 41, 42, 43, 47, 48, 99)
+FTH_TEMPLATE_NAMES = {
+    "1e herinnering offerte Friettruck huren",
+    "Orderkopie voor partner",
+    "Verkoop: Nog",
+    "Verkoop: Nog drie dagen tot uw friettruck-feest",
+    "Verkoop: Nog één dag tot uw friettruck-feest",
+    "Verkoop: Offerte aanpassing verzenden",
+    "Verkoop: Offerte verzenden test 2.0",
+    "Verkoop: Nog acht dagen tot uw friettruck-feest"
+}
+
 
 def migrate_templates_if_needed():
     """
-    Migreer odoo_mail_templates.json naar templates.json als templates.json nog niet bestaat.
+    Migreer odoo_mail_templates.json naar templates.json als templates.json nog niet bestaat,
+    of voeg ontbrekende FTH templates toe als templates.json al bestaat.
     """
-    if TEMPLATES_FILE.exists():
-        _LOG.info("templates.json bestaat al, geen migratie nodig")
-        return
-    
     if not ODOO_TEMPLATES_FILE.exists():
         _LOG.warning("odoo_mail_templates.json niet gevonden, kan niet migreren")
         return
@@ -35,25 +44,45 @@ def migrate_templates_if_needed():
         with open(ODOO_TEMPLATES_FILE, 'r', encoding='utf-8') as f:
             odoo_templates = json.load(f)
         
-        # Converteer naar nieuwe structuur
-        new_structure: Dict[str, Dict[str, str]] = {}
+        # Lees bestaande templates als die al bestaan
+        existing_templates: Dict[str, Dict[str, str]] = {}
+        if TEMPLATES_FILE.exists():
+            try:
+                with open(TEMPLATES_FILE, 'r', encoding='utf-8') as f:
+                    existing_templates = json.load(f)
+                _LOG.info(f"Bestaande templates.json geladen: {len(existing_templates)} templates")
+            except Exception as e:
+                _LOG.warning(f"Kon bestaande templates.json niet laden: {e}")
         
+        # Converteer FTH templates uit odoo_mail_templates.json
+        fth_templates_from_odoo: Dict[str, Dict[str, str]] = {}
         for template in odoo_templates:
             naam = template.get("naam", "")
             body_html = template.get("body_html", "")
             
-            if naam:
-                new_structure[naam] = {
+            # Alleen FTH templates migreren
+            if naam and naam in FTH_TEMPLATE_NAMES:
+                fth_templates_from_odoo[naam] = {
                     "original": body_html,
                     "revised": body_html  # Start met kopie van original
                 }
         
-        # Sla nieuwe structuur op
+        # Merge: behoud bestaande templates, update/voeg toe FTH templates
+        # Als template al bestaat, behoud revised versie als die bestaat
+        for naam, versions in fth_templates_from_odoo.items():
+            if naam in existing_templates:
+                # Behoud bestaande revised versie als die bestaat
+                existing_revised = existing_templates[naam].get("revised")
+                if existing_revised:
+                    versions["revised"] = existing_revised
+            existing_templates[naam] = versions
+        
+        # Sla op
         TEMPLATES_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(TEMPLATES_FILE, 'w', encoding='utf-8') as f:
-            json.dump(new_structure, f, indent=2, ensure_ascii=False)
+            json.dump(existing_templates, f, indent=2, ensure_ascii=False)
         
-        _LOG.info(f"Migratie voltooid: {len(new_structure)} templates gemigreerd naar templates.json")
+        _LOG.info(f"Migratie voltooid: {len(fth_templates_from_odoo)} FTH templates verwerkt")
         
     except Exception as e:
         _LOG.error(f"Fout bij migratie templates: {e}")
@@ -61,7 +90,7 @@ def migrate_templates_if_needed():
 
 
 def load_templates() -> Dict[str, Dict[str, str]]:
-    """Laad templates uit JSON bestand"""
+    """Laad templates uit JSON bestand - alleen FTH templates"""
     if not TEMPLATES_FILE.exists():
         # Probeer migratie
         migrate_templates_if_needed()
@@ -71,18 +100,43 @@ def load_templates() -> Dict[str, Dict[str, str]]:
     
     try:
         with open(TEMPLATES_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            all_templates = json.load(f)
+        
+        # Filter alleen FTH templates
+        fth_templates = {
+            naam: versions 
+            for naam, versions in all_templates.items() 
+            if naam in FTH_TEMPLATE_NAMES
+        }
+        
+        return fth_templates
     except Exception as e:
         _LOG.error(f"Fout bij laden templates: {e}")
         raise HTTPException(status_code=500, detail=f"Kon templates niet laden: {str(e)}")
 
 
 def save_templates(templates: Dict[str, Dict[str, str]]):
-    """Sla templates op in JSON bestand"""
+    """Sla templates op in JSON bestand - behoud alle templates, update alleen FTH templates"""
     try:
+        # Laad alle bestaande templates eerst
+        all_templates = {}
+        if TEMPLATES_FILE.exists():
+            try:
+                with open(TEMPLATES_FILE, 'r', encoding='utf-8') as f:
+                    all_templates = json.load(f)
+            except Exception:
+                # Als laden mislukt, start met lege dict
+                all_templates = {}
+        
+        # Update alleen FTH templates (behoud niet-FTH templates)
+        for naam, versions in templates.items():
+            if naam in FTH_TEMPLATE_NAMES:
+                all_templates[naam] = versions
+        
+        # Sla alle templates op
         TEMPLATES_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(TEMPLATES_FILE, 'w', encoding='utf-8') as f:
-            json.dump(templates, f, indent=2, ensure_ascii=False)
+            json.dump(all_templates, f, indent=2, ensure_ascii=False)
         _LOG.info("Templates opgeslagen")
     except Exception as e:
         _LOG.error(f"Fout bij opslaan templates: {e}")
