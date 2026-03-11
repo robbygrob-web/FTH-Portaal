@@ -123,6 +123,25 @@ CREATE INDEX idx_orders_odoo_id ON orders(odoo_id);
 CREATE INDEX idx_orders_beschikbaar ON orders(portaal_status, contractor_id) WHERE portaal_status IN ('beschikbaar', 'transfer');
 
 -- ============================================================================
+-- ARTIKELEN (product.product)
+-- ============================================================================
+CREATE TABLE artikelen (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    naam VARCHAR(255) NOT NULL,
+    prijs_excl DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    btw_pct DECIMAL(5, 2) NOT NULL DEFAULT 9.00,
+    btw_bedrag DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    prijs_incl DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    odoo_id INTEGER UNIQUE NOT NULL,
+    actief BOOLEAN DEFAULT TRUE,
+    aangemaakt_op TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_artikelen_odoo_id ON artikelen(odoo_id);
+CREATE INDEX idx_artikelen_actief ON artikelen(actief);
+CREATE INDEX idx_artikelen_naam ON artikelen(naam);
+
+-- ============================================================================
 -- FACTUREN (account.move)
 -- ============================================================================
 CREATE TABLE facturen (
@@ -268,6 +287,7 @@ CREATE TRIGGER update_mail_logs_updated_at BEFORE UPDATE ON mail_logs
 CREATE TRIGGER update_agents_updated_at BEFORE UPDATE ON agents
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+
 -- ============================================================================
 -- COMMENTS voor documentatie
 -- ============================================================================
@@ -276,6 +296,7 @@ COMMENT ON TABLE orders IS 'Verkooporders en offertes';
 COMMENT ON TABLE facturen IS 'Facturen en creditnota''s';
 COMMENT ON TABLE mail_logs IS 'E-mail en bericht logs';
 COMMENT ON TABLE agents IS 'AI agent configuraties';
+COMMENT ON TABLE artikelen IS 'Producten/artikelen uit Odoo';
 
 COMMENT ON COLUMN contacten.is_portaal_partner IS 'Of dit een portaal partner is (leverancier)';
 COMMENT ON COLUMN contacten.partner_commissie IS 'Commissie percentage voor partner';

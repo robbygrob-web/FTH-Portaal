@@ -112,7 +112,11 @@ async def poll_inkomende_mails():
 
 @app.on_event("startup")
 async def startup_event():
-    """Start achtergrondtaak voor mail polling bij startup"""
+    """Start achtergrondtaak voor mail polling bij startup en print routes"""
+    # Print alle geregistreerde routes
+    print_routes()
+    
+    # Start mail polling achtergrondtaak
     if mail_router is not None:
         print("[STARTUP] Start achtergrondtaak voor inkomende mail polling")
         asyncio.create_task(poll_inkomende_mails())

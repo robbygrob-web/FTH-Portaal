@@ -1,0 +1,430 @@
+{
+  "fetched_at": "2026-03-11T16:44:07.590160",
+  "products": [
+    {
+      "name": "Puntzak Verse Friet",
+      "id": 81,
+      "filled_fields": {
+        "id": 81,
+        "display_name": "Puntzak Verse Friet",
+        "message_is_follower": true,
+        "message_follower_ids": [
+          6561
+        ],
+        "message_partner_ids": [
+          3
+        ],
+        "message_ids": [
+          37197
+        ],
+        "has_message": true,
+        "message_needaction_counter": 0,
+        "message_has_error_counter": 0,
+        "message_attachment_count": 0,
+        "price_extra": 0.0,
+        "lst_price": 5.0,
+        "partner_ref": "Puntzak Verse Friet",
+        "active": true,
+        "product_tmpl_id": [
+          81,
+          "Puntzak Verse Friet"
+        ],
+        "is_product_variant": true,
+        "standard_price": 0.0,
+        "volume": 0.0,
+        "weight": 0.0,
+        "pricelist_item_count": 0,
+        "product_document_count": 0,
+        "write_date": "2026-02-09 13:21:02",
+        "create_uid": [
+          2,
+          "e e"
+        ],
+        "create_date": "2026-02-09 13:21:02",
+        "write_uid": [
+          2,
+          "e e"
+        ],
+        "tax_string": "(= € 4,59 Excl. btw)",
+        "qty_available": 0.0,
+        "virtual_available": 0.0,
+        "free_qty": 0.0,
+        "incoming_qty": 0.0,
+        "outgoing_qty": 0.0,
+        "nbr_moves_in": 0,
+        "nbr_moves_out": 0,
+        "nbr_reordering_rules": 0,
+        "reordering_min_qty": 0.0,
+        "reordering_max_qty": 0.0,
+        "show_qty_update_button": true,
+        "purchased_product_qty": 0.0,
+        "value_svl": 0.0,
+        "quantity_svl": 0.0,
+        "avg_cost": 0.0,
+        "total_value": 0.0,
+        "company_currency_id": [
+          125,
+          "EUR"
+        ],
+        "sales_count": 0.0,
+        "name": "Puntzak Verse Friet",
+        "sequence": 1,
+        "type": "consu",
+        "service_tracking": "no",
+        "currency_id": [
+          125,
+          "EUR"
+        ],
+        "cost_currency_id": [
+          125,
+          "EUR"
+        ],
+        "list_price": 5.0,
+        "volume_uom_name": "m³",
+        "weight_uom_name": "kg",
+        "sale_ok": true,
+        "purchase_ok": true,
+        "uom_id": [
+          1,
+          "Units"
+        ],
+        "uom_name": "Units",
+        "color": 0,
+        "product_variant_ids": [
+          81
+        ],
+        "product_variant_id": [
+          81,
+          "Puntzak Verse Friet"
+        ],
+        "product_variant_count": 1,
+        "taxes_id": [
+          4
+        ],
+        "supplier_taxes_id": [
+          12
+        ],
+        "property_account_income_id": [
+          370,
+          "800500 Turnover NL services 1"
+        ],
+        "fiscal_country_codes": "NL",
+        "responsible_id": [
+          2,
+          "e e"
+        ],
+        "property_stock_production": [
+          21,
+          "Virtual Locations/Production"
+        ],
+        "property_stock_inventory": [
+          18,
+          "Virtual Locations/Inventory adjustment"
+        ],
+        "sale_delay": 0,
+        "tracking": "none",
+        "has_available_route_ids": true,
+        "route_ids": [
+          5
+        ],
+        "purchase_method": "receive",
+        "purchase_line_warn": "no-message",
+        "cost_method": "standard",
+        "valuation": "manual_periodic",
+        "service_type": "manual",
+        "sale_line_warn": "no-message",
+        "expense_policy": "no",
+        "visible_expense_policy": true,
+        "invoice_policy": "order",
+        "service_policy": "ordered_prepaid"
+      }
+    },
+    {
+      "name": "Verse Friet , Snacks & Burger ( onbeperkt)",
+      "id": 85,
+      "filled_fields": {
+        "id": 85,
+        "display_name": "Verse Friet , Snacks & Burger ( onbeperkt)",
+        "message_is_follower": true,
+        "message_follower_ids": [
+          6569
+        ],
+        "message_partner_ids": [
+          3
+        ],
+        "message_ids": [
+          37205
+        ],
+        "has_message": true,
+        "message_needaction_counter": 0,
+        "message_has_error_counter": 0,
+        "message_attachment_count": 0,
+        "price_extra": 0.0,
+        "lst_price": 11.75,
+        "partner_ref": "Verse Friet , Snacks & Burger ( onbeperkt)",
+        "active": true,
+        "product_tmpl_id": [
+          85,
+          "Verse Friet , Snacks & Burger ( onbeperkt)"
+        ],
+        "is_product_variant": true,
+        "standard_price": 0.0,
+        "volume": 0.0,
+        "weight": 0.0,
+        "pricelist_item_count": 0,
+        "product_document_count": 0,
+        "write_date": "2026-02-09 14:00:20",
+        "create_uid": [
+          2,
+          "e e"
+        ],
+        "create_date": "2026-02-09 13:25:10",
+        "write_uid": [
+          2,
+          "e e"
+        ],
+        "tax_string": "(= € 10,78 Excl. btw)",
+        "stock_move_ids": [
+          672,
+          681
+        ],
+        "qty_available": 0.0,
+        "virtual_available": -1.0,
+        "free_qty": 0.0,
+        "incoming_qty": 0.0,
+        "outgoing_qty": 1.0,
+        "nbr_moves_in": 0,
+        "nbr_moves_out": 0,
+        "nbr_reordering_rules": 0,
+        "reordering_min_qty": 0.0,
+        "reordering_max_qty": 0.0,
+        "show_qty_update_button": true,
+        "purchased_product_qty": 0.0,
+        "value_svl": 0.0,
+        "quantity_svl": 0.0,
+        "avg_cost": 0.0,
+        "total_value": 0.0,
+        "company_currency_id": [
+          125,
+          "EUR"
+        ],
+        "sales_count": 0.0,
+        "name": "Verse Friet , Snacks & Burger ( onbeperkt)",
+        "sequence": 1,
+        "type": "consu",
+        "service_tracking": "no",
+        "currency_id": [
+          125,
+          "EUR"
+        ],
+        "cost_currency_id": [
+          125,
+          "EUR"
+        ],
+        "list_price": 11.75,
+        "volume_uom_name": "m³",
+        "weight_uom_name": "kg",
+        "sale_ok": true,
+        "purchase_ok": true,
+        "uom_id": [
+          1,
+          "Units"
+        ],
+        "uom_name": "Units",
+        "color": 0,
+        "product_variant_ids": [
+          85
+        ],
+        "product_variant_id": [
+          85,
+          "Verse Friet , Snacks & Burger ( onbeperkt)"
+        ],
+        "product_variant_count": 1,
+        "taxes_id": [
+          4
+        ],
+        "supplier_taxes_id": [
+          11
+        ],
+        "property_account_income_id": [
+          370,
+          "800500 Turnover NL services 1"
+        ],
+        "fiscal_country_codes": "NL",
+        "responsible_id": [
+          2,
+          "e e"
+        ],
+        "property_stock_production": [
+          21,
+          "Virtual Locations/Production"
+        ],
+        "property_stock_inventory": [
+          18,
+          "Virtual Locations/Inventory adjustment"
+        ],
+        "sale_delay": 0,
+        "tracking": "none",
+        "has_available_route_ids": true,
+        "route_ids": [
+          5
+        ],
+        "purchase_method": "receive",
+        "purchase_line_warn": "no-message",
+        "cost_method": "standard",
+        "valuation": "manual_periodic",
+        "service_type": "manual",
+        "sale_line_warn": "no-message",
+        "expense_policy": "no",
+        "visible_expense_policy": true,
+        "invoice_policy": "order",
+        "service_policy": "ordered_prepaid"
+      }
+    },
+    {
+      "name": "Kids Pakket",
+      "id": 86,
+      "filled_fields": {
+        "id": 86,
+        "display_name": "Kids Pakket",
+        "message_is_follower": true,
+        "message_follower_ids": [
+          6572
+        ],
+        "message_partner_ids": [
+          3
+        ],
+        "message_ids": [
+          37208
+        ],
+        "has_message": true,
+        "message_needaction_counter": 0,
+        "message_has_error_counter": 0,
+        "message_attachment_count": 0,
+        "price_extra": 0.0,
+        "lst_price": 6.5,
+        "partner_ref": "Kids Pakket",
+        "active": true,
+        "product_tmpl_id": [
+          86,
+          "Kids Pakket"
+        ],
+        "is_product_variant": true,
+        "standard_price": 0.0,
+        "volume": 0.0,
+        "weight": 0.0,
+        "pricelist_item_count": 0,
+        "product_document_count": 0,
+        "write_date": "2026-02-09 13:27:38",
+        "create_uid": [
+          2,
+          "e e"
+        ],
+        "create_date": "2026-02-09 13:26:13",
+        "write_uid": [
+          2,
+          "e e"
+        ],
+        "tax_string": "(= € 5,96 Excl. btw)",
+        "stock_move_ids": [
+          657,
+          669,
+          675,
+          685,
+          688
+        ],
+        "qty_available": 0.0,
+        "virtual_available": -5.0,
+        "free_qty": 0.0,
+        "incoming_qty": 0.0,
+        "outgoing_qty": 5.0,
+        "nbr_moves_in": 0,
+        "nbr_moves_out": 0,
+        "nbr_reordering_rules": 0,
+        "reordering_min_qty": 0.0,
+        "reordering_max_qty": 0.0,
+        "show_qty_update_button": true,
+        "purchased_product_qty": 0.0,
+        "value_svl": 0.0,
+        "quantity_svl": 0.0,
+        "avg_cost": 0.0,
+        "total_value": 0.0,
+        "company_currency_id": [
+          125,
+          "EUR"
+        ],
+        "sales_count": 0.0,
+        "name": "Kids Pakket",
+        "sequence": 1,
+        "type": "consu",
+        "service_tracking": "no",
+        "currency_id": [
+          125,
+          "EUR"
+        ],
+        "cost_currency_id": [
+          125,
+          "EUR"
+        ],
+        "list_price": 6.5,
+        "volume_uom_name": "m³",
+        "weight_uom_name": "kg",
+        "sale_ok": true,
+        "purchase_ok": true,
+        "uom_id": [
+          1,
+          "Units"
+        ],
+        "uom_name": "Units",
+        "color": 0,
+        "product_variant_ids": [
+          86
+        ],
+        "product_variant_id": [
+          86,
+          "Kids Pakket"
+        ],
+        "product_variant_count": 1,
+        "taxes_id": [
+          4
+        ],
+        "supplier_taxes_id": [
+          12
+        ],
+        "property_account_income_id": [
+          370,
+          "800500 Turnover NL services 1"
+        ],
+        "fiscal_country_codes": "NL",
+        "responsible_id": [
+          2,
+          "e e"
+        ],
+        "property_stock_production": [
+          21,
+          "Virtual Locations/Production"
+        ],
+        "property_stock_inventory": [
+          18,
+          "Virtual Locations/Inventory adjustment"
+        ],
+        "sale_delay": 0,
+        "tracking": "none",
+        "has_available_route_ids": true,
+        "route_ids": [
+          5
+        ],
+        "purchase_method": "receive",
+        "purchase_line_warn": "no-message",
+        "cost_method": "standard",
+        "valuation": "manual_periodic",
+        "service_type": "manual",
+        "sale_line_warn": "no-message",
+        "expense_policy": "no",
+        "visible_expense_policy": true,
+        "invoice_policy": "order",
+        "service_policy": "ordered_prepaid"
+      }
+    }
+  ]
+}

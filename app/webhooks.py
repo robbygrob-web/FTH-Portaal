@@ -439,7 +439,20 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
             order_id = result[0]
             conn.commit()
             
-            _LOG.info(f"Order aangemaakt: {order_id} (ordernummer: {ordernummer}, contact: {contact_id})")
+            # Verbeterde logging voor nieuwe orders
+            _LOG.info("=" * 60)
+            _LOG.info(f"[GRAVITY WEBHOOK] Nieuwe order ontvangen en opgeslagen!")
+            _LOG.info(f"  Order ID: {order_id}")
+            _LOG.info(f"  Ordernummer: {ordernummer}")
+            _LOG.info(f"  Contact ID: {contact_id}")
+            _LOG.info(f"  Plaats: {plaats}")
+            _LOG.info(f"  Aantal personen: {aantal_personen}")
+            _LOG.info(f"  Aantal kinderen: {aantal_kinderen}")
+            _LOG.info(f"  Leverdatum: {leverdatum}")
+            _LOG.info(f"  UTM Source: {utm_source or 'Geen'}")
+            _LOG.info(f"  UTM Medium: {utm_medium or 'Geen'}")
+            _LOG.info(f"  UTM Campaign: {utm_campaign or 'Geen'}")
+            _LOG.info("=" * 60)
             
         except psycopg2.IntegrityError as e:
             if conn:
