@@ -591,14 +591,15 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 # 3. Broodjes toevoegen als veld "79" gevuld is
                 broodjes_veld = body.get("79")
                 if broodjes_veld and broodjes_veld.strip() and broodjes_veld != "0":
-                    # Formaat: "Ja graag!|1" - als gevuld: aantal = 1
+                    # Als gevuld: aantal = aantal_personen
                     broodjes_artikel = get_artikel_by_naam("Broodjes")
                     if broodjes_artikel:
                         broodjes_prijs_incl = Decimal(str(broodjes_artikel[2]))  # prijs_incl uit artikel
+                        broodjes_aantal = Decimal(str(aantal_personen)) if aantal_personen > 0 else Decimal("1")
                         add_order_artikel(
                             broodjes_artikel[0],  # artikel_id
                             broodjes_artikel[1],  # naam
-                            Decimal("1"),  # altijd 1 stuk
+                            broodjes_aantal,  # aantal = aantal_personen
                             broodjes_prijs_incl  # prijs_incl
                         )
                     else:
@@ -607,14 +608,15 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 # 4. Drankjes toevoegen als veld "44" gevuld is
                 drankjes_veld = body.get("44")
                 if drankjes_veld and drankjes_veld.strip() and drankjes_veld != "0":
-                    # Formaat: "Ja graag!|3" - als gevuld: aantal = 1
+                    # Als gevuld: aantal = aantal_personen
                     drankjes_artikel = get_artikel_by_naam("Drankjes")
                     if drankjes_artikel:
                         drankjes_prijs_incl = Decimal(str(drankjes_artikel[2]))  # prijs_incl uit artikel
+                        drankjes_aantal = Decimal(str(aantal_personen)) if aantal_personen > 0 else Decimal("1")
                         add_order_artikel(
                             drankjes_artikel[0],  # artikel_id
                             drankjes_artikel[1],  # naam
-                            Decimal("1"),  # altijd 1 stuk
+                            drankjes_aantal,  # aantal = aantal_personen
                             drankjes_prijs_incl  # prijs_incl
                         )
                     else:

@@ -346,10 +346,71 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         portaal_status = order.get("portaal_status", "nieuw")
         order_status = order.get("status", "draft")
         
-        # Build artikelen tabel
+        # Bereken totaal excl. reiskosten eerst
+        totaal_excl_reiskosten = 0.00
+        for artikel in artikelen:
+            naam = artikel.get("naam") or artikel.get("artikel_naam") or "-"
+            aantal = float(artikel.get("aantal", 0))
+            prijs_incl = float(artikel.get("prijs_incl", 0))
+            totaal_regel = aantal * prijs_incl
+            # Tel alleen mee voor minimum check als het geen reiskosten is
+            if naam != "Reiskosten" and naam != "Toeslag":
+                totaal_excl_reiskosten += totaal_regel
+        
+        # Automatische toeslag toevoegen/updaten als totaal < 500
+        if totaal_excl_reiskosten < 500:
+            benodigde_toeslag = 500 - totaal_excl_reiskosten
+            
+            # Zoek "Toeslag" artikel
+            cur.execute("SELECT id, naam, prijs_incl FROM artikelen WHERE naam = 'Toeslag' AND actief = TRUE LIMIT 1")
+            toeslag_artikel = cur.fetchone()
+            
+            if toeslag_artikel:
+                toeslag_artikel_id = str(toeslag_artikel.get("id"))
+                toeslag_prijs_incl = float(toeslag_artikel.get("prijs_incl", 1.00))
+                # Aantal = benodigde_toeslag (want prijs_incl = €1.00)
+                toeslag_aantal = benodigde_toeslag / toeslag_prijs_incl
+                
+                # Check of Toeslag al bestaat in order_artikelen
+                cur.execute("""
+                    SELECT id FROM order_artikelen 
+                    WHERE order_id = %s AND naam = 'Toeslag'
+                    LIMIT 1
+                """, (order_id,))
+                bestaande_toeslag = cur.fetchone()
+                
+                if bestaande_toeslag:
+                    # Update bestaande toeslag
+                    cur.execute("""
+                        UPDATE order_artikelen
+                        SET aantal = %s
+                        WHERE id = %s
+                    """, (toeslag_aantal, bestaande_toeslag.get("id")))
+                else:
+                    # Voeg nieuwe toeslag toe
+                    cur.execute("""
+                        INSERT INTO order_artikelen (order_id, artikel_id, naam, aantal, prijs_incl)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (order_id, toeslag_artikel_id, "Toeslag", toeslag_aantal, toeslag_prijs_incl))
+                
+                conn.commit()
+                
+                # Haal artikelen opnieuw op na toeslag toevoegen/updaten
+                cur.execute("""
+                    SELECT 
+                        oa.*,
+                        a.naam as artikel_naam
+                    FROM order_artikelen oa
+                    LEFT JOIN artikelen a ON oa.artikel_id = a.id
+                    WHERE oa.order_id = %s
+                    ORDER BY oa.created_at
+                """, (order_id,))
+                artikelen = cur.fetchall()
+        
+        # Build artikelen tabel (na eventuele toeslag toevoegen)
         artikelen_rows = ""
         totaal_prijs = 0.00
-        totaal_excl_reiskosten = 0.00
+        totaal_excl_reiskosten_final = 0.00
         for artikel in artikelen:
             artikel_id = str(artikel.get("id"))
             naam = artikel.get("naam") or artikel.get("artikel_naam") or "-"
@@ -359,7 +420,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
             totaal_prijs += totaal_regel
             # Tel alleen mee voor minimum check als het geen reiskosten is
             if naam != "Reiskosten":
-                totaal_excl_reiskosten += totaal_regel
+                totaal_excl_reiskosten_final += totaal_regel
             
             artikelen_rows += f"""
             <tr>
@@ -677,8 +738,6 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                         </tr>
                     </tbody>
                 </table>
-                
-                {f'<div style="background:#fee;border:2px solid #fcc;border-radius:8px;padding:15px;margin-top:15px;color:#c00;"><strong>⚠ Minimumprijs €500 niet bereikt</strong><br>Huidige totaal (excl. reiskosten): € {totaal_excl_reiskosten:,.2f}<br>Pas de prijs aan om het minimum te bereiken.</div>' if totaal_excl_reiskosten < 500 else ''}
                 
                 <form method="post" action="/admin/order/{order_id}/artikel-toevoegen?token={SESSION_SECRET}" class="add-artikel-form">
                     <select name="artikel_id" required>
