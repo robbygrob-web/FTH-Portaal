@@ -977,7 +977,10 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
         <body>
             <div class="header">
                 <h1>Admin Dashboard - Aanvragen</h1>
-                <a href="/admin/nieuw?token={SESSION_SECRET}" class="btn">Nieuwe aanvraag</a>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <a href="/admin/nieuw?token={SESSION_SECRET}" class="btn">Nieuwe aanvraag</a>
+                    <a href="/admin/artikelen?token={SESSION_SECRET}" class="btn" style="background: #3498db; color: white;">Artikelen</a>
+                </div>
             </div>
             <div class="table-container">
                 <table>
