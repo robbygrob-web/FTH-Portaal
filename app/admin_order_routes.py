@@ -636,6 +636,16 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                         <div class="info-label">Opmerkingen</div>
                         <textarea id="opmerkingen" class="editable-field" rows="3" placeholder="Opmerkingen">{order.get('opmerkingen') or ''}</textarea>
                     </div>
+                    <div class="info-item" style="grid-column: 1 / -1;">
+                        <div class="info-label">Notitie klant</div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Wordt meegestuurd op offerte, bevestiging, factuur en plannings mails</div>
+                        <textarea id="notitie_klant" class="editable-field" rows="3" placeholder="Notitie klant">{order.get('notitie_klant') or ''}</textarea>
+                    </div>
+                    <div class="info-item" style="grid-column: 1 / -1;">
+                        <div class="info-label">Notitie partner</div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Wordt weergegeven in partner overzicht en portaal</div>
+                        <textarea id="notitie_partner" class="editable-field" rows="3" placeholder="Notitie partner">{order.get('notitie_partner') or ''}</textarea>
+                    </div>
                 </div>
             </div>
             
@@ -810,6 +820,12 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     // Initialiseer factuur knop status
                     updateFactuurKnop();
 
+                    // Voeg notitie velden toe aan editable fields
+                    const notitieKlant = document.getElementById('notitie_klant');
+                    const notitiePartner = document.getElementById('notitie_partner');
+                    if (notitieKlant) fields.push(notitieKlant);
+                    if (notitiePartner) fields.push(notitiePartner);
+                    
                     fields.forEach(function(field) {{
                         field.addEventListener('input', function() {{
                             hasChanges = true;
@@ -832,7 +848,9 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             leverdatum: document.getElementById('leverdatum').value,
                             aantal_personen: document.getElementById('aantal_personen').value,
                             aantal_kinderen: document.getElementById('aantal_kinderen').value,
-                            opmerkingen: document.getElementById('opmerkingen').value
+                            opmerkingen: document.getElementById('opmerkingen').value,
+                            notitie_klant: document.getElementById('notitie_klant').value,
+                            notitie_partner: document.getElementById('notitie_partner').value
                         }};
                         fetch(window.location.pathname + '/opslaan' + window.location.search, {{
                             method: 'POST',
@@ -1573,6 +1591,8 @@ async def opslaan_order(
         aantal_personen = int(body.get("aantal_personen", 0)) if body.get("aantal_personen") else 0
         aantal_kinderen = int(body.get("aantal_kinderen", 0)) if body.get("aantal_kinderen") else 0
         opmerkingen = body.get("opmerkingen", "").strip()
+        notitie_klant = body.get("notitie_klant", "").strip()
+        notitie_partner = body.get("notitie_partner", "").strip()
         
         # Parse leverdatum (datetime-local format: YYYY-MM-DDTHH:MM)
         leverdatum = None
@@ -1595,6 +1615,8 @@ async def opslaan_order(
                 aantal_personen = %s,
                 aantal_kinderen = %s,
                 opmerkingen = %s,
+                notitie_klant = %s,
+                notitie_partner = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (
@@ -1603,6 +1625,8 @@ async def opslaan_order(
             aantal_personen,
             aantal_kinderen,
             opmerkingen if opmerkingen else None,
+            notitie_klant if notitie_klant else None,
+            notitie_partner if notitie_partner else None,
             order_id
         ))
         
