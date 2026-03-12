@@ -1202,7 +1202,7 @@ async def verstuur_factuur(
         
         # Check of er al een factuur is
         cur.execute("""
-            SELECT id, mollie_checkout_url, factuurnummer, totaal_bedrag
+            SELECT id, mollie_payment_id, mollie_checkout_url, factuurnummer, totaal_bedrag
             FROM facturen WHERE order_id = %s
             ORDER BY created_at DESC
             LIMIT 1
@@ -1210,28 +1210,29 @@ async def verstuur_factuur(
         
         bestaande_factuur = cur.fetchone()
         order_totaal_bedrag = float(order.get("totaal_bedrag", 0))
+        klant_email = order.get("klant_email")
+        ordernummer = order.get("ordernummer", "")
+        ordertype = order.get("ordertype") or "b2c"
         
-        if bestaande_factuur and betaal_status == "factuur_verstuurd":
-            # Factuur bestaat al en is verstuurd
+        if bestaande_factuur:
+            # Factuur bestaat al - gebruik update-factuur logica
             factuur_bedrag = float(bestaande_factuur.get("totaal_bedrag", 0))
             mollie_checkout_url = bestaande_factuur.get("mollie_checkout_url")
             factuurnummer = bestaande_factuur.get("factuurnummer", "")
-            ordertype = order.get("ordertype") or "b2c"
             
-            if not mollie_checkout_url:
-                raise HTTPException(status_code=400, detail="Factuur heeft geen Mollie betaallink")
+            if not klant_email:
+                raise HTTPException(status_code=400, detail="Geen email adres gevonden voor klant")
             
-            # Check of bedrag gewijzigd is
+            # Vergelijk factuur.bedrag met orders.totaal_bedrag
             if abs(factuur_bedrag - order_totaal_bedrag) >= 0.01:
-                # Bedrag gewijzigd: annuleer oude payment, maak nieuwe aan
+                # Bedrag ANDERS: cancel oude payment, maak nieuwe aan, update factuur
                 update_factuur_bij_orderwijziging(order_id, order_totaal_bedrag, conn, background_tasks)
                 conn.commit()
                 return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
             else:
-                # Bedrag zelfde: stuur bestaande link opnieuw (geen nieuwe payment)
-                klant_email = order.get("klant_email")
-                if not klant_email:
-                    raise HTTPException(status_code=400, detail="Geen email adres gevonden voor klant")
+                # Bedrag ZELFDE: stuur mail opnieuw met bestaande link
+                if not mollie_checkout_url:
+                    raise HTTPException(status_code=400, detail="Factuur heeft geen Mollie betaallink")
                 
                 # Maak mail body
                 if ordertype == "b2b":
@@ -1240,8 +1241,8 @@ async def verstuur_factuur(
                     <body>
                         <h2>Factuur {factuurnummer}</h2>
                         <p>Beste {order.get('klant_naam', '')},</p>
-                        <p>Bij deze ontvangt u de factuur voor uw bestelling {order.get('ordernummer', '')}.</p>
-                        <p><strong>Te betalen bedrag: € {factuur_bedrag:,.2f}</strong></p>
+                        <p>Bij deze ontvangt u de factuur voor uw bestelling {ordernummer}.</p>
+                        <p><strong>Te betalen bedrag: € {order_totaal_bedrag:,.2f}</strong></p>
                         <p>U kunt betalen via de onderstaande betaallink:</p>
                         <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
                         <p>Of maak het bedrag over naar:</p>
@@ -1257,8 +1258,8 @@ async def verstuur_factuur(
                     <body>
                         <h2>Factuur {factuurnummer}</h2>
                         <p>Beste {order.get('klant_naam', '')},</p>
-                        <p>Bij deze ontvangt u de factuur voor uw bestelling {order.get('ordernummer', '')}.</p>
-                        <p><strong>Te betalen bedrag: € {factuur_bedrag:,.2f}</strong></p>
+                        <p>Bij deze ontvangt u de factuur voor uw bestelling {ordernummer}.</p>
+                        <p><strong>Te betalen bedrag: € {order_totaal_bedrag:,.2f}</strong></p>
                         <p>U kunt betalen via de onderstaande betaallink:</p>
                         <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
                         <p>Met vriendelijke groet,<br>FTH Portaal</p>
@@ -1270,11 +1271,20 @@ async def verstuur_factuur(
                 background_tasks.add_task(
                     stuur_mail,
                     naar=klant_email,
-                    onderwerp=f"Factuur {factuurnummer} - {order.get('ordernummer', '')}",
+                    onderwerp=f"Uw factuur {ordernummer}",
                     inhoud=mail_body,
                     order_id=order_id,
                     template_naam="Factuur"
                 )
+                
+                # Update betaal_status als nog niet verstuurd
+                if betaal_status != "factuur_verstuurd":
+                    cur.execute("""
+                        UPDATE orders
+                        SET betaal_status = 'factuur_verstuurd', updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    """, (order_id,))
+                    conn.commit()
                 
                 return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
         
