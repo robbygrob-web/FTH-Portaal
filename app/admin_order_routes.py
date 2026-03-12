@@ -801,17 +801,21 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     const fields = Array.from(document.querySelectorAll('.editable-field'));
                     let hasChanges = false;
                     let factuurVerstuurd = false;
-                    // Bereken origineel bedrag uit artikelen tabel
+                    // Bereken origineel bedrag uit artikelen tabel (ALLE regels inclusief toeslag en reiskosten)
                     let origineelBedrag = 0;
                     document.querySelectorAll('table tbody tr').forEach(function(row) {{
                         const cells = row.querySelectorAll('td');
+                        // Skip de "Totaal" rij
+                        const eersteCel = cells[0] ? cells[0].textContent.trim() : '';
+                        if (eersteCel === 'Totaal' || eersteCel === '') {{
+                            return; // Skip deze rij
+                        }}
                         if (cells.length >= 4) {{
                             const totaalCell = cells[3];
                             const totaalText = totaalCell.textContent.trim();
                             if (totaalText.startsWith('€')) {{
-                                const bedrag = parseFloat(totaalText.replace('€', '').replace(/[.,]/g, function(match, offset, string) {{
-                                    return match === '.' ? '' : '.';
-                                }}));
+                                const bedragText = totaalText.replace('€', '').trim().replace(',', '.');
+                                const bedrag = parseFloat(bedragText);
                                 if (!isNaN(bedrag)) {{
                                     origineelBedrag += bedrag;
                                 }}
@@ -1017,10 +1021,26 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                                 saveBtn.className = 'save-btn green';
                                 saveBtn.textContent = 'Opgeslagen ✓';
                                 
-                                // Update huidigBedrag na opslaan
-                                if (result.totaal_bedrag !== undefined) {{
-                                    huidigBedrag = parseFloat(result.totaal_bedrag);
-                                }}
+                                // Herbereken huidigBedrag uit artikelen tabel na opslaan
+                                huidigBedrag = 0;
+                                document.querySelectorAll('table tbody tr').forEach(function(row) {{
+                                    const cells = row.querySelectorAll('td');
+                                    const eersteCel = cells[0] ? cells[0].textContent.trim() : '';
+                                    if (eersteCel === 'Totaal' || eersteCel === '') {{
+                                        return;
+                                    }}
+                                    if (cells.length >= 4) {{
+                                        const totaalCell = cells[3];
+                                        const totaalText = totaalCell.textContent.trim();
+                                        if (totaalText.startsWith('€')) {{
+                                            const bedragText = totaalText.replace('€', '').trim().replace(',', '.');
+                                            const bedrag = parseFloat(bedragText);
+                                            if (!isNaN(bedrag)) {{
+                                                huidigBedrag += bedrag;
+                                            }}
+                                        }}
+                                    }}
+                                }});
                                 
                                 // Update factuur knop als bedrag gewijzigd
                                 if (Math.abs(huidigBedrag - origineelBedrag) >= 0.01 && betaalStatus === 'factuur_verstuurd') {{
