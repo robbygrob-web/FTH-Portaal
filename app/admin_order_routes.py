@@ -209,7 +209,7 @@ def update_factuur_bij_orderwijziging(order_id: str, nieuwe_totaal: float, conn,
         background_tasks.add_task(
             stuur_mail,
             naar=klant_email,
-            onderwerp=f"Factuur {factuurnummer} gewijzigd - {ordernummer}",
+            onderwerp=f"Aangepaste factuur {ordernummer} — Friettruck-huren.nl",
             inhoud=mail_body,
             order_id=order_id,
             template_naam="Factuur gewijzigd"
