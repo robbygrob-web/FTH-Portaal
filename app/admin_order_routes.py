@@ -682,6 +682,19 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                         return;
                     }}
 
+                    // Check URL parameter voor saved status
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.get('saved') === '1') {{
+                        saveBtn.disabled = false;
+                        saveBtn.className = 'save-btn green';
+                        saveBtn.textContent = 'Opgeslagen ✓';
+                        setTimeout(function() {{
+                            saveBtn.disabled = true;
+                            saveBtn.className = 'save-btn';
+                            saveBtn.textContent = 'Geen wijzigingen';
+                        }}, 3000);
+                    }}
+
                     fields.forEach(function(field) {{
                         field.addEventListener('input', function() {{
                             hasChanges = true;
@@ -806,7 +819,7 @@ async def artikel_toevoegen(
             _LOG.error(f"Fout bij updaten factuur na artikel toevoegen: {e}", exc_info=True)
             # Ga door, dit is niet kritiek voor de redirect
         
-        return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
+        return RedirectResponse(url=f"/admin/order/{order_id}?saved=1&token={SESSION_SECRET}", status_code=303)
         
     except HTTPException:
         raise
@@ -860,7 +873,7 @@ async def artikel_verwijderen(
             _LOG.error(f"Fout bij updaten factuur na artikel verwijderen: {e}", exc_info=True)
             # Ga door, dit is niet kritiek voor de redirect
         
-        return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
+        return RedirectResponse(url=f"/admin/order/{order_id}?saved=1&token={SESSION_SECRET}", status_code=303)
         
     except HTTPException:
         raise
