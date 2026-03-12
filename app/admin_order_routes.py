@@ -73,15 +73,17 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         conn = psycopg2.connect(database_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Haal order op met contact informatie
+        # Haal order op met contact informatie en partner
         cur.execute("""
             SELECT 
                 o.*,
                 c.naam as klant_naam,
                 c.email as klant_email,
-                c.telefoon as klant_telefoon
+                c.telefoon as klant_telefoon,
+                p.naam as partner_naam
             FROM orders o
             LEFT JOIN contacten c ON o.klant_id = c.id
+            LEFT JOIN contacten p ON o.contractor_id = p.id
             WHERE o.id = %s
         """, (order_id,))
         
@@ -165,8 +167,8 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         if portaal_status == "nieuw":
             status_knoppen += f'<form method="post" action="/admin/order/{order_id}/status?token={SESSION_SECRET}" style="display:inline;margin-right:10px;"><input type="hidden" name="portaal_status" value="beschikbaar"><button type="submit" class="btn">Zet beschikbaar</button></form>'
         
-        if order_status == "sale" and portaal_status != "claimed":
-            status_knoppen += f'<form method="post" action="/admin/order/{order_id}/claim?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Claim voor Aardappeltuin</button></form>'
+        # Claim knop altijd zichtbaar
+        status_knoppen += f'<form method="post" action="/admin/order/{order_id}/claim?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Claim voor Aardappeltuin</button></form>'
         
         # Offerte knoppen
         offerte_knoppen = ""
@@ -376,6 +378,10 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     <div class="info-item">
                         <div class="info-label">Status offerte</div>
                         <div class="info-value">{order_status}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Partner</div>
+                        <div class="info-value">{order.get('partner_naam') or 'Niet toegewezen'}</div>
                     </div>
                 </div>
                 <div style="margin-top: 15px;">

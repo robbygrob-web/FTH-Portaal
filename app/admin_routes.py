@@ -474,7 +474,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
         conn = psycopg2.connect(database_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Haal orders op met contact informatie
+        # Haal orders op met contact informatie en partner
         cur.execute("""
             SELECT 
                 o.id,
@@ -493,9 +493,11 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                 o.opmerkingen,
                 c.naam as klant_naam,
                 c.email as klant_email,
-                c.telefoon as klant_telefoon
+                c.telefoon as klant_telefoon,
+                p.naam as partner_naam
             FROM orders o
             LEFT JOIN contacten c ON o.klant_id = c.id
+            LEFT JOIN contacten p ON o.contractor_id = p.id
             ORDER BY o.created_at DESC
             LIMIT 100
         """)
@@ -540,6 +542,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             personen = order.get("aantal_personen", 0)
             kinderen = order.get("aantal_kinderen", 0)
             totaal = float(order.get("totaal_bedrag", 0))
+            partner_naam = order.get("partner_naam") or "-"
             
             order_id = str(order.get("id"))
             table_rows += f"""
@@ -551,6 +554,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                 <td>€ {totaal:,.2f}</td>
                 <td><span style="color:{portaal_status_color};">{portaal_status_text}</span></td>
                 <td><span style="color:{order_status_color};">{order_status_text}</span></td>
+                <td>{partner_naam}</td>
                 <td>-</td>
             </tr>
             """
@@ -642,11 +646,12 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                             <th>Totaalprijs incl. BTW</th>
                             <th>Status aanvraag</th>
                             <th>Status offerte</th>
+                            <th>Partner</th>
                             <th>Status betaling</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {table_rows if table_rows else '<tr><td colspan="8" style="text-align:center;padding:40px;">Geen aanvragen gevonden</td></tr>'}
+                        {table_rows if table_rows else '<tr><td colspan="9" style="text-align:center;padding:40px;">Geen aanvragen gevonden</td></tr>'}
                     </tbody>
                 </table>
             </div>
