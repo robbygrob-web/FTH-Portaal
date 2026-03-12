@@ -87,7 +87,8 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
                 AND table_name = 'order_artikelen'
             );
         """)
-        table_exists = cur.fetchone()[0]
+        row = cur.fetchone()
+        table_exists = row[0] if isinstance(row, tuple) else row.get("exists", list(row.values())[0] if row else False)
         
         if not table_exists:
             _LOG.info("Aanmaken order_artikelen tabel...")
