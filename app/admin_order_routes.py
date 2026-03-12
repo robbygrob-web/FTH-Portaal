@@ -1755,9 +1755,10 @@ async def verstuur_factuur_nogmaals(
         conn = psycopg2.connect(database_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Haal order op met contact
+        # Haal vers bedrag op uit orders tabel
         cur.execute("""
-            SELECT o.*, c.email as klant_email, c.naam as klant_naam
+            SELECT o.totaal_bedrag, o.betaal_status, o.ordernummer, o.ordertype,
+                   c.email as klant_email, c.naam as klant_naam
             FROM orders o
             LEFT JOIN contacten c ON o.klant_id = c.id
             WHERE o.id = %s
@@ -1771,9 +1772,15 @@ async def verstuur_factuur_nogmaals(
         if not klant_email:
             raise HTTPException(status_code=400, detail="Geen email adres gevonden voor klant")
         
-        # Haal bestaande factuur op
+        # Haal vers bedrag uit order
+        vers_bedrag = float(order.get("totaal_bedrag", 0)) if order.get("totaal_bedrag") else 0.00
+        ordernummer = order.get("ordernummer", "")
+        ordertype = order.get("ordertype") or "b2c"
+        klant_naam = order.get("klant_naam", "")
+        
+        # Haal bestaande factuur op voor factuurnummer en checkout URL
         cur.execute("""
-            SELECT factuurnummer, mollie_checkout_url, totaal_bedrag
+            SELECT factuurnummer, mollie_checkout_url
             FROM facturen
             WHERE order_id = %s
             ORDER BY created_at DESC
@@ -1786,23 +1793,19 @@ async def verstuur_factuur_nogmaals(
         
         factuurnummer = factuur.get("factuurnummer", "")
         mollie_checkout_url = factuur.get("mollie_checkout_url")
-        totaal_bedrag = float(factuur.get("totaal_bedrag", 0))
         
         if not mollie_checkout_url:
             raise HTTPException(status_code=400, detail="Factuur heeft geen Mollie betaallink")
         
-        ordernummer = order.get("ordernummer", "")
-        ordertype = order.get("ordertype") or "b2c"
-        
-        # Maak mail body (zelfde als verstuur-factuur)
+        # Maak mail body met vers bedrag uit orders tabel
         if ordertype == "b2b":
             mail_body = f"""
             <html>
             <body>
                 <h2>Factuur {factuurnummer}</h2>
-                <p>Beste {order.get('klant_naam', '')},</p>
+                <p>Beste {klant_naam},</p>
                 <p>Bij deze ontvangt u de factuur voor uw bestelling {ordernummer}.</p>
-                <p><strong>Te betalen bedrag: € {totaal_bedrag:,.2f}</strong></p>
+                <p><strong>Te betalen bedrag: € {vers_bedrag:,.2f}</strong></p>
                 <p>U kunt betalen via de onderstaande betaallink:</p>
                 <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
                 <p>Of maak het bedrag over naar:</p>
@@ -1817,9 +1820,9 @@ async def verstuur_factuur_nogmaals(
             <html>
             <body>
                 <h2>Factuur {factuurnummer}</h2>
-                <p>Beste {order.get('klant_naam', '')},</p>
+                <p>Beste {klant_naam},</p>
                 <p>Bij deze ontvangt u de factuur voor uw bestelling {ordernummer}.</p>
-                <p><strong>Te betalen bedrag: € {totaal_bedrag:,.2f}</strong></p>
+                <p><strong>Te betalen bedrag: € {vers_bedrag:,.2f}</strong></p>
                 <p>U kunt betalen via de onderstaande betaallink:</p>
                 <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
                 <p>Met vriendelijke groet,<br>FTH Portaal</p>
