@@ -379,15 +379,15 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                 # Al betaald, geen wijziging mogelijk
                 factuur_knoppen = '<p style="color:#666;">Order al betaald - geen wijzigingen mogelijk</p>'
             elif betaal_status == "factuur_verstuurd" and heeft_factuur:
-                # Factuur al verstuurd, toon "nogmaals versturen" knop
-                factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur-nogmaals?token={SESSION_SECRET}" style="display:inline;" onsubmit="window.factuurVerstuurd = true;"><button type="submit" id="verstuur-factuur-btn" class="btn">Verstuur factuur nogmaals</button></form>'
+                # Factuur al verstuurd, toon "nogmaals versturen" knop (wordt dynamisch aangepast via JS)
+                factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur-nogmaals?token={SESSION_SECRET}" style="display:inline;" onsubmit="window.factuurVerstuurd = true;"><button type="submit" id="factuur-btn" class="btn">Verstuur factuur nogmaals</button></form>'
             elif not betaal_status or betaal_status == "onbetaald":
                 # Nog geen factuur verstuurd, toon normale knop
                 if not heeft_factuur:
-                    factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur factuur</button></form>'
+                    factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur?token={SESSION_SECRET}" style="display:inline;"><button type="submit" id="factuur-btn" class="btn">Verstuur factuur</button></form>'
                 else:
                     # Factuur bestaat maar nog niet verstuurd, toon "verstuur factuur" knop
-                    factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur factuur</button></form>'
+                    factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur?token={SESSION_SECRET}" style="display:inline;"><button type="submit" id="factuur-btn" class="btn">Verstuur factuur</button></form>'
         
         html_content = f"""
         <!DOCTYPE html>
@@ -679,9 +679,9 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     const fields = document.querySelectorAll('.editable-field');
                     let hasChanges = false;
                     let factuurVerstuurd = false;
-                    const origineelBedrag = {order.get('totaal_bedrag', 0) or 0};
+                    const origineelBedrag = parseFloat({order.get('totaal_bedrag', 0) or 0});
                     let huidigBedrag = origineelBedrag;
-                    const betaalStatus = '{order.get("betaal_status") or ""}';
+                    let betaalStatus = '{order.get("betaal_status") or ""}';
                     const orderId = '{order_id}';
                     const token = '{SESSION_SECRET}';
 
@@ -700,27 +700,40 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
 
                     // Functie om factuur knop aan te passen
                     function updateFactuurKnop() {{
-                        const factuurBtn = document.getElementById('verstuur-factuur-btn');
+                        const factuurBtn = document.getElementById('factuur-btn');
                         if (!factuurBtn) return;
                         
-                        if (betaalStatus === 'factuur_verstuurd' && Math.abs(huidigBedrag - origineelBedrag) >= 0.01) {{
+                        if (betaalStatus === 'betaald') {{
+                            factuurBtn.textContent = 'Betaald ✓';
+                            factuurBtn.className = 'btn';
+                            factuurBtn.disabled = true;
+                            factuurBtn.style.background = '#28a745';
+                            factuurBtn.style.color = 'white';
+                        }} else if (betaalStatus === 'factuur_verstuurd' && Math.abs(huidigBedrag - origineelBedrag) >= 0.01) {{
                             factuurBtn.textContent = 'Verstuur aangepaste factuur';
                             factuurBtn.className = 'btn orange';
                             factuurBtn.setAttribute('data-aangepast', 'true');
-                        }} else {{
+                            factuurBtn.disabled = false;
+                        }} else if (betaalStatus === 'factuur_verstuurd') {{
                             factuurBtn.textContent = 'Verstuur factuur nogmaals';
                             factuurBtn.className = 'btn';
                             factuurBtn.removeAttribute('data-aangepast');
+                            factuurBtn.disabled = false;
+                        }} else {{
+                            factuurBtn.textContent = 'Verstuur factuur';
+                            factuurBtn.className = 'btn';
+                            factuurBtn.removeAttribute('data-aangepast');
+                            factuurBtn.disabled = false;
                         }}
                     }}
 
                     // Event listener voor factuur knop klik
-                    const factuurBtn = document.getElementById('verstuur-factuur-btn');
+                    const factuurBtn = document.getElementById('factuur-btn');
                     if (factuurBtn) {{
                         factuurBtn.addEventListener('click', function() {{
                             if (factuurBtn.getAttribute('data-aangepast') === 'true') {{
                                 window.factuurVerstuurd = true;
-                                factuurBtn.textContent = 'Factuur verstuurd';
+                                factuurBtn.textContent = 'Bezig...';
                                 factuurBtn.className = 'btn';
                                 factuurBtn.disabled = true;
                             }}
@@ -744,7 +757,8 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                         if (savedBedrag) {{
                             huidigBedrag = parseFloat(savedBedrag);
                             sessionStorage.removeItem('bedrag_voor_redirect');
-                        }                        } else {{
+                            updateFactuurKnop();
+                        }} else {{
                             // Haal totaal op via API
                             fetch(window.location.pathname + '/totaal' + window.location.search)
                                 .then(function(r) {{ return r.json(); }})
@@ -753,6 +767,9 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                                         huidigBedrag = parseFloat(result.totaal);
                                     }} else if (result.totaal_bedrag !== undefined) {{
                                         huidigBedrag = parseFloat(result.totaal_bedrag);
+                                    }}
+                                    if (result.betaal_status !== undefined) {{
+                                        betaalStatus = result.betaal_status;
                                     }}
                                     updateFactuurKnop();
                                 }});
@@ -1190,61 +1207,74 @@ async def verstuur_factuur(
         """, (order_id,))
         
         bestaande_factuur = cur.fetchone()
+        order_totaal_bedrag = float(order.get("totaal_bedrag", 0))
         
         if bestaande_factuur and betaal_status == "factuur_verstuurd":
-            # Factuur bestaat al en is verstuurd, stuur bestaande link opnieuw
+            # Factuur bestaat al en is verstuurd
+            factuur_bedrag = float(bestaande_factuur.get("totaal_bedrag", 0))
             mollie_checkout_url = bestaande_factuur.get("mollie_checkout_url")
             factuurnummer = bestaande_factuur.get("factuurnummer", "")
-            totaal_bedrag = float(bestaande_factuur.get("totaal_bedrag", 0))
             ordertype = order.get("ordertype") or "b2c"
             
             if not mollie_checkout_url:
                 raise HTTPException(status_code=400, detail="Factuur heeft geen Mollie betaallink")
             
-            # Maak mail body (zelfde als verstuur-factuur-nogmaals)
-            if ordertype == "b2b":
-                mail_body = f"""
-                <html>
-                <body>
-                    <h2>Factuur {factuurnummer}</h2>
-                    <p>Beste {order.get('klant_naam', '')},</p>
-                    <p>Bij deze ontvangt u de factuur voor uw bestelling {order.get('ordernummer', '')}.</p>
-                    <p><strong>Te betalen bedrag: € {totaal_bedrag:,.2f}</strong></p>
-                    <p>U kunt betalen via de onderstaande betaallink:</p>
-                    <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
-                    <p>Of maak het bedrag over naar:</p>
-                    <p><strong>Rekeningnummer:</strong> NL91ABNA0417164300<br>
-                    <strong>Ten name van:</strong> Treatlab VOF</p>
-                    <p>Met vriendelijke groet,<br>FTH Portaal</p>
-                </body>
-                </html>
-                """
+            # Check of bedrag gewijzigd is
+            if abs(factuur_bedrag - order_totaal_bedrag) >= 0.01:
+                # Bedrag gewijzigd: annuleer oude payment, maak nieuwe aan
+                update_factuur_bij_orderwijziging(order_id, order_totaal_bedrag, conn, background_tasks)
+                conn.commit()
+                return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
             else:
-                mail_body = f"""
-                <html>
-                <body>
-                    <h2>Factuur {factuurnummer}</h2>
-                    <p>Beste {order.get('klant_naam', '')},</p>
-                    <p>Bij deze ontvangt u de factuur voor uw bestelling {order.get('ordernummer', '')}.</p>
-                    <p><strong>Te betalen bedrag: € {totaal_bedrag:,.2f}</strong></p>
-                    <p>U kunt betalen via de onderstaande betaallink:</p>
-                    <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
-                    <p>Met vriendelijke groet,<br>FTH Portaal</p>
-                </body>
-                </html>
-                """
-            
-            # Verstuur mail in background
-            background_tasks.add_task(
-                stuur_mail,
-                naar=klant_email,
-                onderwerp=f"Factuur {factuurnummer} - {order.get('ordernummer', '')}",
-                inhoud=mail_body,
-                order_id=order_id,
-                template_naam="Factuur"
-            )
-            
-            return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
+                # Bedrag zelfde: stuur bestaande link opnieuw (geen nieuwe payment)
+                klant_email = order.get("klant_email")
+                if not klant_email:
+                    raise HTTPException(status_code=400, detail="Geen email adres gevonden voor klant")
+                
+                # Maak mail body
+                if ordertype == "b2b":
+                    mail_body = f"""
+                    <html>
+                    <body>
+                        <h2>Factuur {factuurnummer}</h2>
+                        <p>Beste {order.get('klant_naam', '')},</p>
+                        <p>Bij deze ontvangt u de factuur voor uw bestelling {order.get('ordernummer', '')}.</p>
+                        <p><strong>Te betalen bedrag: € {factuur_bedrag:,.2f}</strong></p>
+                        <p>U kunt betalen via de onderstaande betaallink:</p>
+                        <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
+                        <p>Of maak het bedrag over naar:</p>
+                        <p><strong>Rekeningnummer:</strong> NL91ABNA0417164300<br>
+                        <strong>Ten name van:</strong> Treatlab VOF</p>
+                        <p>Met vriendelijke groet,<br>FTH Portaal</p>
+                    </body>
+                    </html>
+                    """
+                else:
+                    mail_body = f"""
+                    <html>
+                    <body>
+                        <h2>Factuur {factuurnummer}</h2>
+                        <p>Beste {order.get('klant_naam', '')},</p>
+                        <p>Bij deze ontvangt u de factuur voor uw bestelling {order.get('ordernummer', '')}.</p>
+                        <p><strong>Te betalen bedrag: € {factuur_bedrag:,.2f}</strong></p>
+                        <p>U kunt betalen via de onderstaande betaallink:</p>
+                        <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
+                        <p>Met vriendelijke groet,<br>FTH Portaal</p>
+                    </body>
+                    </html>
+                    """
+                
+                # Verstuur mail in background
+                background_tasks.add_task(
+                    stuur_mail,
+                    naar=klant_email,
+                    onderwerp=f"Factuur {factuurnummer} - {order.get('ordernummer', '')}",
+                    inhoud=mail_body,
+                    order_id=order_id,
+                    template_naam="Factuur"
+                )
+                
+                return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
         
         klant_email = order.get("klant_email")
         if not klant_email:
@@ -1504,15 +1534,16 @@ async def get_order_totaal(
         conn = psycopg2.connect(database_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        cur.execute("SELECT totaal_bedrag FROM orders WHERE id = %s", (order_id,))
+        cur.execute("SELECT totaal_bedrag, betaal_status FROM orders WHERE id = %s", (order_id,))
         order = cur.fetchone()
         
         if not order:
             raise HTTPException(status_code=404, detail="Order niet gevonden")
         
         totaal_bedrag = float(order.get("totaal_bedrag", 0)) if order.get("totaal_bedrag") else 0.00
+        betaal_status = order.get("betaal_status") or ""
         
-        return JSONResponse(content={"totaal": totaal_bedrag})
+        return JSONResponse(content={"totaal": totaal_bedrag, "betaal_status": betaal_status})
         
     except HTTPException:
         raise
@@ -1577,7 +1608,10 @@ async def update_factuur_pagina_verlaten(
             return JSONResponse(content={"success": False, "detail": "Bedrag niet gewijzigd"})
         
         # Gebruik bestaande update_factuur_bij_orderwijziging functie
+        # Deze annuleert oude payment, maakt nieuwe aan en stuurt mail
         update_factuur_bij_orderwijziging(order_id, order_bedrag, conn, background_tasks)
+        
+        conn.commit()
         
         return JSONResponse(content={"success": True})
         
