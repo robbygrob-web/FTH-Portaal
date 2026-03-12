@@ -93,6 +93,59 @@ def verify_admin_session(request: Request):
     raise HTTPException(status_code=401, detail="Admin toegang vereist. Voeg ?token=YOUR_SESSION_SECRET toe aan de URL.")
 
 
+@setup_router.post("/add-bevestig-token-column")
+async def add_bevestig_token_column(verified: bool = Depends(verify_admin_token)):
+    """
+    Tijdelijk endpoint om bevestig_token kolom toe te voegen aan orders tabel.
+    Vereist Bearer token authenticatie met SESSION_SECRET.
+    """
+    database_url = get_database_url()
+    conn = None
+    
+    try:
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check of kolom al bestaat
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'orders' AND column_name = 'bevestig_token'
+        """)
+        
+        if cur.fetchone():
+            return JSONResponse({
+                "success": True,
+                "message": "Kolom bevestig_token bestaat al"
+            })
+        
+        # Voeg kolom toe
+        cur.execute("""
+            ALTER TABLE orders
+            ADD COLUMN bevestig_token VARCHAR(64) UNIQUE
+        """)
+        
+        conn.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Kolom bevestig_token succesvol toegevoegd aan orders tabel"
+        })
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        error_message = str(e) if str(e) else repr(e)
+        error_traceback = traceback.format_exc()
+        full_error = f"{error_message}\n\nTraceback:\n{error_traceback}"
+        _LOG.error(f"Fout bij toevoegen bevestig_token kolom: {full_error}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij toevoegen kolom: {full_error}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
 @setup_router.post("/init-db")
 async def init_database(verified: bool = Depends(verify_admin_token)):
     """

@@ -2,7 +2,11 @@ from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app.odoo_client import get_odoo_client
 from app.auth import get_partner_auth
+from app.config import get_config_value
 import logging
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from datetime import datetime, date, date
 
 _LOG = logging.getLogger(__name__)
@@ -792,6 +796,328 @@ async def logout(request: Request):
     """Logout"""
     request.session.clear()
     return RedirectResponse(url="/login", status_code=303)
+
+@router.get("/rob-chat", response_class=HTMLResponse)
+async def rob_chat_page(request: Request):
+    """Rob's chatbot interface - alleen toegankelijk met password"""
+    # Check if already authenticated
+    if not request.session.get("is_rob"):
+        # Show password form
+        password_error = request.query_params.get("error")
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>FTH Portaal - Rob Chat</title>
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: #fffdf2;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }}
+                .login-container {{
+                    background: white;
+                    border-radius: 12px;
+                    padding: 40px;
+                    width: 100%;
+                    max-width: 400px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }}
+                h1 {{
+                    color: #333333;
+                    margin-bottom: 20px;
+                    font-size: 24px;
+                }}
+                .error {{
+                    background: #fee;
+                    color: #c33;
+                    padding: 12px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                    font-size: 14px;
+                }}
+                input[type="password"] {{
+                    width: 100%;
+                    padding: 12px 16px;
+                    border: 2px solid #e0e0e0;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    margin-bottom: 20px;
+                }}
+                button {{
+                    width: 100%;
+                    padding: 14px;
+                    background: #fec82a;
+                    color: #333333;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    cursor: pointer;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="login-container">
+                <h1>Rob Chat - Toegang</h1>
+                {f'<div class="error">Ongeldig wachtwoord</div>' if password_error else ''}
+                <form method="post" action="/rob-chat">
+                    <input type="password" name="password" placeholder="Wachtwoord" required autofocus>
+                    <button type="submit">Inloggen</button>
+                </form>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+    
+    # Show chat interface
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="nl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>FTH Portaal - Rob Chat</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #fffdf2;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                padding: 20px;
+            }
+            .header {
+                background: white;
+                padding: 20px;
+                border-radius: 12px;
+                margin-bottom: 20px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            h1 {
+                color: #333333;
+                font-size: 24px;
+            }
+            .chat-container {
+                flex: 1;
+                background: white;
+                border-radius: 12px;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                max-width: 800px;
+                width: 100%;
+                margin: 0 auto;
+            }
+            .messages {
+                flex: 1;
+                overflow-y: auto;
+                padding: 20px;
+                margin-bottom: 20px;
+                border: 2px solid #e0e0e0;
+                border-radius: 8px;
+                min-height: 400px;
+                max-height: 600px;
+            }
+            .message {
+                margin-bottom: 15px;
+                padding: 12px;
+                border-radius: 8px;
+                max-width: 80%;
+            }
+            .message.user {
+                background: #fec82a;
+                color: #333;
+                margin-left: auto;
+                text-align: right;
+            }
+            .message.agent {
+                background: #e0e0e0;
+                color: #333;
+            }
+            .message.meta {
+                font-size: 12px;
+                color: #666;
+                margin-top: 5px;
+            }
+            .input-area {
+                display: flex;
+                gap: 10px;
+            }
+            input[type="text"] {
+                flex: 1;
+                padding: 12px 16px;
+                border: 2px solid #e0e0e0;
+                border-radius: 8px;
+                font-size: 16px;
+            }
+            button {
+                padding: 12px 24px;
+                background: #fec82a;
+                color: #333333;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 700;
+                cursor: pointer;
+            }
+            button:hover {
+                background: #e2af13;
+            }
+            button:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+            }
+            .loading {
+                color: #666;
+                font-style: italic;
+            }
+            select {
+                padding: 12px 16px;
+                border: 2px solid #e0e0e0;
+                border-radius: 8px;
+                font-size: 16px;
+                background: white;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>Rob Chat</h1>
+        </div>
+        <div class="chat-container">
+            <div class="messages" id="messages"></div>
+            <div class="input-area">
+                <select id="agentSelector">
+                    <option value="default">Default</option>
+                    <option value="Bouwbot">Bouwbot</option>
+                </select>
+                <input type="text" id="messageInput" placeholder="Typ je bericht..." autofocus>
+                <button id="sendButton" onclick="sendMessage()">Verstuur</button>
+            </div>
+        </div>
+        <script>
+            const messagesDiv = document.getElementById('messages');
+            const messageInput = document.getElementById('messageInput');
+            const sendButton = document.getElementById('sendButton');
+            
+            function addMessage(text, type, meta = null) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${type}`;
+                messageDiv.innerHTML = text;
+                if (meta) {
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'message meta';
+                    metaDiv.textContent = meta;
+                    messageDiv.appendChild(metaDiv);
+                }
+                messagesDiv.appendChild(messageDiv);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+            
+            async function sendMessage() {
+                const message = messageInput.value.trim();
+                if (!message) return;
+                
+                // Add user message
+                addMessage(message, 'user');
+                messageInput.value = '';
+                sendButton.disabled = true;
+                sendButton.textContent = 'Verzenden...';
+                
+                // Add loading indicator
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'message agent loading';
+                loadingDiv.textContent = 'Denken...';
+                messagesDiv.appendChild(loadingDiv);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                
+                // Helper om loadingDiv veilig te verwijderen
+                function removeLoading() {
+                    if (loadingDiv && loadingDiv.parentNode === messagesDiv) {
+                        messagesDiv.removeChild(loadingDiv);
+                    }
+                }
+                
+                try {
+                    const agentSelector = document.getElementById('agentSelector');
+                    const selectedAgent = agentSelector.value;
+                    
+                    const payload = { message: message };
+                    if (selectedAgent === 'Bouwbot') {
+                        payload.agent_name = 'Bouwbot';
+                    }
+                    
+                    const response = await fetch('/chat/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    // Remove loading indicator
+                    removeLoading();
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Add agent reply
+                    let meta = null;
+                    if (data.agent_meta) {
+                        meta = `Agent: ${data.agent_name || 'N/A'} | Model: ${data.agent_meta.model_used || 'N/A'} | Tokens: ${data.agent_meta.tokens || 'N/A'}`;
+                    }
+                    addMessage(data.agent_reply || 'Geen antwoord ontvangen.', 'agent', meta);
+                    
+                } catch (error) {
+                    removeLoading();
+                    addMessage('Fout bij verzenden: ' + error.message, 'agent');
+                } finally {
+                    sendButton.disabled = false;
+                    sendButton.textContent = 'Verstuur';
+                    messageInput.focus();
+                }
+            }
+            
+            // Allow Enter key to send
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+@router.post("/rob-chat", response_class=HTMLResponse)
+async def rob_chat_auth(request: Request, password: str = Form(...)):
+    """Authenticate voor Rob chat met password"""
+    expected_password = get_config_value("ROB_CHAT_PASSWORD")
+    
+    if not expected_password:
+        raise HTTPException(status_code=500, detail="ROB_CHAT_PASSWORD niet geconfigureerd")
+    
+    if password == expected_password:
+        request.session["is_rob"] = True
+        return RedirectResponse(url="/rob-chat", status_code=303)
+    else:
+        return RedirectResponse(url="/rob-chat?error=1", status_code=303)
 
 @router.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -1974,3 +2300,138 @@ async def test_odoo_verbinding_endpoint():
             "error": str(e),
             "type": type(e).__name__
         }
+
+@router.get("/bevestig/{token}", response_class=HTMLResponse)
+async def bevestig_order(token: str):
+    """Bevestig order via token link"""
+    conn = None
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise HTTPException(status_code=500, detail="Database configuratie ontbreekt")
+        
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Zoek order op token
+        cur.execute("""
+            SELECT id, status, portaal_status
+            FROM orders
+            WHERE bevestig_token = %s
+        """, (token,))
+        
+        order = cur.fetchone()
+        
+        if not order:
+            html_content = """
+            <!DOCTYPE html>
+            <html lang="nl">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Bevestiging - FTH</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        background: #fffdf2;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        padding: 20px;
+                    }
+                    .container {
+                        background: white;
+                        padding: 40px;
+                        border-radius: 12px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        max-width: 500px;
+                        text-align: center;
+                    }
+                    h1 {
+                        color: #333333;
+                        margin-bottom: 20px;
+                    }
+                    p {
+                        color: #666;
+                        line-height: 1.6;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Link is ongeldig</h1>
+                    <p>Deze bevestigingslink is ongeldig of al gebruikt.</p>
+                </div>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content)
+        
+        # Update order status
+        cur.execute("""
+            UPDATE orders
+            SET status = 'sale', portaal_status = 'beschikbaar', updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (order["id"],))
+        
+        conn.commit()
+        
+        html_content = """
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Bevestiging - FTH</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: #fffdf2;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    padding: 20px;
+                }
+                .container {
+                    background: white;
+                    padding: 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    max-width: 500px;
+                    text-align: center;
+                }
+                h1 {
+                    color: #333333;
+                    margin-bottom: 20px;
+                }
+                p {
+                    color: #666;
+                    line-height: 1.6;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Bedankt!</h1>
+                <p>Uw aanvraag is bevestigd. We nemen contact met u op.</p>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij bevestigen order: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij bevestigen order: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()

@@ -4,6 +4,7 @@ Admin order detail endpoints.
 import os
 import logging
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, Request, Form
@@ -644,8 +645,28 @@ async def verstuur_offerte(
         if not template_html:
             raise HTTPException(status_code=500, detail=f"Template '{template_name}' niet gevonden")
         
-        # TODO: Vervang template variabelen met order data
-        # Voor nu sturen we template zoals het is
+        # Genereer bevestig token (UUID4)
+        bevestig_token = str(uuid.uuid4())
+        
+        # Sla token op in database
+        cur.execute("""
+            UPDATE orders
+            SET bevestig_token = %s
+            WHERE id = %s
+        """, (bevestig_token, order_id))
+        
+        # Maak bevestigingslink
+        bevestig_link = f"https://fth-portaal-production.up.railway.app/bevestig/{bevestig_token}"
+        
+        # Voeg bevestigingslink toe aan template
+        # Zoek naar einde van body of voeg toe aan einde
+        if "</body>" in template_html:
+            bevestig_html = f'<p style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px;"><strong>Bevestig uw aanvraag:</strong><br><a href="{bevestig_link}" style="color: #fec82a; font-weight: bold; text-decoration: none;">Klik hier om uw aanvraag te bevestigen</a></p>'
+            template_html = template_html.replace("</body>", bevestig_html + "</body>")
+        else:
+            # Als geen body tag, voeg toe aan einde
+            bevestig_html = f'<p style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px;"><strong>Bevestig uw aanvraag:</strong><br><a href="{bevestig_link}" style="color: #fec82a; font-weight: bold; text-decoration: none;">Klik hier om uw aanvraag te bevestigen</a></p>'
+            template_html = template_html + bevestig_html
         
         # Verstuur mail
         result = stuur_mail(
