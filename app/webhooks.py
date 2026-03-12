@@ -216,6 +216,9 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
         - aantal_personen (aantal personen)
         - opmerkingen (opmerkingen/notities)
     """
+    body = await request.body()
+    print(f"GRAVITY RAW PAYLOAD: {body.decode()}")
+    
     # Verifieer token uit query parameter
     if not token:
         _LOG.warning("Gravity Forms webhook call zonder token")
