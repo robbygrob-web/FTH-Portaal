@@ -546,51 +546,6 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     min-height: 60px;
                 }}
             </style>
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {{
-                    const saveBtn = document.getElementById('save-btn');
-                    const fields = document.querySelectorAll('.editable-field');
-                    let hasChanges = false;
-
-                    fields.forEach(function(field) {{
-                        field.addEventListener('input', function() {{
-                            hasChanges = true;
-                            saveBtn.disabled = false;
-                            saveBtn.className = 'save-btn orange';
-                            saveBtn.textContent = 'Opslaan';
-                        }});
-                    }});
-
-                    saveBtn.addEventListener('click', function() {{
-                        if (!hasChanges) return;
-                        const data = {{
-                            plaats: document.getElementById('plaats').value,
-                            leverdatum: document.getElementById('leverdatum').value,
-                            aantal_personen: document.getElementById('aantal_personen').value,
-                            aantal_kinderen: document.getElementById('aantal_kinderen').value,
-                            opmerkingen: document.getElementById('opmerkingen').value
-                        }};
-                        fetch(window.location.pathname + '/opslaan' + window.location.search, {{
-                            method: 'POST',
-                            headers: {{'Content-Type': 'application/json'}},
-                            body: JSON.stringify(data)
-                        }})
-                        .then(r => r.json())
-                        .then(function(result) {{
-                            if (result.success) {{
-                                hasChanges = false;
-                                saveBtn.className = 'save-btn green';
-                                saveBtn.textContent = 'Opgeslagen \u2713';
-                                setTimeout(function() {{
-                                    saveBtn.disabled = true;
-                                    saveBtn.className = 'save-btn';
-                                    saveBtn.textContent = 'Geen wijzigingen';
-                                }}, 3000);
-                            }}
-                        }});
-                    }});
-                }});
-            </script>
         </head>
         <body>
             <div class="header">
@@ -711,6 +666,61 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     {factuur_knoppen if factuur_knoppen else '<p style="color:#666;">Geen acties beschikbaar</p>'}
                 </div>
             </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {{
+                    const saveBtn = document.getElementById('save-btn');
+                    const fields = document.querySelectorAll('.editable-field');
+                    let hasChanges = false;
+
+                    if (!saveBtn) {{
+                        console.error('Save button niet gevonden');
+                        return;
+                    }}
+
+                    if (fields.length === 0) {{
+                        console.error('Geen editable fields gevonden');
+                        return;
+                    }}
+
+                    fields.forEach(function(field) {{
+                        field.addEventListener('input', function() {{
+                            hasChanges = true;
+                            saveBtn.disabled = false;
+                            saveBtn.className = 'save-btn orange';
+                            saveBtn.textContent = 'Opslaan';
+                        }});
+                    }});
+
+                    saveBtn.addEventListener('click', function() {{
+                        if (!hasChanges) return;
+                        const data = {{
+                            plaats: document.getElementById('plaats').value,
+                            leverdatum: document.getElementById('leverdatum').value,
+                            aantal_personen: document.getElementById('aantal_personen').value,
+                            aantal_kinderen: document.getElementById('aantal_kinderen').value,
+                            opmerkingen: document.getElementById('opmerkingen').value
+                        }};
+                        fetch(window.location.pathname + '/opslaan' + window.location.search, {{
+                            method: 'POST',
+                            headers: {{'Content-Type': 'application/json'}},
+                            body: JSON.stringify(data)
+                        }})
+                        .then(r => r.json())
+                        .then(function(result) {{
+                            if (result.success) {{
+                                hasChanges = false;
+                                saveBtn.className = 'save-btn green';
+                                saveBtn.textContent = 'Opgeslagen \u2713';
+                                setTimeout(function() {{
+                                    saveBtn.disabled = true;
+                                    saveBtn.className = 'save-btn';
+                                    saveBtn.textContent = 'Geen wijzigingen';
+                                }}, 3000);
+                            }}
+                        }});
+                    }});
+                }});
+            </script>
         </body>
         </html>
         """
