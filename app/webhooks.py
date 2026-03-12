@@ -546,8 +546,10 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     conn.commit()
                     _LOG.info(f"Order artikel toegevoegd: {naam} (aantal: {aantal})")
                 
-                # 1. Hoofdartikel uit veld "57.1" met aantal uit "57.3"
-                artikel_naam = body.get("57.1")
+                # 1. Hoofdartikel uit veld "69" (prioriteit) of "57.1" met aantal uit "57.3"
+                artikel_naam = body.get("69", "").split("|")[0].strip()
+                if not artikel_naam:
+                    artikel_naam = body.get("57.1") or ""
                 if artikel_naam:
                     artikel = get_artikel_by_naam(artikel_naam)
                     if artikel:

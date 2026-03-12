@@ -59,6 +59,35 @@ def run_migration_004():
         conn.commit()
         print("[MIGRATION 004] ✓ foutmelding toegevoegd aan mail_logs")
         
+        # Artikelen: seed data
+        print("[MIGRATION 004] Voeg UNIQUE constraint toe aan artikelen.naam...")
+        try:
+            cur.execute("ALTER TABLE artikelen ADD CONSTRAINT artikelen_naam_unique UNIQUE (naam);")
+            conn.commit()
+            print("[MIGRATION 004] ✓ UNIQUE constraint toegevoegd aan artikelen.naam")
+        except psycopg2.ProgrammingError as e:
+            if "already exists" in str(e) or "duplicate" in str(e).lower():
+                print("[MIGRATION 004] UNIQUE constraint bestaat al, overslaan...")
+                conn.rollback()
+            else:
+                raise
+        
+        print("[MIGRATION 004] Seed artikelen...")
+        cur.execute("""
+            INSERT INTO artikelen (naam, prijs_excl, btw_pct, btw_bedrag, prijs_incl, actief, odoo_id)
+            VALUES
+              ('Frietpakket', 4.59, 9, 0.41, 5.00, true, 0),
+              ('Verse Friet & Snack', 6.88, 9, 0.62, 7.50, true, 0),
+              ('Verse Friet & Snacks (onbeperkt)', 9.63, 9, 0.87, 10.50, true, 0),
+              ('Verse Friet, Snacks & Burger (onbeperkt)', 10.78, 9, 0.97, 11.75, true, 0),
+              ('Broodjes', 0.92, 9, 0.08, 1.00, true, 0),
+              ('Drankjes', 2.75, 9, 0.25, 3.00, true, 0),
+              ('Reiskosten', 68.81, 9, 6.19, 75.00, true, 0)
+            ON CONFLICT (naam) DO NOTHING;
+        """)
+        conn.commit()
+        print("[MIGRATION 004] ✓ artikelen geseed")
+        
         print("[MIGRATION 004] Migratie voltooid!")
         return True
         
