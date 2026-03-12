@@ -185,15 +185,22 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         if order_status != "sale":
             offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/bevestig?token={SESSION_SECRET}" style="display:inline;margin-left:10px;"><button type="submit" class="btn">Bevestig order</button></form>'
         
-        # Factuur knoppen (alleen als status = sale en nog geen factuur)
+        # Factuur knoppen
         factuur_knoppen = ""
+        betaal_status = order.get("betaal_status")
+        
         if order_status == "sale":
             # Check of er al een factuur is
             cur.execute("SELECT id FROM facturen WHERE order_id = %s LIMIT 1", (order_id,))
             heeft_factuur = cur.fetchone()
             
-            if not heeft_factuur:
-                factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur factuur</button></form>'
+            if betaal_status in ["factuur_verstuurd", "betaald"] and heeft_factuur:
+                # Factuur al verstuurd, toon "nogmaals versturen" knop
+                factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur-nogmaals?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur factuur nogmaals</button></form>'
+            elif not betaal_status or betaal_status == "onbetaald":
+                # Nog geen factuur verstuurd, toon normale knop
+                if not heeft_factuur:
+                    factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur factuur</button></form>'
         
         html_content = f"""
         <!DOCTYPE html>
