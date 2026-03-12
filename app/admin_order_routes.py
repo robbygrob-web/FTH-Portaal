@@ -705,18 +705,22 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             headers: {{'Content-Type': 'application/json'}},
                             body: JSON.stringify(data)
                         }})
-                        .then(r => r.json())
+                        .then(function(r) {{ return r.json(); }})
                         .then(function(result) {{
                             if (result.success) {{
                                 hasChanges = false;
                                 saveBtn.className = 'save-btn green';
-                                saveBtn.textContent = 'Opgeslagen \u2713';
+                                saveBtn.textContent = 'Opgeslagen ✓';
                                 setTimeout(function() {{
                                     saveBtn.disabled = true;
                                     saveBtn.className = 'save-btn';
                                     saveBtn.textContent = 'Geen wijzigingen';
                                 }}, 3000);
                             }}
+                        }})
+                        .catch(function(error) {{
+                            console.error('Fout bij opslaan:', error);
+                            alert('Fout bij opslaan: ' + error.message);
                         }});
                     }});
                 }});
