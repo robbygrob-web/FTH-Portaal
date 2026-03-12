@@ -1375,6 +1375,10 @@ async def verstuur_factuur(
         mollie_payment_id = payment["id"]
         mollie_checkout_url = payment["checkout_url"]
         
+        # Debug logging
+        _LOG.info(f"Nieuwe Mollie payment aangemaakt voor order {order_id}: payment_id={mollie_payment_id}, checkout_url={mollie_checkout_url}")
+        print(f"Nieuwe Mollie URL: {mollie_checkout_url}")
+        
         # Sla factuur op in database met vers bedrag
         cur.execute("""
             INSERT INTO facturen (
@@ -1410,6 +1414,17 @@ async def verstuur_factuur(
         """, (order_id,))
         
         conn.commit()
+        
+        # Verifieer dat checkout URL is opgeslagen
+        cur.execute("SELECT mollie_checkout_url FROM facturen WHERE id = %s", (factuur_id,))
+        saved_factuur = cur.fetchone()
+        if saved_factuur:
+            saved_url = saved_factuur.get("mollie_checkout_url")
+            _LOG.info(f"Factuur {factuur_id} opgeslagen met checkout_url: {saved_url}")
+            if saved_url != mollie_checkout_url:
+                _LOG.warning(f"WAARSCHUWING: Opgeslagen URL ({saved_url}) verschilt van nieuwe URL ({mollie_checkout_url})")
+                # Gebruik de opgeslagen URL voor mail
+                mollie_checkout_url = saved_url if saved_url else mollie_checkout_url
         
         # Maak mail body met vers bedrag
         if ordertype == "b2b":
