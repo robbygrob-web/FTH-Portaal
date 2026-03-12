@@ -4,6 +4,7 @@ Wordt verwijderd na succesvolle import.
 """
 import os
 import logging
+import traceback
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
@@ -435,8 +436,11 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
     except Exception as e:
         if conn:
             conn.rollback()
-        _LOG.error(f"Fout tijdens database setup: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Fout tijdens database setup: {str(e)}")
+        error_message = str(e) if str(e) else repr(e)
+        error_traceback = traceback.format_exc()
+        full_error = f"{error_message}\n\nTraceback:\n{error_traceback}"
+        _LOG.error(f"Fout tijdens database setup: {full_error}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout tijdens database setup: {full_error}")
     finally:
         if conn:
             cur.close()
