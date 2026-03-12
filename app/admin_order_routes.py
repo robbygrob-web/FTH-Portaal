@@ -1076,6 +1076,18 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     
                     // Expose factuurVerstuurd voor onsubmit handler
                     window.factuurVerstuurd = false;
+                    
+                    // Automatisch reset prijs_partner als leeg of 0
+                    const prijsPartnerVeld = document.getElementById('prijs_partner');
+                    if (prijsPartnerVeld) {{
+                        const waarde = parseFloat(prijsPartnerVeld.value) || 0;
+                        if (waarde === 0) {{
+                            const resetBtn = document.getElementById('reset-prijs-partner');
+                            if (resetBtn) {{
+                                resetBtn.click();
+                            }}
+                        }}
+                    }}
                 }});
             </script>
         </body>
