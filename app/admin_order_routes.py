@@ -886,3 +886,47 @@ async def verstuur_factuur(
         if conn:
             cur.close()
             conn.close()
+
+
+@router.post("/{order_id}/bevestig", response_class=RedirectResponse)
+async def bevestig_order(
+    request: Request,
+    order_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Bevestig order handmatig (zet status naar sale)"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check of order bestaat
+        cur.execute("SELECT id, status FROM orders WHERE id = %s", (order_id,))
+        order = cur.fetchone()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order niet gevonden")
+        
+        # Update order status
+        cur.execute("""
+            UPDATE orders
+            SET status = 'sale', portaal_status = 'beschikbaar', updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (order_id,))
+        
+        conn.commit()
+        
+        return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij bevestigen order: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij bevestigen order: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
