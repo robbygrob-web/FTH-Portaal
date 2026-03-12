@@ -837,24 +837,41 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     
                     // Reset prijs partner knop
                     const resetPrijsPartnerBtn = document.getElementById('reset-prijs-partner');
+                    console.log('Reset knop gevonden:', resetPrijsPartnerBtn);
+                    console.log('Prijs partner veld gevonden:', prijsPartner);
+                    
                     if (resetPrijsPartnerBtn && prijsPartner) {{
-                        resetPrijsPartnerBtn.addEventListener('click', function() {{
+                        resetPrijsPartnerBtn.addEventListener('click', function(e) {{
+                            e.preventDefault();
+                            console.log('Reset knop geklikt!');
+                            
                             // Bereken prijs_partner opnieuw
                             const totaalBedrag = parseFloat({order.get('totaal_bedrag', 0) or 0});
+                            console.log('Totaal bedrag:', totaalBedrag);
+                            
                             const subtotaal = totaalBedrag - 75; // Reiskosten aftrekken
+                            console.log('Subtotaal (na reiskosten):', subtotaal);
                             
                             let nieuwePrijsPartner;
                             if (subtotaal <= 500) {{
                                 nieuwePrijsPartner = (500 * 0.15).toFixed(2);
+                                console.log('Subtotaal <= 500, gebruik 15% van 500');
                             }} else {{
                                 nieuwePrijsPartner = (subtotaal * 0.20).toFixed(2);
+                                console.log('Subtotaal > 500, gebruik 20% van subtotaal');
                             }}
                             
+                            console.log('Nieuwe prijs partner:', nieuwePrijsPartner);
                             prijsPartner.value = nieuwePrijsPartner;
                             
                             // Trigger change event om save knop te activeren
                             prijsPartner.dispatchEvent(new Event('input'));
+                            console.log('Input event getriggerd');
                         }});
+                    }} else {{
+                        console.error('Reset knop of prijs partner veld niet gevonden!');
+                        console.error('Reset knop:', resetPrijsPartnerBtn);
+                        console.error('Prijs partner:', prijsPartner);
                     }}
                     
                     fields.forEach(function(field) {{
