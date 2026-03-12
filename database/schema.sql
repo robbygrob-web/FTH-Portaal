@@ -142,6 +142,36 @@ CREATE INDEX idx_artikelen_actief ON artikelen(actief);
 CREATE INDEX idx_artikelen_naam ON artikelen(naam);
 
 -- ============================================================================
+-- ORDER_ARTIKELEN (sale.order.line)
+-- ============================================================================
+CREATE TABLE order_artikelen (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Relaties
+    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    artikel_id UUID REFERENCES artikelen(id) ON DELETE SET NULL,
+    
+    -- Orderline informatie
+    naam VARCHAR(500) NOT NULL, -- Product naam/omschrijving
+    aantal DECIMAL(10, 2) NOT NULL DEFAULT 1.00, -- product_uom_qty
+    prijs_excl DECIMAL(10, 2) NOT NULL DEFAULT 0.00, -- price_unit
+    btw_pct DECIMAL(5, 2) NOT NULL DEFAULT 9.00, -- tax percentage
+    btw_bedrag DECIMAL(10, 2) NOT NULL DEFAULT 0.00, -- calculated tax
+    prijs_incl DECIMAL(10, 2) NOT NULL DEFAULT 0.00, -- price_subtotal_incl
+    
+    -- Odoo sync (tijdelijk)
+    odoo_id INTEGER UNIQUE, -- sale.order.line ID
+    
+    CONSTRAINT order_artikelen_order_id_fk FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    CONSTRAINT order_artikelen_artikel_id_fk FOREIGN KEY (artikel_id) REFERENCES artikelen(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_order_artikelen_order_id ON order_artikelen(order_id);
+CREATE INDEX idx_order_artikelen_artikel_id ON order_artikelen(artikel_id);
+CREATE INDEX idx_order_artikelen_odoo_id ON order_artikelen(odoo_id);
+
+-- ============================================================================
 -- FACTUREN (account.move)
 -- ============================================================================
 CREATE TABLE facturen (
@@ -293,6 +323,7 @@ CREATE TRIGGER update_agents_updated_at BEFORE UPDATE ON agents
 -- ============================================================================
 COMMENT ON TABLE contacten IS 'Contacten/partners (klanten en leveranciers)';
 COMMENT ON TABLE orders IS 'Verkooporders en offertes';
+COMMENT ON TABLE order_artikelen IS 'Order regels (artikelen per order)';
 COMMENT ON TABLE facturen IS 'Facturen en creditnota''s';
 COMMENT ON TABLE mail_logs IS 'E-mail en bericht logs';
 COMMENT ON TABLE agents IS 'AI agent configuraties';

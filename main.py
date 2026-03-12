@@ -41,6 +41,19 @@ except Exception as e:
     mail_router = None
     # Mail router is optioneel, niet kritiek voor startup
 
+# Import chat router
+chat_router = None
+try:
+    from app.chat_routes import router as chat_router
+    print(f"[DEBUG] Chat router geïmporteerd: {len(chat_router.routes)} routes")
+except Exception as e:
+    print(f"[ERROR] Chat router import gefaald: {e}")
+    print(f"[ERROR] Error type: {type(e).__name__}")
+    import traceback
+    traceback.print_exc()
+    chat_router = None
+    # Chat router is optioneel, niet kritiek voor startup
+
 # Voer startup validatie uit
 startup_validation()
 
@@ -78,6 +91,27 @@ else:
     print(f"[WARNING] Mail router niet beschikbaar - skip registratie")
 
 app.include_router(templates_router)
+
+# Include admin routes (tijdelijk voor database setup)
+try:
+    from app.admin_routes import router as admin_router
+    app.include_router(admin_router)
+    print(f"[DEBUG] Admin router geregistreerd in app")
+except Exception as e:
+    print(f"[WARNING] Admin router niet beschikbaar: {e}")
+
+# Include chat routes
+if chat_router is not None:
+    try:
+        app.include_router(chat_router)
+        print(f"[DEBUG] Chat router geregistreerd in app met {len(chat_router.routes)} routes")
+    except Exception as e:
+        print(f"[ERROR] Chat router registratie gefaald: {e}")
+        import traceback
+        traceback.print_exc()
+        # Chat router is optioneel, niet kritiek voor startup
+else:
+    print(f"[WARNING] Chat router niet beschikbaar - skip registratie")
 
 # DEBUG: Print alle geregistreerde routes bij startup
 def print_routes():
@@ -119,9 +153,13 @@ async def startup_event():
     # Print alle geregistreerde routes
     print_routes()
     
-    # Start mail polling achtergrondtaak
-    if mail_router is not None:
+    # Start mail polling achtergrondtaak (alleen als enabled via env var)
+    mail_polling_enabled = os.getenv("MAIL_POLLING_ENABLED", "false").lower() == "true"
+    
+    if mail_router is not None and mail_polling_enabled:
         print("[STARTUP] Start achtergrondtaak voor inkomende mail polling")
         asyncio.create_task(poll_inkomende_mails())
-    else:
+    elif mail_router is None:
         print("[STARTUP] Mail router niet beschikbaar - skip mail polling")
+    else:
+        print("[STARTUP] Mail polling uitgeschakeld (MAIL_POLLING_ENABLED niet 'true')")
