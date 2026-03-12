@@ -181,6 +181,10 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
             else:
                 offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-offerte?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur gewijzigde offerte</button></form>'
         
+        # Bevestigingsknop (alleen als status != 'sale')
+        if order_status != "sale":
+            offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/bevestig?token={SESSION_SECRET}" style="display:inline;margin-left:10px;"><button type="submit" class="btn">Bevestig order</button></form>'
+        
         # Factuur knoppen (alleen als status = sale en nog geen factuur)
         factuur_knoppen = ""
         if order_status == "sale":
