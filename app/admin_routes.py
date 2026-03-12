@@ -702,6 +702,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                 o.leverdatum,
                 o.status,
                 o.portaal_status,
+                o.betaal_status,
                 CASE WHEN o.status = 'sale' 
                      AND o.portaal_status IN ('claimed','transfer') 
                      THEN 'definitief'
@@ -755,6 +756,16 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             }
             return status_map.get(status, (status, "#999"))
         
+        def format_betaal_status(status):
+            if status == "betaald":
+                return ('<span style="background:#27ae60;color:white;padding:4px 8px;border-radius:4px;font-size:12px;">Betaald ✓</span>', "#27ae60")
+            elif status == "factuur_verstuurd":
+                return ('<span style="background:#e67e22;color:white;padding:4px 8px;border-radius:4px;font-size:12px;">Factuur verstuurd</span>', "#e67e22")
+            elif status == "link_verlopen":
+                return ('<span style="background:#95a5a6;color:white;padding:4px 8px;border-radius:4px;font-size:12px;">Link verlopen</span>', "#95a5a6")
+            else:
+                return ('<span style="color:#999;">-</span>', "#999")
+        
         # Build HTML table rows
         table_rows = ""
         for order in orders:
@@ -775,6 +786,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             
             order_id = str(order.get("id"))
             klant_link = f"/admin/klant/{klant_id}?token={SESSION_SECRET}" if klant_id else "#"
+            betaal_status_html, _ = format_betaal_status(order.get("betaal_status"))
             table_rows += f"""
             <tr>
                 <td><a href="/admin/order/{order_id}?token={SESSION_SECRET}" style="color:#333;text-decoration:none;font-weight:500;">{ordernummer}</a></td>
@@ -786,7 +798,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                 <td><span style="color:{portaal_status_color};">{portaal_status_text}</span></td>
                 <td><span style="color:{order_status_color};">{order_status_text}</span></td>
                 <td>{partner_naam}</td>
-                <td>-</td>
+                <td>{betaal_status_html}</td>
             </tr>
             """
         

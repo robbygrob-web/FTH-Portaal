@@ -1830,6 +1830,35 @@ async def verstuur_factuur_nogmaals(
                   vers_bedrag, factuur["id"]))
             conn.commit()
             
+            # Annuleer oude payments voor deze order
+            cur.execute("""
+                SELECT id, mollie_payment_id 
+                FROM facturen
+                WHERE order_id = %s 
+                AND mollie_payment_id != %s
+                AND mollie_payment_id IS NOT NULL
+            """, (order_id, nieuw_payment_id))
+            
+            oude_facturen = cur.fetchall()
+            for oude_factuur in oude_facturen:
+                oud_payment_id = oude_factuur.get("mollie_payment_id")
+                oude_factuur_id = oude_factuur.get("id")
+                if oud_payment_id:
+                    try:
+                        cancel_payment(oud_payment_id)
+                        print(f"Geannuleerd: {oud_payment_id}")
+                    except Exception as e:
+                        print(f"Cancel mislukt (al verlopen): {oud_payment_id} - {e}")
+                    
+                    # Verwijder payment info uit oude factuur
+                    cur.execute("""
+                        UPDATE facturen SET 
+                            mollie_payment_id = NULL,
+                            mollie_checkout_url = NULL
+                        WHERE id = %s
+                    """, (oude_factuur_id,))
+                    conn.commit()
+            
             print(f"NIEUWE URL: {mollie_checkout_url}")
             mail_onderwerp = f"Aangepaste factuur {ordernummer}"
         else:
