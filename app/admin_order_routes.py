@@ -161,7 +161,7 @@ def update_factuur_bij_orderwijziging(order_id: str, nieuwe_totaal: float, conn,
         _LOG.info(f"Update factuur {factuur_id} voor order {order_id}: nieuwe payment_id={nieuwe_mollie_payment_id}, checkout_url={nieuwe_mollie_checkout_url}")
         print(f"Nieuwe Mollie URL: {nieuwe_mollie_checkout_url}")
         
-        # Update factuur record - gebruik WHERE order_id om zeker te zijn dat de juiste factuur wordt geupdate
+        # Update factuur record - gebruik WHERE id = factuur_id (meest recente factuur voor deze order)
         cur.execute("""
             UPDATE facturen
             SET mollie_payment_id = %s,
@@ -170,43 +170,21 @@ def update_factuur_bij_orderwijziging(order_id: str, nieuwe_totaal: float, conn,
                 bedrag_excl_btw = %s,
                 bedrag_btw = %s,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE order_id = %s
-            ORDER BY created_at DESC
-            LIMIT 1
+            WHERE id = %s
         """, (
             nieuwe_mollie_payment_id,
             nieuwe_mollie_checkout_url,
             nieuwe_totaal,
             float(order_info.get("bedrag_excl_btw", 0)),
             float(order_info.get("bedrag_btw", 0)),
-            order_id
+            factuur_id
         ))
         
         rows_updated = cur.rowcount
-        _LOG.info(f"UPDATE facturen uitgevoerd: {rows_updated} rij(en) geupdate voor order {order_id}")
+        _LOG.info(f"UPDATE facturen uitgevoerd: {rows_updated} rij(en) geupdate voor factuur_id {factuur_id} (order {order_id})")
         
         if rows_updated == 0:
-            _LOG.warning(f"GEEN factuur geupdate voor order {order_id}! Probeer met factuur_id")
-            # Fallback: gebruik factuur_id
-            cur.execute("""
-                UPDATE facturen
-                SET mollie_payment_id = %s,
-                    mollie_checkout_url = %s,
-                    totaal_bedrag = %s,
-                    bedrag_excl_btw = %s,
-                    bedrag_btw = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (
-                nieuwe_mollie_payment_id,
-                nieuwe_mollie_checkout_url,
-                nieuwe_totaal,
-                float(order_info.get("bedrag_excl_btw", 0)),
-                float(order_info.get("bedrag_btw", 0)),
-                factuur_id
-            ))
-            rows_updated = cur.rowcount
-            _LOG.info(f"Fallback UPDATE met factuur_id: {rows_updated} rij(en) geupdate")
+            _LOG.error(f"GEEN factuur geupdate voor factuur_id {factuur_id}! Factuur bestaat mogelijk niet.")
         
         conn.commit()
         
