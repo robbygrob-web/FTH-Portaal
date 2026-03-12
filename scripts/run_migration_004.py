@@ -53,6 +53,12 @@ def run_migration_004():
         conn.commit()
         print("[MIGRATION 004] ✓ land toegevoegd aan contacten")
         
+        # Mail_logs: foutmelding kolom
+        print("[MIGRATION 004] Voeg foutmelding toe aan mail_logs...")
+        cur.execute("ALTER TABLE mail_logs ADD COLUMN IF NOT EXISTS foutmelding TEXT;")
+        conn.commit()
+        print("[MIGRATION 004] ✓ foutmelding toegevoegd aan mail_logs")
+        
         print("[MIGRATION 004] Migratie voltooid!")
         return True
         
