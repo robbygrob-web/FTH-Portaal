@@ -369,8 +369,10 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         # Factuur knoppen
         factuur_knoppen = ""
         betaal_status = order.get("betaal_status")
+        portaal_status = order.get("portaal_status", "")
         
-        if order_status == "sale":
+        # Factuur alleen beschikbaar als order bevestigd is (status = sale) OF portaal_status in (sale, transfer, claimed)
+        if order_status == "sale" or portaal_status in ("sale", "transfer", "claimed"):
             # Check of er al een factuur is
             cur.execute("SELECT id FROM facturen WHERE order_id = %s LIMIT 1", (order_id,))
             heeft_factuur = cur.fetchone()
