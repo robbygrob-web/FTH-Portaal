@@ -93,6 +93,119 @@ def verify_admin_session(request: Request):
     raise HTTPException(status_code=401, detail="Admin toegang vereist. Voeg ?token=YOUR_SESSION_SECRET toe aan de URL.")
 
 
+@setup_router.post("/add-betaal-status-column")
+async def add_betaal_status_column(verified: bool = Depends(verify_admin_token)):
+    """
+    Tijdelijk endpoint om betaal_status kolom toe te voegen aan orders tabel.
+    Vereist Bearer token authenticatie met SESSION_SECRET.
+    """
+    database_url = get_database_url()
+    conn = None
+    
+    try:
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check of kolom al bestaat
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'orders' AND column_name = 'betaal_status'
+        """)
+        
+        if cur.fetchone():
+            return JSONResponse({
+                "success": True,
+                "message": "Kolom betaal_status bestaat al"
+            })
+        
+        # Voeg kolom toe
+        cur.execute("""
+            ALTER TABLE orders
+            ADD COLUMN betaal_status VARCHAR(50) DEFAULT 'onbetaald'
+        """)
+        
+        conn.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Kolom betaal_status succesvol toegevoegd aan orders tabel"
+        })
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        error_message = str(e) if str(e) else repr(e)
+        error_traceback = traceback.format_exc()
+        full_error = f"{error_message}\n\nTraceback:\n{error_traceback}"
+        _LOG.error(f"Fout bij toevoegen betaal_status kolom: {full_error}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij toevoegen kolom: {full_error}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@setup_router.post("/add-facturen-mollie-columns")
+async def add_facturen_mollie_columns(verified: bool = Depends(verify_admin_token)):
+    """
+    Tijdelijk endpoint om mollie_payment_id en mollie_checkout_url kolommen toe te voegen aan facturen tabel.
+    Vereist Bearer token authenticatie met SESSION_SECRET.
+    """
+    database_url = get_database_url()
+    conn = None
+    
+    try:
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check mollie_payment_id
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'facturen' AND column_name = 'mollie_payment_id'
+        """)
+        
+        if not cur.fetchone():
+            cur.execute("""
+                ALTER TABLE facturen
+                ADD COLUMN mollie_payment_id VARCHAR(100)
+            """)
+        
+        # Check mollie_checkout_url
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'facturen' AND column_name = 'mollie_checkout_url'
+        """)
+        
+        if not cur.fetchone():
+            cur.execute("""
+                ALTER TABLE facturen
+                ADD COLUMN mollie_checkout_url TEXT
+            """)
+        
+        conn.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Mollie kolommen succesvol toegevoegd aan facturen tabel"
+        })
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        error_message = str(e) if str(e) else repr(e)
+        error_traceback = traceback.format_exc()
+        full_error = f"{error_message}\n\nTraceback:\n{error_traceback}"
+        _LOG.error(f"Fout bij toevoegen Mollie kolommen: {full_error}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij toevoegen kolommen: {full_error}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
 @setup_router.post("/add-gf-referentie-column")
 async def add_gf_referentie_column(verified: bool = Depends(verify_admin_token)):
     """

@@ -17,6 +17,14 @@ _LOG = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
+def get_database_url():
+    """Haal DATABASE_URL op uit environment"""
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise ValueError("DATABASE_URL niet gevonden in environment variabelen")
+    return database_url
+
+
 @router.get("/test")
 async def test_webhook():
     """
@@ -553,3 +561,80 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 pass
         _LOG.error(f"Fout bij Gravity Forms webhook verwerking: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Interne server fout: {str(e)}")
+
+
+@router.post("/mollie")
+async def mollie_webhook(request: Request):
+    """Mollie betaling webhook - ontvangt betaling bevestigingen"""
+    conn = None
+    try:
+        body = await request.json()
+        payment_id = body.get("id")
+        
+        if not payment_id:
+            _LOG.warning("Mollie webhook zonder payment ID")
+            raise HTTPException(status_code=400, detail="Payment ID ontbreekt")
+        
+        _LOG.info(f"Mollie webhook ontvangen voor payment: {payment_id}")
+        
+        # Haal payment op van Mollie
+        from app.mollie_client import get_payment
+        payment = get_payment(payment_id)
+        
+        payment_status = payment.get("status")
+        metadata = payment.get("metadata", {})
+        order_id = metadata.get("order_id")
+        
+        if not order_id:
+            _LOG.warning(f"Mollie payment {payment_id} heeft geen order_id in metadata")
+            return JSONResponse({"status": "ok", "message": "Geen order_id gevonden"})
+        
+        # Connect naar database
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Als status = 'paid', update order betaal_status
+        if payment_status == "paid":
+            cur.execute("""
+                UPDATE orders
+                SET betaal_status = 'betaald', updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (order_id,))
+            
+            # Update factuur betalingsstatus
+            cur.execute("""
+                UPDATE facturen
+                SET betalingsstatus = 'paid', updated_at = CURRENT_TIMESTAMP
+                WHERE order_id = %s
+            """, (order_id,))
+            
+            conn.commit()
+            
+            # Log in mail_logs
+            cur.execute("""
+                INSERT INTO mail_logs (order_id, onderwerp, status, foutmelding)
+                VALUES (%s, %s, %s, %s)
+            """, (
+                order_id,
+                f"Mollie betaling bevestigd - Payment {payment_id}",
+                "success",
+                None
+            ))
+            conn.commit()
+            
+            _LOG.info(f"Betaling bevestigd voor order {order_id} - Payment {payment_id}")
+        
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Mollie webhook fout: {e}", exc_info=True)
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+    finally:
+        if conn:
+            cur.close()
+            conn.close()

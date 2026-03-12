@@ -15,6 +15,8 @@ from psycopg2.extras import RealDictCursor
 from app.config import SESSION_SECRET
 from app.mail import stuur_mail
 from app.admin_routes import verify_admin_session, get_database_url
+from app.mollie_client import create_payment
+import random
 
 _LOG = logging.getLogger(__name__)
 
@@ -178,6 +180,16 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                 offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-offerte?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur offerte</button></form>'
             else:
                 offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-offerte?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur gewijzigde offerte</button></form>'
+        
+        # Factuur knoppen (alleen als status = sale en nog geen factuur)
+        factuur_knoppen = ""
+        if order_status == "sale":
+            # Check of er al een factuur is
+            cur.execute("SELECT id FROM facturen WHERE order_id = %s LIMIT 1", (order_id,))
+            heeft_factuur = cur.fetchone()
+            
+            if not heeft_factuur:
+                factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur factuur</button></form>'
         
         html_content = f"""
         <!DOCTYPE html>
@@ -395,6 +407,13 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                 <h2>Offerte</h2>
                 <div>
                     {offerte_knoppen if offerte_knoppen else '<p style="color:#666;">Geen acties beschikbaar</p>'}
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Factuur</h2>
+                <div>
+                    {factuur_knoppen if factuur_knoppen else '<p style="color:#666;">Geen acties beschikbaar</p>'}
                 </div>
             </div>
         </body>
@@ -698,6 +717,167 @@ async def verstuur_offerte(
             conn.rollback()
         _LOG.error(f"Fout bij versturen offerte: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout bij versturen offerte: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/{order_id}/verstuur-factuur", response_class=RedirectResponse)
+async def verstuur_factuur(
+    request: Request,
+    order_id: str,
+    background_tasks: BackgroundTasks,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Verstuur factuur met Mollie betaallink"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Haal order op met contact
+        cur.execute("""
+            SELECT o.*, c.email as klant_email, c.naam as klant_naam
+            FROM orders o
+            LEFT JOIN contacten c ON o.klant_id = c.id
+            WHERE o.id = %s
+        """, (order_id,))
+        
+        order = cur.fetchone()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order niet gevonden")
+        
+        # Check of status = sale (bevestigd)
+        if order.get("status") != "sale":
+            raise HTTPException(status_code=400, detail="Order moet bevestigd zijn (status = sale) voordat factuur verstuurd kan worden")
+        
+        # Check of er al een factuur is
+        cur.execute("""
+            SELECT id FROM facturen WHERE order_id = %s LIMIT 1
+        """, (order_id,))
+        
+        if cur.fetchone():
+            raise HTTPException(status_code=400, detail="Er is al een factuur verstuurd voor deze order")
+        
+        klant_email = order.get("klant_email")
+        if not klant_email:
+            raise HTTPException(status_code=400, detail="Geen email adres gevonden voor klant")
+        
+        ordernummer = order.get("ordernummer", "")
+        totaal_bedrag = float(order.get("totaal_bedrag", 0))
+        ordertype = order.get("ordertype") or "b2c"
+        
+        # Genereer factuurnummer: FTHINVYYYYMMDDXXXX
+        today = datetime.now()
+        random_suffix = random.randint(1000, 9999)
+        factuurnummer = f"FTHINV{today.strftime('%Y%m%d')}{random_suffix:04d}"
+        
+        # Maak Mollie payment
+        try:
+            payment = create_payment(
+                amount=totaal_bedrag,
+                description=f"Factuur {ordernummer}",
+                redirect_url="https://fth-portaal-production.up.railway.app/betaling/bedankt",
+                webhook_url="https://fth-portaal-production.up.railway.app/webhooks/mollie",
+                metadata={"order_id": str(order_id)}
+            )
+        except Exception as e:
+            _LOG.error(f"Fout bij aanmaken Mollie payment: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Fout bij aanmaken betaallink: {str(e)}")
+        
+        mollie_payment_id = payment["id"]
+        mollie_checkout_url = payment["checkout_url"]
+        
+        # Sla factuur op in database
+        cur.execute("""
+            INSERT INTO facturen (
+                factuurnummer, factuurdatum, klant_id, order_id,
+                totaal_bedrag, bedrag_excl_btw, bedrag_btw,
+                status, betalingsstatus, type_naam,
+                mollie_payment_id, mollie_checkout_url
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            ) RETURNING id
+        """, (
+            factuurnummer,
+            today.date(),
+            order.get("klant_id"),
+            order_id,
+            totaal_bedrag,
+            float(order.get("bedrag_excl_btw", 0)),
+            float(order.get("bedrag_btw", 0)),
+            "posted",  # status
+            "not_paid",  # betalingsstatus
+            "Invoice",  # type_naam
+            mollie_payment_id,
+            mollie_checkout_url
+        ))
+        
+        factuur_id = cur.fetchone()["id"]
+        
+        # Update order betaal_status
+        cur.execute("""
+            UPDATE orders
+            SET betaal_status = 'factuur_verstuurd', updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (order_id,))
+        
+        conn.commit()
+        
+        # Maak mail body
+        if ordertype == "b2b":
+            mail_body = f"""
+            <html>
+            <body>
+                <h2>Factuur {factuurnummer}</h2>
+                <p>Beste {order.get('klant_naam', '')},</p>
+                <p>Bij deze ontvangt u de factuur voor uw bestelling {ordernummer}.</p>
+                <p><strong>Te betalen bedrag: € {totaal_bedrag:,.2f}</strong></p>
+                <p>U kunt betalen via de onderstaande betaallink:</p>
+                <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
+                <p>Of maak het bedrag over naar:</p>
+                <p><strong>Rekeningnummer:</strong> NL91ABNA0417164300<br>
+                <strong>Ten name van:</strong> Treatlab VOF</p>
+                <p>Met vriendelijke groet,<br>FTH Portaal</p>
+            </body>
+            </html>
+            """
+        else:
+            mail_body = f"""
+            <html>
+            <body>
+                <h2>Factuur {factuurnummer}</h2>
+                <p>Beste {order.get('klant_naam', '')},</p>
+                <p>Bij deze ontvangt u de factuur voor uw bestelling {ordernummer}.</p>
+                <p><strong>Te betalen bedrag: € {totaal_bedrag:,.2f}</strong></p>
+                <p>U kunt betalen via de onderstaande betaallink:</p>
+                <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
+                <p>Met vriendelijke groet,<br>FTH Portaal</p>
+            </body>
+            </html>
+            """
+        
+        # Verstuur mail in background
+        background_tasks.add_task(
+            stuur_mail,
+            naar=klant_email,
+            onderwerp=f"Factuur {factuurnummer} - {ordernummer}",
+            inhoud=mail_body,
+            order_id=order_id,
+            template_naam="Factuur"
+        )
+        
+        return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij versturen factuur: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij versturen factuur: {str(e)}")
     finally:
         if conn:
             cur.close()

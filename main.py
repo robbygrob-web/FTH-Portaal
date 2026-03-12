@@ -168,3 +168,11 @@ async def startup_event():
         print("[STARTUP] Mail router niet beschikbaar - skip mail polling")
     else:
         print("[STARTUP] Mail polling uitgeschakeld (MAIL_POLLING_ENABLED niet 'true')")
+    
+    # Start dagelijkse factuur scheduler
+    try:
+        from app.factuur_scheduler import run_daily_factuur_check
+        print("[STARTUP] Start achtergrondtaak voor automatische facturen")
+        asyncio.create_task(run_daily_factuur_check())
+    except Exception as e:
+        print(f"[WARNING] Factuur scheduler niet beschikbaar: {e}")
