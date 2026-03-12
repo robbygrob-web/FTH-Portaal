@@ -129,7 +129,7 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
         # Stap 2: Connect naar Odoo
         client = get_odoo_client()
         
-        # Stap 3: Haal 10 recente orders op (alleen veilige standaard velden)
+        # Stap 3: Haal 10 recente orders op (alleen essentiële velden)
         orders = client.execute_kw(
             "sale.order",
             "search_read",
@@ -137,10 +137,8 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
             {
                 "fields": [
                     "id", "name", "date_order", "state", "partner_id",
-                    "commitment_date", "amount_total", "amount_untaxed", "amount_tax",
-                    "note", "order_line",
-                    "utm_source_id", "utm_medium_id", "utm_campaign_id",
-                    "payment_term_id"
+                    "commitment_date", "amount_total", "amount_untaxed", 
+                    "amount_tax", "order_line"
                 ],
                 "order": "id desc",
                 "limit": 10
@@ -158,51 +156,6 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
                     "order_artikelen": 0
                 }
             })
-        
-        # Stap 3b: Haal x_studio velden op per order (met try/except voor veiligheid)
-        order_ids = [order["id"] for order in orders]
-        x_studio_data = {}
-        if order_ids:
-            try:
-                x_studio_orders = client.execute_kw(
-                    "sale.order",
-                    "read",
-                    order_ids,
-                    {
-                        "fields": [
-                            "id", "x_studio_plaats", "x_studio_aantal_personen",
-                            "x_studio_aantal_kinderen", "x_studio_ordertype"
-                        ]
-                    }
-                )
-                for x_order in x_studio_orders:
-                    x_studio_data[x_order["id"]] = {
-                        "x_studio_plaats": x_order.get("x_studio_plaats"),
-                        "x_studio_aantal_personen": x_order.get("x_studio_aantal_personen"),
-                        "x_studio_aantal_kinderen": x_order.get("x_studio_aantal_kinderen"),
-                        "x_studio_ordertype": x_order.get("x_studio_ordertype")
-                    }
-            except Exception as e:
-                _LOG.warning(f"Kon x_studio velden niet ophalen: {e}. Gebruik None als default.")
-                # Maak lege dict voor alle orders
-                for order_id in order_ids:
-                    x_studio_data[order_id] = {
-                        "x_studio_plaats": None,
-                        "x_studio_aantal_personen": None,
-                        "x_studio_aantal_kinderen": None,
-                        "x_studio_ordertype": None
-                    }
-        
-        # Voeg x_studio velden toe aan orders
-        for order in orders:
-            order_id = order["id"]
-            if order_id in x_studio_data:
-                order.update(x_studio_data[order_id])
-            else:
-                order["x_studio_plaats"] = None
-                order["x_studio_aantal_personen"] = None
-                order["x_studio_aantal_kinderen"] = None
-                order["x_studio_ordertype"] = None
         
         # Stap 4: Verzamel partner IDs en haal partners op
         partner_ids = []
@@ -323,30 +276,6 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
             status = "sent" if state == "sent" else "sale"
             type_naam = "Offerte" if state == "sent" else "Verkooporder"
             
-            payment_term_id = None
-            payment_term_naam = None
-            if order.get("payment_term_id"):
-                payment_term_id = order["payment_term_id"][0] if isinstance(order["payment_term_id"], (list, tuple)) else order["payment_term_id"]
-                payment_term_naam = order["payment_term_id"][1] if isinstance(order["payment_term_id"], (list, tuple)) else None
-            
-            # Extract UTM values from many2one fields
-            utm_source = None
-            utm_medium = None
-            utm_campaign = None
-            utm_content = None
-            
-            if order.get("utm_source_id"):
-                utm_source_tuple = order["utm_source_id"]
-                utm_source = utm_source_tuple[1] if isinstance(utm_source_tuple, (list, tuple)) and len(utm_source_tuple) > 1 else None
-            
-            if order.get("utm_medium_id"):
-                utm_medium_tuple = order["utm_medium_id"]
-                utm_medium = utm_medium_tuple[1] if isinstance(utm_medium_tuple, (list, tuple)) and len(utm_medium_tuple) > 1 else None
-            
-            if order.get("utm_campaign_id"):
-                utm_campaign_tuple = order["utm_campaign_id"]
-                utm_campaign = utm_campaign_tuple[1] if isinstance(utm_campaign_tuple, (list, tuple)) and len(utm_campaign_tuple) > 1 else None
-            
             order_data = {
                 "odoo_id": odoo_id,
                 "ordernummer": order.get("name", ""),
@@ -359,17 +288,17 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
                 "totaal_bedrag": float(order.get("amount_total", 0)) if order.get("amount_total") else 0.00,
                 "bedrag_excl_btw": float(order.get("amount_untaxed", 0)) if order.get("amount_untaxed") else 0.00,
                 "bedrag_btw": float(order.get("amount_tax", 0)) if order.get("amount_tax") else 0.00,
-                "plaats": order.get("x_studio_plaats"),
-                "aantal_personen": int(order.get("x_studio_aantal_personen", 0)) if order.get("x_studio_aantal_personen") else 0,
-                "aantal_kinderen": int(order.get("x_studio_aantal_kinderen", 0)) if order.get("x_studio_aantal_kinderen") else 0,
-                "ordertype": order.get("x_studio_ordertype"),
-                "betaaltermijn_id": payment_term_id,
-                "betaaltermijn_naam": payment_term_naam,
-                "opmerkingen": order.get("note"),
-                "utm_source": utm_source,
-                "utm_medium": utm_medium,
-                "utm_campaign": utm_campaign,
-                "utm_content": utm_content
+                "plaats": None,
+                "aantal_personen": 0,
+                "aantal_kinderen": 0,
+                "ordertype": None,
+                "betaaltermijn_id": None,
+                "betaaltermijn_naam": None,
+                "opmerkingen": None,
+                "utm_source": None,
+                "utm_medium": None,
+                "utm_campaign": None,
+                "utm_content": None
             }
             
             cur.execute("""
