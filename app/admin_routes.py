@@ -83,12 +83,10 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
         cur.execute("""
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name = 'order_artikelen'
-            );
+                WHERE table_name = 'order_artikelen'
+            )
         """)
-        row = cur.fetchone()
-        table_exists = row[0] if isinstance(row, tuple) else row.get("exists", list(row.values())[0] if row else False)
+        table_exists = cur.fetchone()["exists"]
         
         if not table_exists:
             _LOG.info("Aanmaken order_artikelen tabel...")
