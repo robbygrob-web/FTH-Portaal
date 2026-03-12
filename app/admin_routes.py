@@ -538,9 +538,10 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             kinderen = order.get("aantal_kinderen", 0)
             totaal = float(order.get("totaal_bedrag", 0))
             
+            order_id = str(order.get("id"))
             table_rows += f"""
             <tr>
-                <td>{klant_naam}</td>
+                <td><a href="/admin/order/{order_id}?token={SESSION_SECRET}" style="color:#333;text-decoration:none;font-weight:500;">{klant_naam}</a></td>
                 <td>{plaats}</td>
                 <td>{leverdatum}</td>
                 <td>{personen} / {kinderen}</td>
