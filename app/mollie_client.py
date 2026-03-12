@@ -85,3 +85,29 @@ def get_payment(payment_id: str) -> Dict[str, Any]:
         "description": payment.description,
         "metadata": payment.metadata
     }
+
+
+def cancel_payment(payment_id: str) -> bool:
+    """
+    Annuleer een Mollie payment.
+    
+    Args:
+        payment_id: Mollie payment ID
+    
+    Returns:
+        True als succesvol geannuleerd, False anders
+    """
+    try:
+        mollie_client = get_mollie_client()
+        payment = mollie_client.payments.get(payment_id)
+        
+        # Probeer te annuleren (alleen mogelijk als status open/pending)
+        if payment.status in ["open", "pending"]:
+            payment.delete()
+            return True
+        else:
+            _LOG.warning(f"Payment {payment_id} kan niet geannuleerd worden (status: {payment.status})")
+            return False
+    except Exception as e:
+        _LOG.error(f"Fout bij annuleren Mollie payment {payment_id}: {e}", exc_info=True)
+        return False

@@ -15,7 +15,7 @@ from psycopg2.extras import RealDictCursor
 from app.config import SESSION_SECRET
 from app.mail import stuur_mail
 from app.admin_routes import verify_admin_session, get_database_url
-from app.mollie_client import create_payment
+from app.mollie_client import create_payment, cancel_payment
 import random
 
 _LOG = logging.getLogger(__name__)
@@ -65,6 +65,166 @@ def calculate_order_totals(order_id: str, conn) -> dict:
         "bedrag_excl_btw": float(result["totaal_excl"]) if result["totaal_excl"] else 0.00,
         "bedrag_btw": float(result["totaal_btw"]) if result["totaal_btw"] else 0.00
     }
+
+
+def update_factuur_bij_orderwijziging(order_id: str, nieuwe_totaal: float, conn, background_tasks: BackgroundTasks):
+    """
+    Update factuur bij orderwijziging: annuleer oude Mollie payment, maak nieuwe aan, stuur mail.
+    Alleen als betaal_status = 'factuur_verstuurd' (niet als al betaald).
+    """
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # Check betaal_status
+    cur.execute("SELECT betaal_status FROM orders WHERE id = %s", (order_id,))
+    order = cur.fetchone()
+    
+    if not order or order.get("betaal_status") != "factuur_verstuurd":
+        # Niet factuur_verstuurd of al betaald, geen update nodig
+        return
+    
+    # Haal bestaande factuur op
+    cur.execute("""
+        SELECT id, mollie_payment_id, factuurnummer, klant_id
+        FROM facturen
+        WHERE order_id = %s
+        ORDER BY created_at DESC
+        LIMIT 1
+    """, (order_id,))
+    
+    factuur = cur.fetchone()
+    if not factuur:
+        return
+    
+    mollie_payment_id = factuur.get("mollie_payment_id")
+    factuurnummer = factuur.get("factuurnummer", "")
+    factuur_id = factuur.get("id")
+    
+    if not mollie_payment_id:
+        return
+    
+    # Annuleer oude Mollie payment
+    try:
+        cancel_payment(mollie_payment_id)
+        _LOG.info(f"Oude Mollie payment {mollie_payment_id} geannuleerd voor order {order_id}")
+    except Exception as e:
+        _LOG.warning(f"Kon oude Mollie payment niet annuleren: {e}")
+        # Ga door met nieuwe payment aanmaken
+    
+    # Haal order en klant info op voor nieuwe payment
+    cur.execute("""
+        SELECT o.ordernummer, o.bedrag_excl_btw, o.bedrag_btw, o.ordertype,
+               c.email as klant_email, c.naam as klant_naam
+        FROM orders o
+        LEFT JOIN contacten c ON o.klant_id = c.id
+        WHERE o.id = %s
+    """, (order_id,))
+    
+    order_info = cur.fetchone()
+    if not order_info:
+        return
+    
+    ordernummer = order_info.get("ordernummer", "")
+    ordertype = order_info.get("ordertype") or "b2c"
+    klant_email = order_info.get("klant_email")
+    
+    if not klant_email:
+        _LOG.warning(f"Geen email voor klant bij factuur update order {order_id}")
+        return
+    
+    # Maak nieuwe Mollie payment
+    try:
+        payment = create_payment(
+            amount=nieuwe_totaal,
+            description=f"Factuur {factuurnummer}",
+            redirect_url="https://fth-portaal-production.up.railway.app/betaling/bedankt",
+            webhook_url="https://fth-portaal-production.up.railway.app/webhooks/mollie",
+            metadata={"order_id": str(order_id)}
+        )
+        
+        nieuwe_mollie_payment_id = payment["id"]
+        nieuwe_mollie_checkout_url = payment["checkout_url"]
+        
+        # Update factuur record
+        cur.execute("""
+            UPDATE facturen
+            SET mollie_payment_id = %s,
+                mollie_checkout_url = %s,
+                totaal_bedrag = %s,
+                bedrag_excl_btw = %s,
+                bedrag_btw = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (
+            nieuwe_mollie_payment_id,
+            nieuwe_mollie_checkout_url,
+            nieuwe_totaal,
+            float(order_info.get("bedrag_excl_btw", 0)),
+            float(order_info.get("bedrag_btw", 0)),
+            factuur_id
+        ))
+        
+        conn.commit()
+        
+        # Stuur nieuwe factuurmail
+        if ordertype == "b2b":
+            mail_body = f"""
+            <html>
+            <body>
+                <h2>Factuur {factuurnummer} (gewijzigd)</h2>
+                <p>Beste {order_info.get('klant_naam', '')},</p>
+                <p>De factuur voor uw bestelling {ordernummer} is gewijzigd.</p>
+                <p><strong>Nieuw te betalen bedrag: € {nieuwe_totaal:,.2f}</strong></p>
+                <p>U kunt betalen via de onderstaande betaallink:</p>
+                <p><a href="{nieuwe_mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
+                <p>Of maak het bedrag over naar:</p>
+                <p><strong>Rekeningnummer:</strong> NL91ABNA0417164300<br>
+                <strong>Ten name van:</strong> Treatlab VOF</p>
+                <p>Met vriendelijke groet,<br>FTH Portaal</p>
+            </body>
+            </html>
+            """
+        else:
+            mail_body = f"""
+            <html>
+            <body>
+                <h2>Factuur {factuurnummer} (gewijzigd)</h2>
+                <p>Beste {order_info.get('klant_naam', '')},</p>
+                <p>De factuur voor uw bestelling {ordernummer} is gewijzigd.</p>
+                <p><strong>Nieuw te betalen bedrag: € {nieuwe_totaal:,.2f}</strong></p>
+                <p>U kunt betalen via de onderstaande betaallink:</p>
+                <p><a href="{nieuwe_mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
+                <p>Met vriendelijke groet,<br>FTH Portaal</p>
+            </body>
+            </html>
+            """
+        
+        # Verstuur mail in background
+        background_tasks.add_task(
+            stuur_mail,
+            naar=klant_email,
+            onderwerp=f"Factuur {factuurnummer} gewijzigd - {ordernummer}",
+            inhoud=mail_body,
+            order_id=order_id,
+            template_naam="Factuur gewijzigd"
+        )
+        
+        # Log in mail_logs
+        cur.execute("""
+            INSERT INTO mail_logs (order_id, onderwerp, status, foutmelding)
+            VALUES (%s, %s, %s, %s)
+        """, (
+            order_id,
+            f"Factuur bijgewerkt na orderwijziging - Nieuwe payment {nieuwe_mollie_payment_id}",
+            "success",
+            None
+        ))
+        conn.commit()
+        
+        _LOG.info(f"Factuur bijgewerkt voor order {order_id} - Nieuwe payment {nieuwe_mollie_payment_id}")
+        
+    except Exception as e:
+        _LOG.error(f"Fout bij updaten factuur voor order {order_id}: {e}", exc_info=True)
+        conn.rollback()
 
 
 @router.get("/{order_id}", response_class=HTMLResponse)
@@ -194,12 +354,18 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
             cur.execute("SELECT id FROM facturen WHERE order_id = %s LIMIT 1", (order_id,))
             heeft_factuur = cur.fetchone()
             
-            if betaal_status in ["factuur_verstuurd", "betaald"] and heeft_factuur:
+            if betaal_status == "betaald":
+                # Al betaald, geen wijziging mogelijk
+                factuur_knoppen = '<p style="color:#666;">Order al betaald - geen wijzigingen mogelijk</p>'
+            elif betaal_status == "factuur_verstuurd" and heeft_factuur:
                 # Factuur al verstuurd, toon "nogmaals versturen" knop
                 factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur-nogmaals?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur factuur nogmaals</button></form>'
             elif not betaal_status or betaal_status == "onbetaald":
                 # Nog geen factuur verstuurd, toon normale knop
                 if not heeft_factuur:
+                    factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur factuur</button></form>'
+                else:
+                    # Factuur bestaat maar nog niet verstuurd, toon "verstuur factuur" knop
                     factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur factuur</button></form>'
         
         html_content = f"""
@@ -448,6 +614,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
 async def artikel_toevoegen(
     request: Request,
     order_id: str,
+    background_tasks: BackgroundTasks,
     verified: bool = Depends(verify_admin_session),
     artikel_id: str = Form(...),
     aantal: float = Form(...)
@@ -494,6 +661,13 @@ async def artikel_toevoegen(
         
         conn.commit()
         
+        # Update factuur als nodig (alleen als betaal_status = 'factuur_verstuurd')
+        try:
+            update_factuur_bij_orderwijziging(order_id, totals["totaal_bedrag"], conn, background_tasks)
+        except Exception as e:
+            _LOG.error(f"Fout bij updaten factuur na artikel toevoegen: {e}", exc_info=True)
+            # Ga door, dit is niet kritiek voor de redirect
+        
         return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
         
     except HTTPException:
@@ -514,6 +688,7 @@ async def artikel_verwijderen(
     request: Request,
     order_id: str,
     artikel_line_id: str,
+    background_tasks: BackgroundTasks,
     verified: bool = Depends(verify_admin_session)
 ):
     """Verwijder artikel regel uit order"""
@@ -539,6 +714,13 @@ async def artikel_verwijderen(
         """, (totals["totaal_bedrag"], totals["bedrag_excl_btw"], totals["bedrag_btw"], order_id))
         
         conn.commit()
+        
+        # Update factuur als nodig (alleen als betaal_status = 'factuur_verstuurd')
+        try:
+            update_factuur_bij_orderwijziging(order_id, totals["totaal_bedrag"], conn, background_tasks)
+        except Exception as e:
+            _LOG.error(f"Fout bij updaten factuur na artikel verwijderen: {e}", exc_info=True)
+            # Ga door, dit is niet kritiek voor de redirect
         
         return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
         
@@ -764,13 +946,75 @@ async def verstuur_factuur(
         if order.get("status") != "sale":
             raise HTTPException(status_code=400, detail="Order moet bevestigd zijn (status = sale) voordat factuur verstuurd kan worden")
         
+        # Check betaal_status
+        betaal_status = order.get("betaal_status")
+        if betaal_status == "betaald":
+            raise HTTPException(status_code=400, detail="Order al betaald - geen wijzigingen mogelijk")
+        
         # Check of er al een factuur is
         cur.execute("""
-            SELECT id FROM facturen WHERE order_id = %s LIMIT 1
+            SELECT id, mollie_checkout_url, factuurnummer, totaal_bedrag
+            FROM facturen WHERE order_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
         """, (order_id,))
         
-        if cur.fetchone():
-            raise HTTPException(status_code=400, detail="Er is al een factuur verstuurd voor deze order")
+        bestaande_factuur = cur.fetchone()
+        
+        if bestaande_factuur and betaal_status == "factuur_verstuurd":
+            # Factuur bestaat al en is verstuurd, stuur bestaande link opnieuw
+            mollie_checkout_url = bestaande_factuur.get("mollie_checkout_url")
+            factuurnummer = bestaande_factuur.get("factuurnummer", "")
+            totaal_bedrag = float(bestaande_factuur.get("totaal_bedrag", 0))
+            ordertype = order.get("ordertype") or "b2c"
+            
+            if not mollie_checkout_url:
+                raise HTTPException(status_code=400, detail="Factuur heeft geen Mollie betaallink")
+            
+            # Maak mail body (zelfde als verstuur-factuur-nogmaals)
+            if ordertype == "b2b":
+                mail_body = f"""
+                <html>
+                <body>
+                    <h2>Factuur {factuurnummer}</h2>
+                    <p>Beste {order.get('klant_naam', '')},</p>
+                    <p>Bij deze ontvangt u de factuur voor uw bestelling {order.get('ordernummer', '')}.</p>
+                    <p><strong>Te betalen bedrag: € {totaal_bedrag:,.2f}</strong></p>
+                    <p>U kunt betalen via de onderstaande betaallink:</p>
+                    <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
+                    <p>Of maak het bedrag over naar:</p>
+                    <p><strong>Rekeningnummer:</strong> NL91ABNA0417164300<br>
+                    <strong>Ten name van:</strong> Treatlab VOF</p>
+                    <p>Met vriendelijke groet,<br>FTH Portaal</p>
+                </body>
+                </html>
+                """
+            else:
+                mail_body = f"""
+                <html>
+                <body>
+                    <h2>Factuur {factuurnummer}</h2>
+                    <p>Beste {order.get('klant_naam', '')},</p>
+                    <p>Bij deze ontvangt u de factuur voor uw bestelling {order.get('ordernummer', '')}.</p>
+                    <p><strong>Te betalen bedrag: € {totaal_bedrag:,.2f}</strong></p>
+                    <p>U kunt betalen via de onderstaande betaallink:</p>
+                    <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
+                    <p>Met vriendelijke groet,<br>FTH Portaal</p>
+                </body>
+                </html>
+                """
+            
+            # Verstuur mail in background
+            background_tasks.add_task(
+                stuur_mail,
+                naar=klant_email,
+                onderwerp=f"Factuur {factuurnummer} - {order.get('ordernummer', '')}",
+                inhoud=mail_body,
+                order_id=order_id,
+                template_naam="Factuur"
+            )
+            
+            return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
         
         klant_email = order.get("klant_email")
         if not klant_email:
