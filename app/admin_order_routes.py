@@ -103,9 +103,16 @@ def update_factuur_bij_orderwijziging(order_id: str, nieuwe_totaal: float, conn,
         return
     
     # Annuleer oude Mollie payment
+    oude_payment_id = mollie_payment_id
     try:
-        cancel_payment(mollie_payment_id)
-        _LOG.info(f"Oude Mollie payment {mollie_payment_id} geannuleerd voor order {order_id}")
+        cancel_success = cancel_payment(mollie_payment_id)
+        if cancel_success:
+            _LOG.info(f"Oude Mollie payment {mollie_payment_id} geannuleerd voor order {order_id}")
+            # Wacht 1 seconde zodat Mollie tijd heeft om te verwerken
+            import time
+            time.sleep(1)
+        else:
+            _LOG.warning(f"Oude Mollie payment {mollie_payment_id} kon niet geannuleerd worden (waarschijnlijk al betaald/expired)")
     except Exception as e:
         _LOG.warning(f"Kon oude Mollie payment niet annuleren: {e}")
         # Ga door met nieuwe payment aanmaken
