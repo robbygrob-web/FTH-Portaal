@@ -993,11 +993,11 @@ async def artikel_toevoegen(
         if not artikel:
             raise HTTPException(status_code=404, detail="Artikel niet gevonden")
         
-        # Bereken prijzen
-        prijs_excl = float(artikel.get("prijs_excl", 0))
+        # Gebruik prijzen per stuk uit artikelen tabel
+        prijs_excl = float(artikel.get("prijs_excl", 0))  # Prijs per stuk
         btw_pct = float(artikel.get("btw_pct", 9.00))
-        btw_bedrag = (prijs_excl * aantal) * (btw_pct / 100)
-        prijs_incl = (prijs_excl * aantal) + btw_bedrag
+        btw_bedrag = float(artikel.get("btw_bedrag", 0))  # BTW bedrag per stuk
+        prijs_incl = float(artikel.get("prijs_incl", 0))  # Prijs per stuk
         
         # Voeg artikel toe
         cur.execute("""
