@@ -331,7 +331,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                 <td>€ {prijs_incl:,.2f}</td>
                 <td>€ {totaal_regel:,.2f}</td>
                 <td>
-                    <form method="post" action="/admin/order/{order_id}/artikel-verwijderen/{artikel_id}?token={SESSION_SECRET}" style="display:inline;" onsubmit="sessionStorage.setItem('bedrag_voor_redirect', document.querySelector('.section table tr:last-child td:nth-child(4)').textContent.replace(/[^0-9,.-]/g, '').replace(',', '.'));">
+                    <form method="post" action="/admin/order/{order_id}/artikel-verwijderen/{artikel_id}?token={SESSION_SECRET}" style="display:inline;">
                         <button type="submit" style="background:#dc3545;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">Verwijder</button>
                     </form>
                 </td>
@@ -623,7 +623,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     </tbody>
                 </table>
                 
-                <form method="post" action="/admin/order/{order_id}/artikel-toevoegen?token={SESSION_SECRET}" class="add-artikel-form" onsubmit="sessionStorage.setItem('bedrag_voor_redirect', document.querySelector('.section table tr:last-child td:nth-child(4)').textContent.replace(/[^0-9,.-]/g, '').replace(',', '.'));">
+                <form method="post" action="/admin/order/{order_id}/artikel-toevoegen?token={SESSION_SECRET}" class="add-artikel-form">
                     <select name="artikel_id" required>
                         {artikel_options}
                     </select>
