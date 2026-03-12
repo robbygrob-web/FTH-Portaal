@@ -298,6 +298,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
             <div class="header">
                 <a href="/admin?token={SESSION_SECRET}" class="back-link">← Terug naar dashboard</a>
                 <h1>Aanvraag: {order.get('ordernummer', 'N/A')}</h1>
+                {f'<p style="color:#666;margin-top:5px;font-size:14px;">GF Referentie: {order.get("gf_referentie", "-")}</p>' if order.get('gf_referentie') else ''}
             </div>
             
             <div class="section">

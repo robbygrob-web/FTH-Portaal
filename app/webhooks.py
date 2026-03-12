@@ -230,6 +230,17 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
         
         _LOG.info(f"Gravity Forms webhook ontvangen: {body}")
         
+        # Haal Gravity Forms referentie op (entry_id of entryId)
+        gf_referentie = (
+            body.get("entry_id") or
+            body.get("entryId") or
+            body.get("entry") or
+            body.get("id") or
+            None
+        )
+        if gf_referentie:
+            _LOG.info(f"Gravity Forms referentie gevonden: {gf_referentie}")
+        
         # Haal database connectie
         try:
             database_url = get_database_url()
@@ -447,9 +458,10 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     klant_id, plaats, aantal_personen, aantal_kinderen,
                     ordertype, opmerkingen,
                 utm_source, utm_medium, utm_campaign, utm_content,
-                totaal_bedrag, bedrag_excl_btw, bedrag_btw
+                totaal_bedrag, bedrag_excl_btw, bedrag_btw,
+                gf_referentie
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             ) RETURNING id
             """, (
                 ordernummer,
@@ -470,7 +482,8 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 utm_content,  # utm_content
                 totaal_bedrag_calc,  # totaal_bedrag (berekend uit veld '7' of '10')
                 bedrag_excl_btw,  # bedrag_excl_btw (berekend)
-                bedrag_btw  # bedrag_btw (berekend)
+                bedrag_btw,  # bedrag_btw (berekend)
+                gf_referentie  # gf_referentie (Gravity Forms entry ID)
             ))
             
             result = cur.fetchone()
