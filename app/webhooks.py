@@ -292,26 +292,36 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
         # - Locatie: veld '29.3' (stad)
         # - Aantal personen: veld '68'
         
-        # Parse datum/tijd evenement (veld 48)
-        event_date_str = (
-            body.get("48") or  # Datum veld
-            body.get("event_date") or 
-            body.get("Event Date") or 
-            body.get("datum") or 
-            body.get("Datum")
-        )
+        # Parse datum/tijd evenement (veld 48 + 63)
+        event_date_str = body.get("48")  # Datum veld
+        event_time_str = body.get("63")  # Tijd veld
+        
         leverdatum = None
         if event_date_str:
             try:
-                # Probeer verschillende datum formaten
-                for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%d-%m-%Y %H:%M", "%d-%m-%Y"]:
-                    try:
-                        leverdatum = datetime.strptime(str(event_date_str), fmt)
-                        break
-                    except ValueError:
-                        continue
+                # Combineer datum en tijd
+                if event_time_str:
+                    # Combineer datum en tijd
+                    combined_datetime = f"{event_date_str} {event_time_str}"
+                    # Probeer verschillende datum/tijd formaten
+                    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d-%m-%Y %H:%M:%S", "%d-%m-%Y %H:%M"]:
+                        try:
+                            leverdatum = datetime.strptime(combined_datetime, fmt)
+                            break
+                        except ValueError:
+                            continue
+                
+                # Als alleen datum, probeer datum formaten
                 if not leverdatum:
-                    _LOG.warning(f"Kon datum niet parsen: {event_date_str}")
+                    for fmt in ["%Y-%m-%d", "%d-%m-%Y"]:
+                        try:
+                            leverdatum = datetime.strptime(str(event_date_str), fmt)
+                            break
+                        except ValueError:
+                            continue
+                
+                if not leverdatum:
+                    _LOG.warning(f"Kon datum niet parsen: {event_date_str} / {event_time_str}")
             except Exception as e:
                 _LOG.warning(f"Fout bij parsen datum: {e}")
         
@@ -347,25 +357,13 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
         except (ValueError, TypeError):
             aantal_personen = 0
         
-        aantal_kinderen = (
-            body.get("aantal_kinderen") or 
-            body.get("Aantal kinderen") or 
-            body.get("kinderen") or 
-            0
-        )
+        aantal_kinderen = body.get("80") or 0
         try:
             aantal_kinderen = int(aantal_kinderen)
         except (ValueError, TypeError):
             aantal_kinderen = 0
         
-        opmerkingen = (
-            body.get("opmerkingen") or 
-            body.get("Opmerkingen") or 
-            body.get("notes") or 
-            body.get("Notes") or 
-            body.get("message") or 
-            ""
-        )
+        opmerkingen = body.get("31") or ""
         
         # Haal prijsbedragen op (veld '7' en '10' bevatten prijsdata)
         # Probeer verschillende mogelijke veldnamen voor totaal bedrag
