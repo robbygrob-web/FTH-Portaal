@@ -6,7 +6,9 @@ import logging
 import traceback
 import uuid
 import random
+import json
 from datetime import datetime
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, Header, Request, Form
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from typing import Optional
@@ -14,6 +16,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from app.odoo_client import get_odoo_client
 from app.config import SESSION_SECRET
+from app.mail import stuur_mail
 
 _LOG = logging.getLogger(__name__)
 
