@@ -539,36 +539,75 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                 }}
             </style>
             <script>
-                (function() {{
+                document.addEventListener('DOMContentLoaded', function() {{
+                    console.log('DOM geladen, initialiseer opslaan knop...');
+                    
                     const orderId = '{order_id}';
                     const token = '{SESSION_SECRET}';
                     let hasChanges = false;
                     
+                    // Get elements after DOM is loaded
+                    const plaatsEl = document.getElementById('plaats');
+                    const leverdatumEl = document.getElementById('leverdatum');
+                    const aantalPersonenEl = document.getElementById('aantal_personen');
+                    const aantalKinderenEl = document.getElementById('aantal_kinderen');
+                    const opmerkingenEl = document.getElementById('opmerkingen');
+                    const saveBtn = document.getElementById('saveBtn');
+                    
+                    // Check if elements exist
+                    if (!plaatsEl || !leverdatumEl || !aantalPersonenEl || !aantalKinderenEl || !opmerkingenEl || !saveBtn) {{
+                        console.error('Niet alle elementen gevonden:', {{
+                            plaats: !!plaatsEl,
+                            leverdatum: !!leverdatumEl,
+                            aantalPersonen: !!aantalPersonenEl,
+                            aantalKinderen: !!aantalKinderenEl,
+                            opmerkingen: !!opmerkingenEl,
+                            saveBtn: !!saveBtn
+                        }});
+                        return;
+                    }}
+                    
                     // Store original values
                     const originalValues = {{
-                        plaats: document.getElementById('plaats').value,
-                        leverdatum: document.getElementById('leverdatum').value,
-                        aantal_personen: document.getElementById('aantal_personen').value,
-                        aantal_kinderen: document.getElementById('aantal_kinderen').value,
-                        opmerkingen: document.getElementById('opmerkingen').value
+                        plaats: plaatsEl.value,
+                        leverdatum: leverdatumEl.value,
+                        aantal_personen: aantalPersonenEl.value,
+                        aantal_kinderen: aantalKinderenEl.value,
+                        opmerkingen: opmerkingenEl.value
                     }};
                     
-                    const saveBtn = document.getElementById('saveBtn');
-                    const editableFields = document.querySelectorAll('.editable-field');
+                    console.log('Original values:', originalValues);
                     
-                    // Check for changes
+                    // Get all editable fields using querySelectorAll
+                    const editableFields = document.querySelectorAll('input.editable-field, textarea.editable-field');
+                    console.log('Gevonden editable fields:', editableFields.length);
+                    
+                    // Check for changes function
                     function checkChanges() {{
+                        console.log('checkChanges called');
+                        
+                        const currentValues = {{
+                            plaats: plaatsEl.value,
+                            leverdatum: leverdatumEl.value,
+                            aantal_personen: aantalPersonenEl.value,
+                            aantal_kinderen: aantalKinderenEl.value,
+                            opmerkingen: opmerkingenEl.value
+                        }};
+                        
                         hasChanges = 
-                            document.getElementById('plaats').value !== originalValues.plaats ||
-                            document.getElementById('leverdatum').value !== originalValues.leverdatum ||
-                            document.getElementById('aantal_personen').value !== originalValues.aantal_personen ||
-                            document.getElementById('aantal_kinderen').value !== originalValues.aantal_kinderen ||
-                            document.getElementById('opmerkingen').value !== originalValues.opmerkingen;
+                            currentValues.plaats !== originalValues.plaats ||
+                            currentValues.leverdatum !== originalValues.leverdatum ||
+                            currentValues.aantal_personen !== originalValues.aantal_personen ||
+                            currentValues.aantal_kinderen !== originalValues.aantal_kinderen ||
+                            currentValues.opmerkingen !== originalValues.opmerkingen;
+                        
+                        console.log('Has changes:', hasChanges);
                         
                         if (hasChanges) {{
                             saveBtn.disabled = false;
                             saveBtn.textContent = 'Opslaan';
                             saveBtn.className = 'save-btn orange';
+                            console.log('Knop geactiveerd (oranje)');
                         }} else {{
                             saveBtn.disabled = true;
                             saveBtn.textContent = 'Geen wijzigingen';
@@ -576,23 +615,33 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                         }}
                     }}
                     
-                    // Add change listeners
+                    // Add change listeners to all editable fields
                     editableFields.forEach(field => {{
-                        field.addEventListener('input', checkChanges);
-                        field.addEventListener('change', checkChanges);
+                        console.log('Event listener toegevoegd aan:', field.id || field.name);
+                        field.addEventListener('input', function() {{
+                            console.log('Input event op:', field.id || field.name);
+                            checkChanges();
+                        }});
+                        field.addEventListener('change', function() {{
+                            console.log('Change event op:', field.id || field.name);
+                            checkChanges();
+                        }});
                     }});
                     
                     // Save handler
                     saveBtn.addEventListener('click', async function() {{
+                        console.log('Save button clicked, hasChanges:', hasChanges);
                         if (!hasChanges) return;
                         
                         const data = {{
-                            plaats: document.getElementById('plaats').value,
-                            leverdatum: document.getElementById('leverdatum').value,
-                            aantal_personen: parseInt(document.getElementById('aantal_personen').value) || 0,
-                            aantal_kinderen: parseInt(document.getElementById('aantal_kinderen').value) || 0,
-                            opmerkingen: document.getElementById('opmerkingen').value
+                            plaats: plaatsEl.value,
+                            leverdatum: leverdatumEl.value,
+                            aantal_personen: parseInt(aantalPersonenEl.value) || 0,
+                            aantal_kinderen: parseInt(aantalKinderenEl.value) || 0,
+                            opmerkingen: opmerkingenEl.value
                         }};
+                        
+                        console.log('Sending data:', data);
                         
                         try {{
                             const response = await fetch(`/admin/order/${{orderId}}/opslaan?token=${{token}}`, {{
@@ -604,6 +653,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             }});
                             
                             const result = await response.json();
+                            console.log('Response:', result);
                             
                             if (result.success) {{
                                 // Update original values
@@ -628,10 +678,13 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                                 alert('Fout bij opslaan: ' + (result.detail || 'Onbekende fout'));
                             }}
                         }} catch (error) {{
+                            console.error('Error:', error);
                             alert('Fout bij opslaan: ' + error.message);
                         }}
                     }});
-                }})();
+                    
+                    console.log('Opslaan knop geïnitialiseerd');
+                }});
             </script>
         </head>
         <body>
