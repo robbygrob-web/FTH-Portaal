@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, Request, Form, BackgroundTasks
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from typing import Optional
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -277,7 +277,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         
         beschikbare_artikelen = cur.fetchall()
         
-        # Format datums
+        # Format datums voor display
         def format_datetime(dt):
             if not dt:
                 return "-"
@@ -285,7 +285,20 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                 return dt[:16]
             return dt.strftime("%Y-%m-%d %H:%M")
         
-        leverdatum = format_datetime(order.get("leverdatum"))
+        # Format datetime voor datetime-local input (YYYY-MM-DDTHH:MM)
+        def format_datetime_local(dt):
+            if not dt:
+                return ""
+            if isinstance(dt, str):
+                # Als het al een string is, probeer te converteren
+                try:
+                    dt = datetime.strptime(dt[:16], "%Y-%m-%d %H:%M")
+                except:
+                    return dt[:16].replace(" ", "T")
+            return dt.strftime("%Y-%m-%dT%H:%M")
+        
+        leverdatum_display = format_datetime(order.get("leverdatum"))
+        leverdatum_input = format_datetime_local(order.get("leverdatum"))
         order_datum = format_datetime(order.get("order_datum"))
         
         # Status info
@@ -481,13 +494,156 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     border: 2px solid #e0e0e0;
                     border-radius: 8px;
                 }}
+                .save-btn {{
+                    padding: 12px 24px;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                }}
+                .save-btn:disabled {{
+                    background: #e0e0e0;
+                    color: #999;
+                    cursor: not-allowed;
+                }}
+                .save-btn.orange {{
+                    background: #ff6b35;
+                    color: white;
+                }}
+                .save-btn.orange:hover {{
+                    background: #e55a2b;
+                }}
+                .save-btn.green {{
+                    background: #28a745;
+                    color: white;
+                }}
+                .editable-field {{
+                    width: 100%;
+                    padding: 8px;
+                    border: 2px solid #e0e0e0;
+                    border-radius: 6px;
+                    font-size: 16px;
+                    font-family: inherit;
+                    color: #333;
+                    background: white;
+                }}
+                .editable-field:focus {{
+                    outline: none;
+                    border-color: #fec82a;
+                }}
+                .editable-field textarea {{
+                    resize: vertical;
+                    min-height: 60px;
+                }}
             </style>
+            <script>
+                (function() {{
+                    const orderId = '{order_id}';
+                    const token = '{SESSION_SECRET}';
+                    let hasChanges = false;
+                    
+                    // Store original values
+                    const originalValues = {{
+                        plaats: document.getElementById('plaats').value,
+                        leverdatum: document.getElementById('leverdatum').value,
+                        aantal_personen: document.getElementById('aantal_personen').value,
+                        aantal_kinderen: document.getElementById('aantal_kinderen').value,
+                        opmerkingen: document.getElementById('opmerkingen').value
+                    }};
+                    
+                    const saveBtn = document.getElementById('saveBtn');
+                    const editableFields = document.querySelectorAll('.editable-field');
+                    
+                    // Check for changes
+                    function checkChanges() {{
+                        hasChanges = 
+                            document.getElementById('plaats').value !== originalValues.plaats ||
+                            document.getElementById('leverdatum').value !== originalValues.leverdatum ||
+                            document.getElementById('aantal_personen').value !== originalValues.aantal_personen ||
+                            document.getElementById('aantal_kinderen').value !== originalValues.aantal_kinderen ||
+                            document.getElementById('opmerkingen').value !== originalValues.opmerkingen;
+                        
+                        if (hasChanges) {{
+                            saveBtn.disabled = false;
+                            saveBtn.textContent = 'Opslaan';
+                            saveBtn.className = 'save-btn orange';
+                        }} else {{
+                            saveBtn.disabled = true;
+                            saveBtn.textContent = 'Geen wijzigingen';
+                            saveBtn.className = 'save-btn';
+                        }}
+                    }}
+                    
+                    // Add change listeners
+                    editableFields.forEach(field => {{
+                        field.addEventListener('input', checkChanges);
+                        field.addEventListener('change', checkChanges);
+                    }});
+                    
+                    // Save handler
+                    saveBtn.addEventListener('click', async function() {{
+                        if (!hasChanges) return;
+                        
+                        const data = {{
+                            plaats: document.getElementById('plaats').value,
+                            leverdatum: document.getElementById('leverdatum').value,
+                            aantal_personen: parseInt(document.getElementById('aantal_personen').value) || 0,
+                            aantal_kinderen: parseInt(document.getElementById('aantal_kinderen').value) || 0,
+                            opmerkingen: document.getElementById('opmerkingen').value
+                        }};
+                        
+                        try {{
+                            const response = await fetch(`/admin/order/${{orderId}}/opslaan?token=${{token}}`, {{
+                                method: 'POST',
+                                headers: {{
+                                    'Content-Type': 'application/json'
+                                }},
+                                body: JSON.stringify(data)
+                            }});
+                            
+                            const result = await response.json();
+                            
+                            if (result.success) {{
+                                // Update original values
+                                originalValues.plaats = data.plaats;
+                                originalValues.leverdatum = data.leverdatum;
+                                originalValues.aantal_personen = data.aantal_personen.toString();
+                                originalValues.aantal_kinderen = data.aantal_kinderen.toString();
+                                originalValues.opmerkingen = data.opmerkingen;
+                                
+                                // Show success state
+                                saveBtn.textContent = 'Opgeslagen ✓';
+                                saveBtn.className = 'save-btn green';
+                                hasChanges = false;
+                                
+                                // Reset after 3 seconds
+                                setTimeout(() => {{
+                                    saveBtn.disabled = true;
+                                    saveBtn.textContent = 'Geen wijzigingen';
+                                    saveBtn.className = 'save-btn';
+                                }}, 3000);
+                            }} else {{
+                                alert('Fout bij opslaan: ' + (result.detail || 'Onbekende fout'));
+                            }}
+                        }} catch (error) {{
+                            alert('Fout bij opslaan: ' + error.message);
+                        }}
+                    }});
+                }})();
+            </script>
         </head>
         <body>
             <div class="header">
                 <a href="/admin?token={SESSION_SECRET}" class="back-link">← Terug naar dashboard</a>
-                <h1>Aanvraag: {order.get('ordernummer', 'N/A')}</h1>
-                {f'<p style="color:#666;margin-top:5px;font-size:14px;">GF Referentie: {order.get("gf_referentie", "-")}</p>' if order.get('gf_referentie') else ''}
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <h1>Aanvraag: {order.get('ordernummer', 'N/A')}</h1>
+                        {f'<p style="color:#666;margin-top:5px;font-size:14px;">GF Referentie: {order.get("gf_referentie", "-")}</p>' if order.get('gf_referentie') else ''}
+                    </div>
+                    <button id="saveBtn" class="save-btn" disabled>Geen wijzigingen</button>
+                </div>
             </div>
             
             <div class="section">
@@ -507,23 +663,27 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     </div>
                     <div class="info-item">
                         <div class="info-label">Plaats</div>
-                        <div class="info-value">{order.get('plaats') or '-'}</div>
+                        <input type="text" id="plaats" class="editable-field" value="{order.get('plaats') or ''}" placeholder="Plaats">
                     </div>
                     <div class="info-item">
                         <div class="info-label">Leverdatum</div>
-                        <div class="info-value">{leverdatum}</div>
+                        <input type="datetime-local" id="leverdatum" class="editable-field" value="{leverdatum_input}" placeholder="Leverdatum">
                     </div>
                     <div class="info-item">
-                        <div class="info-label">Personen / Kinderen</div>
-                        <div class="info-value">{order.get('aantal_personen', 0)} / {order.get('aantal_kinderen', 0)}</div>
+                        <div class="info-label">Aantal personen</div>
+                        <input type="number" id="aantal_personen" class="editable-field" value="{order.get('aantal_personen', 0)}" min="0" placeholder="0">
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Aantal kinderen</div>
+                        <input type="number" id="aantal_kinderen" class="editable-field" value="{order.get('aantal_kinderen', 0)}" min="0" placeholder="0">
                     </div>
                     <div class="info-item">
                         <div class="info-label">Ordertype</div>
                         <div class="info-value">{order.get('ordertype', '-')}</div>
                     </div>
-                    <div class="info-item">
+                    <div class="info-item" style="grid-column: 1 / -1;">
                         <div class="info-label">Opmerkingen</div>
-                        <div class="info-value">{order.get('opmerkingen') or '-'}</div>
+                        <textarea id="opmerkingen" class="editable-field" rows="3" placeholder="Opmerkingen">{order.get('opmerkingen') or ''}</textarea>
                     </div>
                 </div>
             </div>
@@ -1177,6 +1337,80 @@ async def bevestig_order(
             conn.rollback()
         _LOG.error(f"Fout bij bevestigen order: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout bij bevestigen order: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/{order_id}/opslaan")
+async def opslaan_order(
+    request: Request,
+    order_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Sla order wijzigingen op"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Haal request body op
+        body = await request.json()
+        
+        plaats = body.get("plaats", "").strip()
+        leverdatum_str = body.get("leverdatum", "").strip()
+        aantal_personen = int(body.get("aantal_personen", 0)) if body.get("aantal_personen") else 0
+        aantal_kinderen = int(body.get("aantal_kinderen", 0)) if body.get("aantal_kinderen") else 0
+        opmerkingen = body.get("opmerkingen", "").strip()
+        
+        # Parse leverdatum (datetime-local format: YYYY-MM-DDTHH:MM)
+        leverdatum = None
+        if leverdatum_str:
+            try:
+                # Convert datetime-local to datetime
+                leverdatum = datetime.strptime(leverdatum_str, "%Y-%m-%dT%H:%M")
+            except ValueError:
+                # Try alternative format
+                try:
+                    leverdatum = datetime.strptime(leverdatum_str[:16], "%Y-%m-%d %H:%M")
+                except ValueError:
+                    _LOG.warning(f"Kon leverdatum niet parsen: {leverdatum_str}")
+        
+        # Update order
+        cur.execute("""
+            UPDATE orders
+            SET plaats = %s,
+                leverdatum = %s,
+                aantal_personen = %s,
+                aantal_kinderen = %s,
+                opmerkingen = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (
+            plaats if plaats else None,
+            leverdatum,
+            aantal_personen,
+            aantal_kinderen,
+            opmerkingen if opmerkingen else None,
+            order_id
+        ))
+        
+        conn.commit()
+        
+        return JSONResponse(content={"success": True})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij opslaan order: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "detail": f"Fout bij opslaan order: {str(e)}"}
+        )
     finally:
         if conn:
             cur.close()
