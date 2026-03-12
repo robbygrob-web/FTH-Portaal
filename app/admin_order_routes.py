@@ -227,7 +227,8 @@ def update_factuur_bij_orderwijziging(order_id: str, nieuwe_totaal: float, conn,
         ))
         conn.commit()
         
-        _LOG.info(f"Factuur bijgewerkt voor order {order_id} - Nieuwe payment {nieuwe_mollie_payment_id}")
+        # Log duidelijk
+        _LOG.info(f"Oude payment {oude_payment_id} geannuleerd, nieuwe payment {nieuwe_mollie_payment_id} aangemaakt voor order {order_id}")
         
     except Exception as e:
         _LOG.error(f"Fout bij updaten factuur voor order {order_id}: {e}", exc_info=True)
