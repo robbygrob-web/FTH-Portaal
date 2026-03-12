@@ -71,18 +71,23 @@ def calculate_btw_percentage(price_excl, price_incl):
 
 def verify_admin_session(request: Request):
     """Verifieer admin sessie via Authorization header of query param"""
+    # Check Authorization header (voor API calls)
     authorization = request.headers.get("Authorization")
     if authorization and authorization.startswith("Bearer "):
         token = authorization.replace("Bearer ", "").strip()
         if token == SESSION_SECRET:
             return True
     
-    # Check query param voor GET requests
+    # Check query param (voor GET requests in browser)
     token = request.query_params.get("token")
-    if token == SESSION_SECRET:
+    if token and token == SESSION_SECRET:
         return True
     
-    raise HTTPException(status_code=401, detail="Admin toegang vereist")
+    # Check session (voor toekomstige sessie-based auth)
+    if request.session.get("is_admin"):
+        return True
+    
+    raise HTTPException(status_code=401, detail="Admin toegang vereist. Voeg ?token=YOUR_SESSION_SECRET toe aan de URL.")
 
 
 @setup_router.post("/init-db")
