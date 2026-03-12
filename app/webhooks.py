@@ -286,6 +286,26 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
             _LOG.error(f"Database fout bij contact aanmaken: {e}")
             raise HTTPException(status_code=500, detail=f"Database fout: {str(e)}")
         
+        # Update contact adresvelden
+        try:
+            adres = body.get("29.1") or None
+            postcode = body.get("29.5") or None
+            land = body.get("29.6") or None
+            
+            if adres or postcode or land:
+                cur.execute("""
+                    UPDATE contacten 
+                    SET adres = COALESCE(%s, adres),
+                        postcode = COALESCE(%s, postcode),
+                        land = COALESCE(%s, land)
+                    WHERE id = %s
+                """, (adres, postcode, land, contact_id))
+                conn.commit()
+                _LOG.info(f"Contact adresvelden bijgewerkt voor contact {contact_id}")
+        except psycopg2.Error as e:
+            _LOG.warning(f"Fout bij updaten contact adresvelden: {e}")
+            # Niet kritiek, doorgaan met order aanmaken
+        
         # Stap 2: Maak order aan
         # Gravity Forms veld mapping:
         # - Datum: veld '48'
@@ -483,7 +503,7 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 plaats,
                 aantal_personen,
                 aantal_kinderen,
-                "b2c",  # ordertype (standaard b2c voor Gravity Forms)
+                "b2b" if body.get("81", "").lower() == "zakelijk" else "b2c",  # ordertype
                 opmerkingen,
                 utm_source,  # utm_source (echte UTM tracking data)
                 utm_medium,  # utm_medium
