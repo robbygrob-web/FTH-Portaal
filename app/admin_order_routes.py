@@ -484,6 +484,13 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                 .btn:hover {{
                     background: #e2af13;
                 }}
+                .btn.orange {{
+                    background: #ff6b35;
+                    color: white;
+                }}
+                .btn.orange:hover {{
+                    background: #e55a2b;
+                }}
                 .add-artikel-form {{
                     display: flex;
                     gap: 10px;
