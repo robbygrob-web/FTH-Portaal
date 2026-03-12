@@ -3,8 +3,8 @@ Admin klant detail endpoints.
 """
 import os
 import logging
-from fastapi import APIRouter, HTTPException, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, HTTPException, Depends, Request, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from app.config import SESSION_SECRET
@@ -26,7 +26,7 @@ async def klant_detail(request: Request, klant_id: str, verified: bool = Depends
         
         # Haal klant op
         cur.execute("""
-            SELECT id, naam, email, telefoon
+            SELECT id, naam, email, telefoon, adres, postcode, land
             FROM contacten
             WHERE id = %s
         """, (klant_id,))
@@ -163,6 +163,38 @@ async def klant_detail(request: Request, klant_id: str, verified: bool = Depends
                     color: #333;
                     font-weight: 500;
                 }}
+                input[type="text"],
+                input[type="email"] {{
+                    width: 100%;
+                    padding: 8px 12px;
+                    border: 2px solid #e0e0e0;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    font-family: inherit;
+                    transition: border-color 0.3s;
+                }}
+                input[type="text"]:focus,
+                input[type="email"]:focus {{
+                    outline: none;
+                    border-color: #e2af13;
+                }}
+                .save-button {{
+                    background: #fec82a;
+                    color: #333333;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    margin-top: 20px;
+                }}
+                .save-button:hover {{
+                    background: #e2af13;
+                }}
+                form {{
+                    margin-top: 10px;
+                }}
                 table {{
                     width: 100%;
                     border-collapse: collapse;
@@ -193,20 +225,35 @@ async def klant_detail(request: Request, klant_id: str, verified: bool = Depends
             
             <div class="section">
                 <h2>Klantgegevens</h2>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <div class="info-label">Naam</div>
-                        <div class="info-value">{klant.get('naam') or '-'}</div>
+                <form method="post" action="/admin/klant/{klant_id}?token={SESSION_SECRET}">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">Bedrijfsnaam</div>
+                            <input type="text" name="naam" value="{klant.get('naam') or ''}" />
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Email</div>
+                            <input type="email" name="email" value="{klant.get('email') or ''}" />
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Telefoon</div>
+                            <input type="text" name="telefoon" value="{klant.get('telefoon') or ''}" />
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Adres</div>
+                            <input type="text" name="adres" value="{klant.get('adres') or ''}" />
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Postcode</div>
+                            <input type="text" name="postcode" value="{klant.get('postcode') or ''}" />
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Land</div>
+                            <input type="text" name="land" value="{klant.get('land') or ''}" />
+                        </div>
                     </div>
-                    <div class="info-item">
-                        <div class="info-label">Email</div>
-                        <div class="info-value">{klant.get('email') or '-'}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Telefoon</div>
-                        <div class="info-value">{klant.get('telefoon') or '-'}</div>
-                    </div>
-                </div>
+                    <button type="submit" class="save-button">Opslaan</button>
+                </form>
             </div>
             
             <div class="section">
@@ -238,6 +285,55 @@ async def klant_detail(request: Request, klant_id: str, verified: bool = Depends
     except Exception as e:
         _LOG.error(f"Fout bij ophalen klant detail: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout bij ophalen klant: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/{klant_id}", response_class=HTMLResponse)
+async def klant_update(
+    request: Request,
+    klant_id: str,
+    naam: str = Form(None),
+    email: str = Form(None),
+    telefoon: str = Form(None),
+    adres: str = Form(None),
+    postcode: str = Form(None),
+    land: str = Form(None),
+    verified: bool = Depends(verify_admin_session)
+):
+    """Update klantgegevens"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        # Update klantgegevens
+        cur.execute("""
+            UPDATE contacten
+            SET naam = COALESCE(%s, naam),
+                email = COALESCE(%s, email),
+                telefoon = COALESCE(%s, telefoon),
+                adres = COALESCE(%s, adres),
+                postcode = COALESCE(%s, postcode),
+                land = COALESCE(%s, land),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (naam, email, telefoon, adres, postcode, land, klant_id))
+        
+        conn.commit()
+        
+        # Redirect terug naar klant detail pagina
+        token = request.query_params.get("token", SESSION_SECRET)
+        return RedirectResponse(url=f"/admin/klant/{klant_id}?token={token}", status_code=303)
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij updaten klant: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij updaten klant: {str(e)}")
     finally:
         if conn:
             cur.close()
