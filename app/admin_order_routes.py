@@ -1781,7 +1781,7 @@ async def verstuur_factuur_nogmaals(
         # Haal volledige factuur op incl. bedrag en payment ID
         cur.execute("""
             SELECT id, factuurnummer, mollie_checkout_url,
-                   mollie_payment_id, bedrag
+                   mollie_payment_id, totaal_bedrag
             FROM facturen
             WHERE order_id = %s
             ORDER BY created_at DESC LIMIT 1
@@ -1793,7 +1793,7 @@ async def verstuur_factuur_nogmaals(
                 detail="Geen factuur gevonden")
         
         factuurnummer = factuur.get("factuurnummer", "")
-        factuur_bedrag = float(factuur.get("bedrag") or 0)
+        factuur_bedrag = float(factuur.get("totaal_bedrag") or 0)
         
         print(f"VERS BEDRAG: {vers_bedrag}")
         print(f"FACTUUR BEDRAG: {factuur_bedrag}")
@@ -1824,7 +1824,7 @@ async def verstuur_factuur_nogmaals(
                 UPDATE facturen 
                 SET mollie_payment_id = %s,
                     mollie_checkout_url = %s,
-                    bedrag = %s
+                    totaal_bedrag = %s
                 WHERE id = %s
             """, (nieuw_payment_id, mollie_checkout_url, 
                   vers_bedrag, factuur["id"]))
