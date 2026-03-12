@@ -44,6 +44,12 @@ def load_template(template_name: str) -> Optional[str]:
         return None
 
 
+def is_definitief(order):
+    """Check of order definitief is: status = 'sale' EN portaal_status IN ('claimed', 'transfer')"""
+    return (order.get('status') == 'sale' and 
+            order.get('portaal_status') in ('claimed', 'transfer'))
+
+
 def calculate_order_totals(order_id: str, conn) -> dict:
     """Herbereken totaalprijs van order op basis van order_artikelen"""
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -369,10 +375,9 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         # Factuur knoppen
         factuur_knoppen = ""
         betaal_status = order.get("betaal_status")
-        portaal_status = order.get("portaal_status", "")
         
-        # Factuur alleen beschikbaar als order bevestigd is (status = sale) OF portaal_status in (sale, transfer, claimed)
-        if order_status == "sale" or portaal_status in ("sale", "transfer", "claimed"):
+        # Factuur alleen beschikbaar als order definitief is
+        if is_definitief(order):
             # Check of er al een factuur is
             cur.execute("SELECT id FROM facturen WHERE order_id = %s LIMIT 1", (order_id,))
             heeft_factuur = cur.fetchone()
@@ -1027,6 +1032,7 @@ async def wijzig_status(
 async def claim_order(
     request: Request,
     order_id: str,
+    background_tasks: BackgroundTasks,
     verified: bool = Depends(verify_admin_session)
 ):
     """Claim order voor Aardappeltuin (contractor_id = 87)"""
@@ -1035,6 +1041,18 @@ async def claim_order(
         database_url = get_database_url()
         conn = psycopg2.connect(database_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Haal order op om status te checken
+        cur.execute("""
+            SELECT o.status, o.ordernummer, c.email as klant_email, c.naam as klant_naam
+            FROM orders o
+            LEFT JOIN contacten c ON o.klant_id = c.id
+            WHERE o.id = %s
+        """, (order_id,))
+        order = cur.fetchone()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order niet gevonden")
         
         # Zoek Aardappeltuin contact (odoo_id = 87 of naam bevat "Aardappeltuin")
         cur.execute("SELECT id FROM contacten WHERE odoo_id = 87 OR naam ILIKE '%aardappeltuin%' LIMIT 1")
@@ -1052,6 +1070,35 @@ async def claim_order(
         """, (contractor_id, order_id))
         
         conn.commit()
+        
+        # Check of order.status = 'sale' na claimen
+        if order.get("status") == "sale":
+            # Stuur bevestigingsmail variant B
+            klant_email = order.get("klant_email")
+            klant_naam = order.get("klant_naam", "")
+            ordernummer = order.get("ordernummer", "")
+            
+            if klant_email:
+                mail_body = f"""
+                <html>
+                <body>
+                    <h2>Bevestigd! We komen bakken</h2>
+                    <p>Beste {klant_naam},</p>
+                    <p>Dank voor de opdracht!</p>
+                    <p>De beschikbaarheid is geverifieerd en we bevestigen bij deze: we komen bakken! :)</p>
+                    <p>Met vriendelijke groet,<br>FTH Portaal</p>
+                </body>
+                </html>
+                """
+                
+                background_tasks.add_task(
+                    stuur_mail,
+                    naar=klant_email,
+                    onderwerp=f"Bevestigd! We komen bakken — Friettruck-huren.nl",
+                    inhoud=mail_body,
+                    order_id=order_id,
+                    template_naam="Bevestiging"
+                )
         
         return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
         

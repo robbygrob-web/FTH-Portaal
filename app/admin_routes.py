@@ -702,6 +702,10 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                 o.leverdatum,
                 o.status,
                 o.portaal_status,
+                CASE WHEN o.status = 'sale' 
+                     AND o.portaal_status IN ('claimed','transfer') 
+                     THEN 'definitief'
+                     ELSE o.status END as offerte_status_label,
                 o.totaal_bedrag,
                 o.bedrag_excl_btw,
                 o.bedrag_btw,
@@ -746,6 +750,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             status_map = {
                 "sent": ("Offerte", "#3498db"),
                 "sale": ("Verkooporder", "#27ae60"),
+                "definitief": ("Definitief", "#27ae60"),  # Groen voor definitief
                 "draft": ("Concept", "#999")
             }
             return status_map.get(status, (status, "#999"))
@@ -754,7 +759,9 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
         table_rows = ""
         for order in orders:
             portaal_status_text, portaal_status_color = format_portaal_status(order.get("portaal_status", "nieuw"))
-            order_status_text, order_status_color = format_order_status(order.get("status", "draft"))
+            # Gebruik offerte_status_label (kan 'definitief' zijn) in plaats van status
+            offerte_status_label = order.get("offerte_status_label", order.get("status", "draft"))
+            order_status_text, order_status_color = format_order_status(offerte_status_label)
             
             ordernummer = order.get("ordernummer") or "-"
             klant_naam = order.get("klant_naam") or "-"
