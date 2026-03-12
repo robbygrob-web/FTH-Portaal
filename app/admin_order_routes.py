@@ -1526,6 +1526,7 @@ async def opslaan_order(
 
 @router.get("/{order_id}/totaal")
 async def get_order_totaal(
+    request: Request,
     order_id: str,
     verified: bool = Depends(verify_admin_session)
 ):
