@@ -935,24 +935,29 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             e.preventDefault();
                             console.log('Reset knop geklikt!');
                             
-                            // Bereken totaal uit artikelen tabel op pagina
+                            // Bereken totaal uit artikelen tabel op pagina (ALLE regels inclusief toeslag en reiskosten)
                             let totaal = 0;
                             document.querySelectorAll('table tbody tr').forEach(function(row) {{
                                 const cells = row.querySelectorAll('td');
+                                // Skip de "Totaal" rij (heeft "Totaal" in eerste cel)
+                                const eersteCel = cells[0] ? cells[0].textContent.trim() : '';
+                                if (eersteCel === 'Totaal' || eersteCel === '') {{
+                                    return; // Skip deze rij
+                                }}
                                 if (cells.length >= 4) {{
                                     const totaalCell = cells[3];
                                     const totaalText = totaalCell.textContent.trim();
                                     if (totaalText.startsWith('€')) {{
-                                        const bedrag = parseFloat(totaalText.replace('€', '').replace(/[.,]/g, function(match, offset, string) {{
-                                            return match === '.' ? '' : '.';
-                                        }}));
+                                        // Parse bedrag: vervang komma door punt voor parsing
+                                        const bedragText = totaalText.replace('€', '').trim().replace(',', '.');
+                                        const bedrag = parseFloat(bedragText);
                                         if (!isNaN(bedrag)) {{
                                             totaal += bedrag;
                                         }}
                                     }}
                                 }}
                             }});
-                            console.log('Totaal bedrag (uit artikelen tabel):', totaal);
+                            console.log('Totaal bedrag (uit artikelen tabel, incl. toeslag en reiskosten):', totaal);
                             
                             // Commissie berekening: 15% tot 575, daarna 20%
                             const commissie = (Math.min(totaal, 575) * 0.15) + (Math.max(totaal - 575, 0) * 0.20);

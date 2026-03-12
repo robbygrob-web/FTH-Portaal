@@ -622,93 +622,11 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     else:
                         _LOG.warning("Drankjes artikel niet gevonden in artikelen tabel")
                 
-                # Stap 4: Bereken totaalprijs op basis van order_artikelen
-                cur.execute("""
-                    SELECT naam, aantal, prijs_incl
-                    FROM order_artikelen
-                    WHERE order_id = %s
-                """, (order_id,))
-                order_artikelen = cur.fetchall()
-                
-                # Bereken subtotaal
-                pakketprijs = Decimal("0")
-                kinderpakket_prijs = Decimal("0")
-                broodjes_prijs = Decimal("0")
-                drankjes_prijs = Decimal("0")
-                reiskosten = Decimal("0")
-                
-                for oa in order_artikelen:
-                    naam = oa[0]
-                    aantal = Decimal(str(oa[1]))
-                    prijs_incl_per_stuk = Decimal(str(oa[2]))
-                    totaal_regel = aantal * prijs_incl_per_stuk
-                    
-                    if naam == "Reiskosten":
-                        reiskosten += totaal_regel
-                    elif "Kinderpakket" in naam:
-                        kinderpakket_prijs += totaal_regel
-                    elif naam == "Broodjes":
-                        broodjes_prijs += totaal_regel
-                    elif naam == "Drankjes":
-                        drankjes_prijs += totaal_regel
-                    else:
-                        # Pakket artikel
-                        pakketprijs += totaal_regel
-                
-                # Bereken subtotaal
-                subtotaal = pakketprijs + kinderpakket_prijs + broodjes_prijs + drankjes_prijs
-                
-                # Reiskosten = altijd 75.00
-                reiskosten = Decimal("75.00")
-                
-                # Totaal = subtotaal + reiskosten
-                totaal_bedrag_calc = subtotaal + reiskosten
-                
-                # Bereken prijs_partner (wat partner ontvangt, niet commissie)
-                # Commissie: 15% tot 575, daarna 20%
-                totaal_decimal = Decimal(str(totaal_bedrag_calc))
-                commissie_deel_1 = min(totaal_decimal, Decimal("575")) * Decimal("0.15")
-                commissie_deel_2 = max(totaal_decimal - Decimal("575"), Decimal("0")) * Decimal("0.20")
-                commissie_totaal = commissie_deel_1 + commissie_deel_2
-                prijs_partner = round(totaal_decimal - commissie_totaal, 2)
-                
-                # Bereken BTW bedragen
-                btw_pct = Decimal("9")
-                bedrag_excl_btw = totaal_bedrag_calc / (Decimal("1") + btw_pct / Decimal("100"))
-                bedrag_btw = totaal_bedrag_calc - bedrag_excl_btw
-                
-                # Update orders tabel met berekende bedragen
-                cur.execute("""
-                    UPDATE orders
-                    SET totaal_bedrag = %s,
-                        bedrag_excl_btw = %s,
-                        bedrag_btw = %s,
-                        prijs_partner = %s,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s
-                """, (
-                    float(totaal_bedrag_calc),
-                    float(bedrag_excl_btw),
-                    float(bedrag_btw),
-                    float(prijs_partner),
-                    order_id
-                ))
-                conn.commit()
-                
-                # Log berekening duidelijk
-                _LOG.info("=" * 60)
-                _LOG.info(f"[PRIJSBEREKENING] Order {ordernummer}")
-                _LOG.info(f"  Pakketprijs: € {float(pakketprijs):,.2f} ({aantal_personen} personen)")
-                _LOG.info(f"  Kinderpakket: € {float(kinderpakket_prijs):,.2f} ({aantal_kinderen} kinderen)")
-                _LOG.info(f"  Broodjes: € {float(broodjes_prijs):,.2f}")
-                _LOG.info(f"  Drankjes: € {float(drankjes_prijs):,.2f}")
-                _LOG.info(f"  Subtotaal: € {float(subtotaal):,.2f}")
-                _LOG.info(f"  Reiskosten: € {float(reiskosten):,.2f}")
-                _LOG.info(f"  TOTAAL: € {float(totaal_bedrag_calc):,.2f}")
-                _LOG.info(f"  Bedrag excl BTW: € {float(bedrag_excl_btw):,.2f}")
-                _LOG.info(f"  BTW bedrag: € {float(bedrag_btw):,.2f}")
-                _LOG.info(f"  Prijs partner: € {float(prijs_partner):,.2f}")
-                _LOG.info("=" * 60)
+                # Webhook slaat alleen artikelen op, geen totaal berekeningen
+                _LOG.info(f"[WEBHOOK] Order {ordernummer} aangemaakt met artikelen")
+                _LOG.info(f"  Aantal personen: {aantal_personen}")
+                _LOG.info(f"  Aantal kinderen: {aantal_kinderen}")
+                _LOG.info(f"  Artikelen opgeslagen in order_artikelen")
                         
             except psycopg2.Error as e:
                 _LOG.warning(f"Fout bij toevoegen order artikelen: {e}")
