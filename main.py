@@ -176,3 +176,11 @@ async def startup_event():
         asyncio.create_task(run_daily_factuur_check())
     except Exception as e:
         print(f"[WARNING] Factuur scheduler niet beschikbaar: {e}")
+    
+    # Voer database migratie 004 uit
+    try:
+        from scripts.run_migration_004 import run_migration_004
+        print("[STARTUP] Voer database migratie 004 uit...")
+        run_migration_004()
+    except Exception as e:
+        print(f"[WARNING] Migratie 004 niet beschikbaar: {e}")
