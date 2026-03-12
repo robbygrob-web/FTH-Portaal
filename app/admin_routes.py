@@ -1,13 +1,14 @@
 """
-Tijdelijk admin endpoint voor database setup en import.
-Wordt verwijderd na succesvolle import.
+Admin endpoints voor database setup, import en dashboard.
 """
 import os
 import logging
 import traceback
+import uuid
+import random
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, Header
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Depends, Header, Request, Form
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from typing import Optional
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -16,7 +17,10 @@ from app.config import SESSION_SECRET
 
 _LOG = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin/setup", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"])
+
+# Setup router voor init-db endpoint
+setup_router = APIRouter(prefix="/admin/setup", tags=["admin"])
 
 
 def verify_admin_token(authorization: Optional[str] = Header(None)):
@@ -65,7 +69,23 @@ def calculate_btw_percentage(price_excl, price_incl):
     return round((btw_amount / price_excl) * 100, 2)
 
 
-@router.post("/init-db")
+def verify_admin_session(request: Request):
+    """Verifieer admin sessie via Authorization header of query param"""
+    authorization = request.headers.get("Authorization")
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.replace("Bearer ", "").strip()
+        if token == SESSION_SECRET:
+            return True
+    
+    # Check query param voor GET requests
+    token = request.query_params.get("token")
+    if token == SESSION_SECRET:
+        return True
+    
+    raise HTTPException(status_code=401, detail="Admin toegang vereist")
+
+
+@setup_router.post("/init-db")
 async def init_database(verified: bool = Depends(verify_admin_token)):
     """
     Tijdelijk endpoint om order_artikelen tabel aan te maken en 10 orders te importeren.
@@ -431,6 +451,418 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
         full_error = f"{error_message}\n\nTraceback:\n{error_traceback}"
         _LOG.error(f"Fout tijdens database setup: {full_error}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout tijdens database setup: {full_error}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.get("", response_class=HTMLResponse)
+async def admin_dashboard(request: Request, verified: bool = Depends(verify_admin_session)):
+    """Admin dashboard met aanvragen lijst"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Haal orders op met contact informatie
+        cur.execute("""
+            SELECT 
+                o.id,
+                o.ordernummer,
+                o.order_datum,
+                o.leverdatum,
+                o.status,
+                o.portaal_status,
+                o.totaal_bedrag,
+                o.bedrag_excl_btw,
+                o.bedrag_btw,
+                o.plaats,
+                o.aantal_personen,
+                o.aantal_kinderen,
+                o.ordertype,
+                o.opmerkingen,
+                c.naam as klant_naam,
+                c.email as klant_email,
+                c.telefoon as klant_telefoon
+            FROM orders o
+            LEFT JOIN contacten c ON o.klant_id = c.id
+            ORDER BY o.created_at DESC
+            LIMIT 100
+        """)
+        
+        orders = cur.fetchall()
+        
+        # Format leverdatum
+        def format_datetime(dt):
+            if not dt:
+                return "-"
+            if isinstance(dt, str):
+                return dt[:16]  # YYYY-MM-DD HH:MM
+            return dt.strftime("%Y-%m-%d %H:%M")
+        
+        # Format status
+        def format_portaal_status(status):
+            status_map = {
+                "nieuw": ("Nieuw", "#3498db"),
+                "beschikbaar": ("Beschikbaar", "#27ae60"),
+                "claimed": ("Geclaimd", "#e67e22"),
+                "transfer": ("Transfer", "#9b59b6")
+            }
+            return status_map.get(status, (status, "#999"))
+        
+        def format_order_status(status):
+            status_map = {
+                "sent": ("Offerte", "#3498db"),
+                "sale": ("Verkooporder", "#27ae60"),
+                "draft": ("Concept", "#999")
+            }
+            return status_map.get(status, (status, "#999"))
+        
+        # Build HTML table rows
+        table_rows = ""
+        for order in orders:
+            portaal_status_text, portaal_status_color = format_portaal_status(order.get("portaal_status", "nieuw"))
+            order_status_text, order_status_color = format_order_status(order.get("status", "draft"))
+            
+            klant_naam = order.get("klant_naam") or "-"
+            plaats = order.get("plaats") or "-"
+            leverdatum = format_datetime(order.get("leverdatum"))
+            personen = order.get("aantal_personen", 0)
+            kinderen = order.get("aantal_kinderen", 0)
+            totaal = float(order.get("totaal_bedrag", 0))
+            
+            table_rows += f"""
+            <tr>
+                <td>{klant_naam}</td>
+                <td>{plaats}</td>
+                <td>{leverdatum}</td>
+                <td>{personen} / {kinderen}</td>
+                <td>€ {totaal:,.2f}</td>
+                <td><span style="color:{portaal_status_color};">{portaal_status_text}</span></td>
+                <td><span style="color:{order_status_color};">{order_status_text}</span></td>
+                <td>-</td>
+            </tr>
+            """
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>FTH Admin - Aanvragen</title>
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: #fffdf2;
+                    padding: 20px;
+                }}
+                .header {{
+                    background: white;
+                    padding: 20px;
+                    border-radius: 12px;
+                    margin-bottom: 20px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }}
+                h1 {{
+                    color: #333333;
+                    font-size: 24px;
+                }}
+                .btn {{
+                    padding: 12px 24px;
+                    background: #fec82a;
+                    color: #333333;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    text-decoration: none;
+                    display: inline-block;
+                }}
+                .btn:hover {{
+                    background: #e2af13;
+                }}
+                .table-container {{
+                    background: white;
+                    border-radius: 12px;
+                    padding: 20px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    overflow-x: auto;
+                }}
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                }}
+                th {{
+                    text-align: left;
+                    padding: 12px;
+                    background: #f5f5f5;
+                    font-weight: 600;
+                    color: #333;
+                    border-bottom: 2px solid #e0e0e0;
+                }}
+                td {{
+                    padding: 12px;
+                    border-bottom: 1px solid #e0e0e0;
+                }}
+                tr:hover {{
+                    background: #f9f9f9;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Admin Dashboard - Aanvragen</h1>
+                <a href="/admin/nieuw?token={SESSION_SECRET}" class="btn">Nieuwe aanvraag</a>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Naam klant</th>
+                            <th>Plaats</th>
+                            <th>Leverdatum + tijd</th>
+                            <th>Aantal personen / kinderen</th>
+                            <th>Totaalprijs incl. BTW</th>
+                            <th>Status aanvraag</th>
+                            <th>Status offerte</th>
+                            <th>Status betaling</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {table_rows if table_rows else '<tr><td colspan="8" style="text-align:center;padding:40px;">Geen aanvragen gevonden</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        _LOG.error(f"Fout bij ophalen admin dashboard: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij ophalen dashboard: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.get("/nieuw", response_class=HTMLResponse)
+async def nieuwe_aanvraag_form(request: Request, verified: bool = Depends(verify_admin_session)):
+    """Formulier voor nieuwe aanvraag"""
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="nl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>FTH Admin - Nieuwe Aanvraag</title>
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #fffdf2;
+                padding: 20px;
+            }}
+            .container {{
+                max-width: 800px;
+                margin: 0 auto;
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }}
+            h1 {{
+                color: #333333;
+                margin-bottom: 30px;
+            }}
+            .form-group {{
+                margin-bottom: 20px;
+            }}
+            label {{
+                display: block;
+                margin-bottom: 8px;
+                color: #333;
+                font-weight: 500;
+            }}
+            input[type="text"],
+            input[type="email"],
+            input[type="tel"],
+            input[type="datetime-local"],
+            input[type="number"],
+            textarea,
+            select {{
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e0e0e0;
+                border-radius: 8px;
+                font-size: 16px;
+            }}
+            textarea {{
+                min-height: 100px;
+                resize: vertical;
+            }}
+            .btn {{
+                padding: 12px 24px;
+                background: #fec82a;
+                color: #333333;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 700;
+                cursor: pointer;
+            }}
+            .btn:hover {{
+                background: #e2af13;
+            }}
+            .btn-secondary {{
+                background: #ccc;
+                margin-left: 10px;
+            }}
+            .btn-secondary:hover {{
+                background: #999;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Nieuwe Aanvraag</h1>
+            <form method="post" action="/admin/nieuw?token={SESSION_SECRET}">
+                <div class="form-group">
+                    <label for="klant_naam">Naam klant *</label>
+                    <input type="text" id="klant_naam" name="klant_naam" required>
+                </div>
+                <div class="form-group">
+                    <label for="klant_email">Email klant *</label>
+                    <input type="email" id="klant_email" name="klant_email" required>
+                </div>
+                <div class="form-group">
+                    <label for="klant_telefoon">Telefoon klant</label>
+                    <input type="tel" id="klant_telefoon" name="klant_telefoon">
+                </div>
+                <div class="form-group">
+                    <label for="plaats">Plaats evenement *</label>
+                    <input type="text" id="plaats" name="plaats" required>
+                </div>
+                <div class="form-group">
+                    <label for="leverdatum">Leverdatum + tijd *</label>
+                    <input type="datetime-local" id="leverdatum" name="leverdatum" required>
+                </div>
+                <div class="form-group">
+                    <label for="aantal_personen">Aantal personen *</label>
+                    <input type="number" id="aantal_personen" name="aantal_personen" min="0" value="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="aantal_kinderen">Aantal kinderen</label>
+                    <input type="number" id="aantal_kinderen" name="aantal_kinderen" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="ordertype">Ordertype</label>
+                    <select id="ordertype" name="ordertype">
+                        <option value="b2b">B2B (Zakelijk)</option>
+                        <option value="b2c">B2C (Particulier)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="opmerkingen">Opmerkingen</label>
+                    <textarea id="opmerkingen" name="opmerkingen"></textarea>
+                </div>
+                <div>
+                    <button type="submit" class="btn">Opslaan</button>
+                    <a href="/admin?token={SESSION_SECRET}" class="btn btn-secondary">Annuleren</a>
+                </div>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+@router.post("/nieuw", response_class=RedirectResponse)
+async def verwerk_nieuwe_aanvraag(
+    request: Request,
+    verified: bool = Depends(verify_admin_session),
+    klant_naam: str = Form(...),
+    klant_email: str = Form(...),
+    klant_telefoon: str = Form(None),
+    plaats: str = Form(...),
+    leverdatum: str = Form(...),
+    aantal_personen: int = Form(...),
+    aantal_kinderen: int = Form(0),
+    ordertype: str = Form("b2b"),
+    opmerkingen: str = Form(None)
+):
+    """Verwerk nieuwe aanvraag"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Parse leverdatum
+        leverdatum_dt = datetime.strptime(leverdatum, "%Y-%m-%dT%H:%M")
+        
+        # Genereer ordernummer: FTH-YYYYMMDD-{random 4 cijfers}
+        today = datetime.now()
+        random_suffix = random.randint(1000, 9999)
+        ordernummer = f"FTH-{today.strftime('%Y%m%d')}-{random_suffix}"
+        
+        # Check of contact al bestaat op email
+        cur.execute("SELECT id FROM contacten WHERE email = %s LIMIT 1", (klant_email,))
+        existing_contact = cur.fetchone()
+        
+        if existing_contact:
+            klant_id = existing_contact["id"]
+            # Update contact gegevens
+            cur.execute("""
+                UPDATE contacten 
+                SET naam = %s, telefoon = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (klant_naam, klant_telefoon, klant_id))
+        else:
+            # Maak nieuw contact
+            cur.execute("""
+                INSERT INTO contacten (naam, email, telefoon)
+                VALUES (%s, %s, %s)
+                RETURNING id
+            """, (klant_naam, klant_email, klant_telefoon))
+            klant_id = cur.fetchone()["id"]
+        
+        # Maak nieuwe order
+        cur.execute("""
+            INSERT INTO orders (
+                ordernummer, order_datum, leverdatum, status, portaal_status,
+                type_naam, klant_id, totaal_bedrag, bedrag_excl_btw, bedrag_btw,
+                plaats, aantal_personen, aantal_kinderen, ordertype, opmerkingen
+            ) VALUES (
+                %s, CURRENT_TIMESTAMP, %s, 'sent', 'nieuw',
+                'Offerte', %s, 0.00, 0.00, 0.00,
+                %s, %s, %s, %s, %s
+            )
+        """, (
+            ordernummer, leverdatum_dt, klant_id,
+            plaats, aantal_personen, aantal_kinderen, ordertype, opmerkingen
+        ))
+        
+        conn.commit()
+        
+        return RedirectResponse(url=f"/admin?token={SESSION_SECRET}", status_code=303)
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij aanmaken nieuwe aanvraag: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij aanmaken aanvraag: {str(e)}")
     finally:
         if conn:
             cur.close()
