@@ -540,150 +540,47 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
             </style>
             <script>
                 document.addEventListener('DOMContentLoaded', function() {{
-                    console.log('DOM geladen, initialiseer opslaan knop...');
-                    
-                    const orderId = '{order_id}';
-                    const token = '{SESSION_SECRET}';
+                    const saveBtn = document.getElementById('save-btn');
+                    const fields = document.querySelectorAll('.editable-field');
                     let hasChanges = false;
-                    
-                    // Get elements after DOM is loaded
-                    const plaatsEl = document.getElementById('plaats');
-                    const leverdatumEl = document.getElementById('leverdatum');
-                    const aantalPersonenEl = document.getElementById('aantal_personen');
-                    const aantalKinderenEl = document.getElementById('aantal_kinderen');
-                    const opmerkingenEl = document.getElementById('opmerkingen');
-                    const saveBtn = document.getElementById('saveBtn');
-                    
-                    // Check if elements exist
-                    if (!plaatsEl || !leverdatumEl || !aantalPersonenEl || !aantalKinderenEl || !opmerkingenEl || !saveBtn) {{
-                        console.error('Niet alle elementen gevonden:', {{
-                            plaats: !!plaatsEl,
-                            leverdatum: !!leverdatumEl,
-                            aantalPersonen: !!aantalPersonenEl,
-                            aantalKinderen: !!aantalKinderenEl,
-                            opmerkingen: !!opmerkingenEl,
-                            saveBtn: !!saveBtn
-                        }});
-                        return;
-                    }}
-                    
-                    // Store original values
-                    const originalValues = {{
-                        plaats: plaatsEl.value,
-                        leverdatum: leverdatumEl.value,
-                        aantal_personen: aantalPersonenEl.value,
-                        aantal_kinderen: aantalKinderenEl.value,
-                        opmerkingen: opmerkingenEl.value
-                    }};
-                    
-                    console.log('Original values:', originalValues);
-                    
-                    // Get all editable fields using querySelectorAll
-                    const editableFields = document.querySelectorAll('input.editable-field, textarea.editable-field');
-                    console.log('Gevonden editable fields:', editableFields.length);
-                    
-                    // Check for changes function
-                    function checkChanges() {{
-                        console.log('checkChanges called');
-                        
-                        const currentValues = {{
-                            plaats: plaatsEl.value,
-                            leverdatum: leverdatumEl.value,
-                            aantal_personen: aantalPersonenEl.value,
-                            aantal_kinderen: aantalKinderenEl.value,
-                            opmerkingen: opmerkingenEl.value
-                        }};
-                        
-                        hasChanges = 
-                            currentValues.plaats !== originalValues.plaats ||
-                            currentValues.leverdatum !== originalValues.leverdatum ||
-                            currentValues.aantal_personen !== originalValues.aantal_personen ||
-                            currentValues.aantal_kinderen !== originalValues.aantal_kinderen ||
-                            currentValues.opmerkingen !== originalValues.opmerkingen;
-                        
-                        console.log('Has changes:', hasChanges);
-                        
-                        if (hasChanges) {{
-                            saveBtn.disabled = false;
-                            saveBtn.textContent = 'Opslaan';
-                            saveBtn.className = 'save-btn orange';
-                            console.log('Knop geactiveerd (oranje)');
-                        }} else {{
-                            saveBtn.disabled = true;
-                            saveBtn.textContent = 'Geen wijzigingen';
-                            saveBtn.className = 'save-btn';
-                        }}
-                    }}
-                    
-                    // Add change listeners to all editable fields
-                    editableFields.forEach(field => {{
-                        console.log('Event listener toegevoegd aan:', field.id || field.name);
+
+                    fields.forEach(function(field) {{
                         field.addEventListener('input', function() {{
-                            console.log('Input event op:', field.id || field.name);
-                            checkChanges();
-                        }});
-                        field.addEventListener('change', function() {{
-                            console.log('Change event op:', field.id || field.name);
-                            checkChanges();
+                            hasChanges = true;
+                            saveBtn.disabled = false;
+                            saveBtn.className = 'save-btn orange';
+                            saveBtn.textContent = 'Opslaan';
                         }});
                     }});
-                    
-                    // Save handler
-                    saveBtn.addEventListener('click', async function() {{
-                        console.log('Save button clicked, hasChanges:', hasChanges);
+
+                    saveBtn.addEventListener('click', function() {{
                         if (!hasChanges) return;
-                        
                         const data = {{
-                            plaats: plaatsEl.value,
-                            leverdatum: leverdatumEl.value,
-                            aantal_personen: parseInt(aantalPersonenEl.value) || 0,
-                            aantal_kinderen: parseInt(aantalKinderenEl.value) || 0,
-                            opmerkingen: opmerkingenEl.value
+                            plaats: document.getElementById('plaats').value,
+                            leverdatum: document.getElementById('leverdatum').value,
+                            aantal_personen: document.getElementById('aantal_personen').value,
+                            aantal_kinderen: document.getElementById('aantal_kinderen').value,
+                            opmerkingen: document.getElementById('opmerkingen').value
                         }};
-                        
-                        console.log('Sending data:', data);
-                        
-                        try {{
-                            const response = await fetch(`/admin/order/${{orderId}}/opslaan?token=${{token}}`, {{
-                                method: 'POST',
-                                headers: {{
-                                    'Content-Type': 'application/json'
-                                }},
-                                body: JSON.stringify(data)
-                            }});
-                            
-                            const result = await response.json();
-                            console.log('Response:', result);
-                            
+                        fetch(window.location.pathname + '/opslaan' + window.location.search, {{
+                            method: 'POST',
+                            headers: {{'Content-Type': 'application/json'}},
+                            body: JSON.stringify(data)
+                        }})
+                        .then(r => r.json())
+                        .then(function(result) {{
                             if (result.success) {{
-                                // Update original values
-                                originalValues.plaats = data.plaats;
-                                originalValues.leverdatum = data.leverdatum;
-                                originalValues.aantal_personen = data.aantal_personen.toString();
-                                originalValues.aantal_kinderen = data.aantal_kinderen.toString();
-                                originalValues.opmerkingen = data.opmerkingen;
-                                
-                                // Show success state
-                                saveBtn.textContent = 'Opgeslagen ✓';
-                                saveBtn.className = 'save-btn green';
                                 hasChanges = false;
-                                
-                                // Reset after 3 seconds
-                                setTimeout(() => {{
+                                saveBtn.className = 'save-btn green';
+                                saveBtn.textContent = 'Opgeslagen \u2713';
+                                setTimeout(function() {{
                                     saveBtn.disabled = true;
-                                    saveBtn.textContent = 'Geen wijzigingen';
                                     saveBtn.className = 'save-btn';
+                                    saveBtn.textContent = 'Geen wijzigingen';
                                 }}, 3000);
-                            }} else {{
-                                alert('Fout bij opslaan: ' + (result.detail || 'Onbekende fout'));
                             }}
-                        }} catch (error) {{
-                            console.error('Error:', error);
-                            alert('Fout bij opslaan: ' + error.message);
-                        }}
+                        }});
                     }});
-                    
-                    console.log('Opslaan knop geïnitialiseerd');
                 }});
             </script>
         </head>
@@ -695,7 +592,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                         <h1>Aanvraag: {order.get('ordernummer', 'N/A')}</h1>
                         {f'<p style="color:#666;margin-top:5px;font-size:14px;">GF Referentie: {order.get("gf_referentie", "-")}</p>' if order.get('gf_referentie') else ''}
                     </div>
-                    <button id="saveBtn" class="save-btn" disabled>Geen wijzigingen</button>
+                    <button id="save-btn" class="save-btn" disabled>Geen wijzigingen</button>
                 </div>
             </div>
             

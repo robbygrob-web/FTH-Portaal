@@ -101,12 +101,17 @@ def cancel_payment(payment_id: str) -> bool:
         mollie_client = get_mollie_client()
         payment = mollie_client.payments.get(payment_id)
         
-        # Probeer te annuleren (alleen mogelijk als status open/pending)
-        if payment.status in ["open", "pending"]:
+        # Check payment status
+        payment_status = payment.status.lower() if payment.status else ""
+        
+        # Alleen annuleren als status 'open' of 'pending' is
+        # Niet annuleren als al 'paid', 'expired', 'failed', 'canceled'
+        if payment_status in ["open", "pending"]:
             payment.delete()
+            _LOG.info(f"Payment {payment_id} succesvol geannuleerd (status was: {payment_status})")
             return True
         else:
-            _LOG.warning(f"Payment {payment_id} kan niet geannuleerd worden (status: {payment.status})")
+            _LOG.warning(f"Payment {payment_id} kan niet geannuleerd worden (status: {payment_status})")
             return False
     except Exception as e:
         _LOG.error(f"Fout bij annuleren Mollie payment {payment_id}: {e}", exc_info=True)
