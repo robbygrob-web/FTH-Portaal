@@ -331,7 +331,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                 <td>€ {prijs_incl:,.2f}</td>
                 <td>€ {totaal_regel:,.2f}</td>
                 <td>
-                    <form method="post" action="/admin/order/{order_id}/artikel-verwijderen/{artikel_id}?token={SESSION_SECRET}" style="display:inline;">
+                    <form method="post" action="/admin/order/{order_id}/artikel-verwijderen/{artikel_id}?token={SESSION_SECRET}" style="display:inline;" onsubmit="sessionStorage.setItem('bedrag_voor_redirect', document.querySelector('.section table tr:last-child td:nth-child(4)').textContent.replace(/[^0-9,.-]/g, '').replace(',', '.'));">
                         <button type="submit" style="background:#dc3545;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">Verwijder</button>
                     </form>
                 </td>
@@ -380,7 +380,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                 factuur_knoppen = '<p style="color:#666;">Order al betaald - geen wijzigingen mogelijk</p>'
             elif betaal_status == "factuur_verstuurd" and heeft_factuur:
                 # Factuur al verstuurd, toon "nogmaals versturen" knop
-                factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur-nogmaals?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur factuur nogmaals</button></form>'
+                factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur-nogmaals?token={SESSION_SECRET}" style="display:inline;" onsubmit="window.factuurVerstuurd = true;"><button type="submit" class="btn">Verstuur factuur nogmaals</button></form>'
             elif not betaal_status or betaal_status == "onbetaald":
                 # Nog geen factuur verstuurd, toon normale knop
                 if not heeft_factuur:
@@ -623,7 +623,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     </tbody>
                 </table>
                 
-                <form method="post" action="/admin/order/{order_id}/artikel-toevoegen?token={SESSION_SECRET}" class="add-artikel-form">
+                <form method="post" action="/admin/order/{order_id}/artikel-toevoegen?token={SESSION_SECRET}" class="add-artikel-form" onsubmit="sessionStorage.setItem('bedrag_voor_redirect', document.querySelector('.section table tr:last-child td:nth-child(4)').textContent.replace(/[^0-9,.-]/g, '').replace(',', '.'));">
                     <select name="artikel_id" required>
                         {artikel_options}
                     </select>
@@ -671,6 +671,12 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     const saveBtn = document.getElementById('save-btn');
                     const fields = document.querySelectorAll('.editable-field');
                     let hasChanges = false;
+                    let factuurVerstuurd = false;
+                    const origineelBedrag = {order.get('totaal_bedrag', 0) or 0};
+                    let huidigBedrag = origineelBedrag;
+                    const betaalStatus = '{order.get("betaal_status") or ""}';
+                    const orderId = '{order_id}';
+                    const token = '{SESSION_SECRET}';
 
                     if (!saveBtn) {{
                         console.error('Save button niet gevonden');
@@ -681,6 +687,9 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                         console.error('Geen editable fields gevonden');
                         return;
                     }}
+
+                    // Expose factuurVerstuurd voor onsubmit handler
+                    window.factuurVerstuurd = false;
 
                     // Check URL parameter voor saved status
                     const urlParams = new URLSearchParams(window.location.search);
@@ -693,6 +702,22 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             saveBtn.className = 'save-btn';
                             saveBtn.textContent = 'Geen wijzigingen';
                         }}, 3000);
+                        
+                        // Haal nieuw totaal bedrag op na redirect
+                        const savedBedrag = sessionStorage.getItem('bedrag_voor_redirect');
+                        if (savedBedrag) {{
+                            huidigBedrag = parseFloat(savedBedrag);
+                            sessionStorage.removeItem('bedrag_voor_redirect');
+                        }} else {{
+                            // Haal totaal op via API
+                            fetch(window.location.pathname + '/totaal' + window.location.search)
+                                .then(function(r) {{ return r.json(); }})
+                                .then(function(result) {{
+                                    if (result.totaal_bedrag !== undefined) {{
+                                        huidigBedrag = parseFloat(result.totaal_bedrag);
+                                    }}
+                                }});
+                        }}
                     }}
 
                     fields.forEach(function(field) {{
@@ -730,6 +755,12 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                                 hasChanges = false;
                                 saveBtn.className = 'save-btn green';
                                 saveBtn.textContent = 'Opgeslagen ✓';
+                                
+                                // Update huidigBedrag na opslaan
+                                if (result.totaal_bedrag !== undefined) {{
+                                    huidigBedrag = parseFloat(result.totaal_bedrag);
+                                }}
+                                
                                 setTimeout(function() {{
                                     saveBtn.disabled = true;
                                     saveBtn.className = 'save-btn';
@@ -742,6 +773,23 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             alert('Fout bij opslaan: ' + error.message);
                         }});
                     }});
+                    
+                    // beforeunload check voor factuur update
+                    window.addEventListener('beforeunload', function(e) {{
+                        if (window.factuurVerstuurd) return;  // al verstuurd
+                        if (Math.abs(huidigBedrag - origineelBedrag) < 0.01) return;  // bedrag niet gewijzigd
+                        if (betaalStatus !== 'factuur_verstuurd') return;
+                        
+                        // Verstuur factuur update via sendBeacon
+                        const data = JSON.stringify({{trigger: 'pagina_verlaten'}});
+                        navigator.sendBeacon(
+                            window.location.pathname + '/update-factuur' + window.location.search,
+                            data
+                        );
+                    }});
+                    
+                    // Expose factuurVerstuurd voor onsubmit handler
+                    window.factuurVerstuurd = false;
                 }});
             </script>
         </body>
@@ -812,13 +860,6 @@ async def artikel_toevoegen(
         
         conn.commit()
         
-        # Update factuur als nodig (alleen als betaal_status = 'factuur_verstuurd')
-        try:
-            update_factuur_bij_orderwijziging(order_id, totals["totaal_bedrag"], conn, background_tasks)
-        except Exception as e:
-            _LOG.error(f"Fout bij updaten factuur na artikel toevoegen: {e}", exc_info=True)
-            # Ga door, dit is niet kritiek voor de redirect
-        
         return RedirectResponse(url=f"/admin/order/{order_id}?saved=1&token={SESSION_SECRET}", status_code=303)
         
     except HTTPException:
@@ -865,13 +906,6 @@ async def artikel_verwijderen(
         """, (totals["totaal_bedrag"], totals["bedrag_excl_btw"], totals["bedrag_btw"], order_id))
         
         conn.commit()
-        
-        # Update factuur als nodig (alleen als betaal_status = 'factuur_verstuurd')
-        try:
-            update_factuur_bij_orderwijziging(order_id, totals["totaal_bedrag"], conn, background_tasks)
-        except Exception as e:
-            _LOG.error(f"Fout bij updaten factuur na artikel verwijderen: {e}", exc_info=True)
-            # Ga door, dit is niet kritiek voor de redirect
         
         return RedirectResponse(url=f"/admin/order/{order_id}?saved=1&token={SESSION_SECRET}", status_code=303)
         
@@ -1390,7 +1424,12 @@ async def opslaan_order(
         
         conn.commit()
         
-        return JSONResponse(content={"success": True})
+        # Haal totaal bedrag op voor response
+        cur.execute("SELECT totaal_bedrag FROM orders WHERE id = %s", (order_id,))
+        totaal_result = cur.fetchone()
+        totaal_bedrag = float(totaal_result.get("totaal_bedrag", 0)) if totaal_result else 0.00
+        
+        return JSONResponse(content={"success": True, "totaal_bedrag": totaal_bedrag})
         
     except HTTPException:
         raise
@@ -1401,6 +1440,111 @@ async def opslaan_order(
         return JSONResponse(
             status_code=500,
             content={"success": False, "detail": f"Fout bij opslaan order: {str(e)}"}
+        )
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.get("/{order_id}/totaal")
+async def get_order_totaal(
+    order_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Haal totaal bedrag op van order"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cur.execute("SELECT totaal_bedrag FROM orders WHERE id = %s", (order_id,))
+        order = cur.fetchone()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order niet gevonden")
+        
+        totaal_bedrag = float(order.get("totaal_bedrag", 0)) if order.get("totaal_bedrag") else 0.00
+        
+        return JSONResponse(content={"totaal_bedrag": totaal_bedrag})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        _LOG.error(f"Fout bij ophalen totaal: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij ophalen totaal: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/{order_id}/update-factuur")
+async def update_factuur_pagina_verlaten(
+    request: Request,
+    order_id: str,
+    background_tasks: BackgroundTasks,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Update factuur bij pagina verlaten als bedrag gewijzigd is"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Haal order op
+        cur.execute("""
+            SELECT o.totaal_bedrag, o.betaal_status, o.ordernummer, o.ordertype,
+                   c.email as klant_email, c.naam as klant_naam
+            FROM orders o
+            LEFT JOIN contacten c ON o.klant_id = c.id
+            WHERE o.id = %s
+        """, (order_id,))
+        
+        order = cur.fetchone()
+        if not order:
+            return JSONResponse(content={"success": False, "detail": "Order niet gevonden"})
+        
+        betaal_status = order.get("betaal_status")
+        if betaal_status != "factuur_verstuurd":
+            return JSONResponse(content={"success": False, "detail": "Factuur niet verstuurd"})
+        
+        # Haal factuur op
+        cur.execute("""
+            SELECT id, mollie_payment_id, factuurnummer, totaal_bedrag
+            FROM facturen
+            WHERE order_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (order_id,))
+        
+        factuur = cur.fetchone()
+        if not factuur:
+            return JSONResponse(content={"success": False, "detail": "Geen factuur gevonden"})
+        
+        factuur_bedrag = float(factuur.get("totaal_bedrag", 0))
+        order_bedrag = float(order.get("totaal_bedrag", 0))
+        
+        # Check of bedrag gewijzigd is
+        if abs(factuur_bedrag - order_bedrag) < 0.01:
+            return JSONResponse(content={"success": False, "detail": "Bedrag niet gewijzigd"})
+        
+        # Gebruik bestaande update_factuur_bij_orderwijziging functie
+        update_factuur_bij_orderwijziging(order_id, order_bedrag, conn, background_tasks)
+        
+        return JSONResponse(content={"success": True})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij updaten factuur: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "detail": f"Fout bij updaten factuur: {str(e)}"}
         )
     finally:
         if conn:
