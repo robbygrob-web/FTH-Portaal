@@ -59,6 +59,12 @@ def run_migration_004():
         conn.commit()
         print("[MIGRATION 004] ✓ foutmelding toegevoegd aan mail_logs")
         
+        # Orders: prijs_partner kolom
+        print("[MIGRATION 004] Voeg prijs_partner toe aan orders...")
+        cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS prijs_partner NUMERIC(10,2);")
+        conn.commit()
+        print("[MIGRATION 004] ✓ prijs_partner toegevoegd aan orders")
+        
         # Artikelen: seed data
         print("[MIGRATION 004] Voeg UNIQUE constraint toe aan artikelen.naam...")
         try:

@@ -695,6 +695,13 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                         <div class="info-label">Partner</div>
                         <div class="info-value">{order.get('partner_naam') or 'Niet toegewezen'}</div>
                     </div>
+                    <div class="info-item">
+                        <div class="info-label">Prijs partner incl. BTW</div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="number" id="prijs_partner" class="editable-field" value="{order.get('prijs_partner') or ''}" step="0.01" min="0" placeholder="0.00" style="flex: 1;">
+                            <button type="button" id="reset-prijs-partner" class="btn" style="padding: 8px 16px; font-size: 14px;">↺ Reset</button>
+                        </div>
+                    </div>
                 </div>
                 <div style="margin-top: 15px;">
                     {status_knoppen if status_knoppen else '<p style="color:#666;">Geen acties beschikbaar</p>'}
@@ -823,8 +830,32 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     // Voeg notitie velden toe aan editable fields
                     const notitieKlant = document.getElementById('notitie_klant');
                     const notitiePartner = document.getElementById('notitie_partner');
+                    const prijsPartner = document.getElementById('prijs_partner');
                     if (notitieKlant) fields.push(notitieKlant);
                     if (notitiePartner) fields.push(notitiePartner);
+                    if (prijsPartner) fields.push(prijsPartner);
+                    
+                    // Reset prijs partner knop
+                    const resetPrijsPartnerBtn = document.getElementById('reset-prijs-partner');
+                    if (resetPrijsPartnerBtn && prijsPartner) {{
+                        resetPrijsPartnerBtn.addEventListener('click', function() {{
+                            // Bereken prijs_partner opnieuw
+                            const totaalBedrag = parseFloat({order.get('totaal_bedrag', 0) or 0});
+                            const subtotaal = totaalBedrag - 75; // Reiskosten aftrekken
+                            
+                            let nieuwePrijsPartner;
+                            if (subtotaal <= 500) {{
+                                nieuwePrijsPartner = (500 * 0.15).toFixed(2);
+                            }} else {{
+                                nieuwePrijsPartner = (subtotaal * 0.20).toFixed(2);
+                            }}
+                            
+                            prijsPartner.value = nieuwePrijsPartner;
+                            
+                            // Trigger change event om save knop te activeren
+                            prijsPartner.dispatchEvent(new Event('input'));
+                        }});
+                    }}
                     
                     fields.forEach(function(field) {{
                         field.addEventListener('input', function() {{
@@ -850,7 +881,8 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             aantal_kinderen: document.getElementById('aantal_kinderen').value,
                             opmerkingen: document.getElementById('opmerkingen').value,
                             notitie_klant: document.getElementById('notitie_klant').value,
-                            notitie_partner: document.getElementById('notitie_partner').value
+                            notitie_partner: document.getElementById('notitie_partner').value,
+                            prijs_partner: document.getElementById('prijs_partner').value
                         }};
                         fetch(window.location.pathname + '/opslaan' + window.location.search, {{
                             method: 'POST',
@@ -1593,6 +1625,15 @@ async def opslaan_order(
         opmerkingen = body.get("opmerkingen", "").strip()
         notitie_klant = body.get("notitie_klant", "").strip()
         notitie_partner = body.get("notitie_partner", "").strip()
+        prijs_partner_str = body.get("prijs_partner", "").strip()
+        
+        # Parse prijs_partner
+        prijs_partner = None
+        if prijs_partner_str:
+            try:
+                prijs_partner = float(prijs_partner_str)
+            except (ValueError, TypeError):
+                prijs_partner = None
         
         # Parse leverdatum (datetime-local format: YYYY-MM-DDTHH:MM)
         leverdatum = None
@@ -1617,6 +1658,7 @@ async def opslaan_order(
                 opmerkingen = %s,
                 notitie_klant = %s,
                 notitie_partner = %s,
+                prijs_partner = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (
@@ -1627,6 +1669,7 @@ async def opslaan_order(
             opmerkingen if opmerkingen else None,
             notitie_klant if notitie_klant else None,
             notitie_partner if notitie_partner else None,
+            prijs_partner,
             order_id
         ))
         

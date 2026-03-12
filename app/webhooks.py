@@ -693,8 +693,8 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 # Bereken subtotaal
                 subtotaal = pakketprijs + kinderpakket_prijs + broodjes_prijs + drankjes_prijs
                 
-                # Minimum subtotaal = 500
-                if subtotaal < Decimal("500"):
+                # Minimum subtotaal = 500 (als subtotaal <= 500, dan subtotaal = 500)
+                if subtotaal <= Decimal("500"):
                     subtotaal = Decimal("500")
                 
                 # Reiskosten = altijd 75.00 (apart, telt NIET mee voor minimum)
@@ -702,6 +702,12 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 
                 # Totaal = subtotaal + reiskosten
                 totaal_bedrag_calc = subtotaal + reiskosten
+                
+                # Bereken prijs_partner
+                if subtotaal == Decimal("500"):
+                    prijs_partner = round(Decimal("500") * Decimal("0.15"), 2)
+                else:
+                    prijs_partner = round(subtotaal * Decimal("0.20"), 2)
                 
                 # Bereken BTW bedragen
                 btw_pct = Decimal("9")
@@ -714,12 +720,14 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     SET totaal_bedrag = %s,
                         bedrag_excl_btw = %s,
                         bedrag_btw = %s,
+                        prijs_partner = %s,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = %s
                 """, (
                     float(totaal_bedrag_calc),
                     float(bedrag_excl_btw),
                     float(bedrag_btw),
+                    float(prijs_partner),
                     order_id
                 ))
                 conn.commit()
@@ -736,6 +744,7 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 _LOG.info(f"  TOTAAL: € {float(totaal_bedrag_calc):,.2f}")
                 _LOG.info(f"  Bedrag excl BTW: € {float(bedrag_excl_btw):,.2f}")
                 _LOG.info(f"  BTW bedrag: € {float(bedrag_btw):,.2f}")
+                _LOG.info(f"  Prijs partner: € {float(prijs_partner):,.2f}")
                 _LOG.info("=" * 60)
                         
             except psycopg2.Error as e:
