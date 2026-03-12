@@ -87,17 +87,43 @@ def run_migration_004():
             print(f"[MIGRATION 004] Opmerking bij odoo_id wijziging: {e}")
             conn.rollback()
         
+        # Verwijder kolommen uit artikelen tabel
+        print("[MIGRATION 004] Verwijder prijs_excl, btw_pct, btw_bedrag uit artikelen...")
+        try:
+            cur.execute("ALTER TABLE artikelen DROP COLUMN IF EXISTS prijs_excl;")
+            conn.commit()
+            print("[MIGRATION 004] ✓ prijs_excl verwijderd")
+        except psycopg2.ProgrammingError as e:
+            print(f"[MIGRATION 004] Opmerking bij verwijderen prijs_excl: {e}")
+            conn.rollback()
+        
+        try:
+            cur.execute("ALTER TABLE artikelen DROP COLUMN IF EXISTS btw_pct;")
+            conn.commit()
+            print("[MIGRATION 004] ✓ btw_pct verwijderd")
+        except psycopg2.ProgrammingError as e:
+            print(f"[MIGRATION 004] Opmerking bij verwijderen btw_pct: {e}")
+            conn.rollback()
+        
+        try:
+            cur.execute("ALTER TABLE artikelen DROP COLUMN IF EXISTS btw_bedrag;")
+            conn.commit()
+            print("[MIGRATION 004] ✓ btw_bedrag verwijderd")
+        except psycopg2.ProgrammingError as e:
+            print(f"[MIGRATION 004] Opmerking bij verwijderen btw_bedrag: {e}")
+            conn.rollback()
+        
         print("[MIGRATION 004] Seed artikelen...")
         cur.execute("""
-            INSERT INTO artikelen (naam, prijs_excl, btw_pct, btw_bedrag, prijs_incl, odoo_id, actief)
+            INSERT INTO artikelen (naam, prijs_incl, odoo_id, actief)
             VALUES
-              ('Frietpakket', 4.59, 9, 0.41, 5.00, NULL, true),
-              ('Verse Friet & Snack', 6.88, 9, 0.62, 7.50, NULL, true),
-              ('Verse Friet & Snacks (onbeperkt)', 9.63, 9, 0.87, 10.50, NULL, true),
-              ('Verse Friet, Snacks & Burger (onbeperkt)', 10.78, 9, 0.97, 11.75, NULL, true),
-              ('Broodjes', 0.92, 9, 0.08, 1.00, NULL, true),
-              ('Drankjes', 2.75, 9, 0.25, 3.00, NULL, true),
-              ('Reiskosten', 68.81, 9, 6.19, 75.00, NULL, true)
+              ('Frietpakket', 5.00, NULL, true),
+              ('Verse Friet & Snack', 7.50, NULL, true),
+              ('Verse Friet & Snacks (onbeperkt)', 10.50, NULL, true),
+              ('Verse Friet, Snacks & Burger (onbeperkt)', 11.75, NULL, true),
+              ('Broodjes', 1.00, NULL, true),
+              ('Drankjes', 3.00, NULL, true),
+              ('Reiskosten', 75.00, NULL, true)
             ON CONFLICT (naam) DO NOTHING;
         """)
         conn.commit()

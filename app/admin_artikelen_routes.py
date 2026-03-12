@@ -27,7 +27,7 @@ async def artikelen_overzicht(request: Request, verified: bool = Depends(verify_
         
         # Haal alle artikelen op
         cur.execute("""
-            SELECT id, naam, prijs_excl, btw_pct, btw_bedrag, prijs_incl, actief
+            SELECT id, naam, prijs_incl, actief
             FROM artikelen
             ORDER BY naam
         """)
@@ -39,18 +39,12 @@ async def artikelen_overzicht(request: Request, verified: bool = Depends(verify_
         for artikel in artikelen:
             artikel_id = str(artikel.get("id"))
             naam = artikel.get("naam") or ""
-            prijs_excl = float(artikel.get("prijs_excl", 0))
-            btw_pct = float(artikel.get("btw_pct", 9))
-            btw_bedrag = float(artikel.get("btw_bedrag", 0))
             prijs_incl = float(artikel.get("prijs_incl", 0))
             actief = artikel.get("actief", True)
             
             artikelen_rows += f"""
             <tr data-artikel-id="{artikel_id}">
                 <td><input type="text" class="artikel-naam" value="{naam}" data-artikel-id="{artikel_id}" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;"></td>
-                <td><input type="number" class="artikel-prijs-excl" value="{prijs_excl:.2f}" step="0.01" data-artikel-id="{artikel_id}" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;"></td>
-                <td><input type="number" class="artikel-btw-pct" value="{btw_pct:.2f}" step="0.01" data-artikel-id="{artikel_id}" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;"></td>
-                <td><input type="number" class="artikel-btw-bedrag" value="{btw_bedrag:.2f}" step="0.01" data-artikel-id="{artikel_id}" readonly style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;background:#f5f5f5;"></td>
                 <td><input type="number" class="artikel-prijs-incl" value="{prijs_incl:.2f}" step="0.01" data-artikel-id="{artikel_id}" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;"></td>
                 <td>
                     <label style="display:flex;align-items:center;gap:8px;">
@@ -142,7 +136,7 @@ async def artikelen_overzicht(request: Request, verified: bool = Depends(verify_
                 }}
                 .add-artikel-form {{
                     display: grid;
-                    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+                    grid-template-columns: 2fr 1fr auto;
                     gap: 10px;
                     align-items: end;
                     margin-top: 20px;
@@ -188,16 +182,13 @@ async def artikelen_overzicht(request: Request, verified: bool = Depends(verify_
                     <thead>
                         <tr>
                             <th>Naam</th>
-                            <th>Prijs excl. BTW</th>
-                            <th>BTW%</th>
-                            <th>BTW bedrag</th>
                             <th>Prijs incl. BTW</th>
                             <th>Actief</th>
                             <th>Actie</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {artikelen_rows if artikelen_rows else '<tr><td colspan="7" style="text-align:center;padding:20px;">Geen artikelen gevonden</td></tr>'}
+                        {artikelen_rows if artikelen_rows else '<tr><td colspan="4" style="text-align:center;padding:20px;">Geen artikelen gevonden</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -207,8 +198,6 @@ async def artikelen_overzicht(request: Request, verified: bool = Depends(verify_
                 <form id="add-artikel-form" class="add-artikel-form">
                     <input type="text" id="nieuwe-naam" placeholder="Artikel naam" required>
                     <input type="number" id="nieuwe-prijs-incl" placeholder="Prijs incl. BTW" step="0.01" min="0" required>
-                    <input type="number" id="nieuwe-btw-pct" placeholder="BTW%" step="0.01" value="9" min="0" max="100" required>
-                    <input type="number" id="nieuwe-prijs-excl" placeholder="Prijs excl. BTW" step="0.01" readonly style="background:#f5f5f5;">
                     <button type="submit" class="btn">Toevoegen</button>
                 </form>
             </div>
@@ -226,51 +215,6 @@ async def artikelen_overzicht(request: Request, verified: bool = Depends(verify_
                     }}, 3000);
                 }}
                 
-                // Auto-bereken prijs_excl en btw_bedrag bij wijziging prijs_incl
-                document.querySelectorAll('.artikel-prijs-incl').forEach(function(input) {{
-                    input.addEventListener('input', function() {{
-                        const row = input.closest('tr');
-                        const prijsIncl = parseFloat(input.value) || 0;
-                        const btwPct = parseFloat(row.querySelector('.artikel-btw-pct').value) || 9;
-                        
-                        const prijsExcl = prijsIncl / (1 + btwPct / 100);
-                        const btwBedrag = prijsIncl - prijsExcl;
-                        
-                        row.querySelector('.artikel-prijs-excl').value = prijsExcl.toFixed(2);
-                        row.querySelector('.artikel-btw-bedrag').value = btwBedrag.toFixed(2);
-                    }});
-                }});
-                
-                // Auto-bereken bij wijziging BTW%
-                document.querySelectorAll('.artikel-btw-pct').forEach(function(input) {{
-                    input.addEventListener('input', function() {{
-                        const row = input.closest('tr');
-                        const prijsIncl = parseFloat(row.querySelector('.artikel-prijs-incl').value) || 0;
-                        const btwPct = parseFloat(input.value) || 9;
-                        
-                        const prijsExcl = prijsIncl / (1 + btwPct / 100);
-                        const btwBedrag = prijsIncl - prijsExcl;
-                        
-                        row.querySelector('.artikel-prijs-excl').value = prijsExcl.toFixed(2);
-                        row.querySelector('.artikel-btw-bedrag').value = btwBedrag.toFixed(2);
-                    }});
-                }});
-                
-                // Auto-bereken voor nieuw artikel formulier
-                document.getElementById('nieuwe-prijs-incl').addEventListener('input', function() {{
-                    const prijsIncl = parseFloat(this.value) || 0;
-                    const btwPct = parseFloat(document.getElementById('nieuwe-btw-pct').value) || 9;
-                    const prijsExcl = prijsIncl / (1 + btwPct / 100);
-                    document.getElementById('nieuwe-prijs-excl').value = prijsExcl.toFixed(2);
-                }});
-                
-                document.getElementById('nieuwe-btw-pct').addEventListener('input', function() {{
-                    const prijsIncl = parseFloat(document.getElementById('nieuwe-prijs-incl').value) || 0;
-                    const btwPct = parseFloat(this.value) || 9;
-                    const prijsExcl = prijsIncl / (1 + btwPct / 100);
-                    document.getElementById('nieuwe-prijs-excl').value = prijsExcl.toFixed(2);
-                }});
-                
                 // Opslaan artikel
                 document.querySelectorAll('.btn-save-artikel').forEach(function(btn) {{
                     btn.addEventListener('click', function() {{
@@ -279,9 +223,6 @@ async def artikelen_overzicht(request: Request, verified: bool = Depends(verify_
                         
                         const data = {{
                             naam: row.querySelector('.artikel-naam').value,
-                            prijs_excl: parseFloat(row.querySelector('.artikel-prijs-excl').value),
-                            btw_pct: parseFloat(row.querySelector('.artikel-btw-pct').value),
-                            btw_bedrag: parseFloat(row.querySelector('.artikel-btw-bedrag').value),
                             prijs_incl: parseFloat(row.querySelector('.artikel-prijs-incl').value),
                             actief: row.querySelector('.artikel-actief').checked
                         }};
@@ -309,17 +250,9 @@ async def artikelen_overzicht(request: Request, verified: bool = Depends(verify_
                 document.getElementById('add-artikel-form').addEventListener('submit', function(e) {{
                     e.preventDefault();
                     
-                    const prijsIncl = parseFloat(document.getElementById('nieuwe-prijs-incl').value);
-                    const btwPct = parseFloat(document.getElementById('nieuwe-btw-pct').value);
-                    const prijsExcl = prijsIncl / (1 + btwPct / 100);
-                    const btwBedrag = prijsIncl - prijsExcl;
-                    
                     const data = {{
                         naam: document.getElementById('nieuwe-naam').value,
-                        prijs_excl: prijsExcl,
-                        btw_pct: btwPct,
-                        btw_bedrag: btwBedrag,
-                        prijs_incl: prijsIncl,
+                        prijs_incl: parseFloat(document.getElementById('nieuwe-prijs-incl').value),
                         actief: true
                     }};
                     
@@ -377,9 +310,6 @@ async def update_artikel(
         body = await request.json()
         
         naam = body.get("naam", "").strip()
-        prijs_excl = float(body.get("prijs_excl", 0))
-        btw_pct = float(body.get("btw_pct", 9))
-        btw_bedrag = float(body.get("btw_bedrag", 0))
         prijs_incl = float(body.get("prijs_incl", 0))
         actief = body.get("actief", True)
         
@@ -392,13 +322,10 @@ async def update_artikel(
         cur.execute("""
             UPDATE artikelen
             SET naam = %s,
-                prijs_excl = %s,
-                btw_pct = %s,
-                btw_bedrag = %s,
                 prijs_incl = %s,
                 actief = %s
             WHERE id = %s
-        """, (naam, prijs_excl, btw_pct, btw_bedrag, prijs_incl, actief, artikel_id))
+        """, (naam, prijs_incl, actief, artikel_id))
         
         conn.commit()
         
@@ -433,9 +360,6 @@ async def toevoegen_artikel(
         body = await request.json()
         
         naam = body.get("naam", "").strip()
-        prijs_excl = float(body.get("prijs_excl", 0))
-        btw_pct = float(body.get("btw_pct", 9))
-        btw_bedrag = float(body.get("btw_bedrag", 0))
         prijs_incl = float(body.get("prijs_incl", 0))
         actief = body.get("actief", True)
         
@@ -454,9 +378,9 @@ async def toevoegen_artikel(
             )
         
         cur.execute("""
-            INSERT INTO artikelen (naam, prijs_excl, btw_pct, btw_bedrag, prijs_incl, actief, odoo_id)
-            VALUES (%s, %s, %s, %s, %s, %s, 0)
-        """, (naam, prijs_excl, btw_pct, btw_bedrag, prijs_incl, actief))
+            INSERT INTO artikelen (naam, prijs_incl, actief, odoo_id)
+            VALUES (%s, %s, %s, 0)
+        """, (naam, prijs_incl, actief))
         
         conn.commit()
         

@@ -988,16 +988,18 @@ async def artikel_toevoegen(
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
         # Haal artikel op
-        cur.execute("SELECT * FROM artikelen WHERE id = %s", (artikel_id,))
+        cur.execute("SELECT id, naam, prijs_incl FROM artikelen WHERE id = %s", (artikel_id,))
         artikel = cur.fetchone()
         if not artikel:
             raise HTTPException(status_code=404, detail="Artikel niet gevonden")
         
-        # Gebruik prijzen per stuk uit artikelen tabel
-        prijs_excl = float(artikel.get("prijs_excl", 0))  # Prijs per stuk
-        btw_pct = float(artikel.get("btw_pct", 9.00))
-        btw_bedrag = float(artikel.get("btw_bedrag", 0))  # BTW bedrag per stuk
+        # Haal prijs_incl op uit artikelen tabel
         prijs_incl = float(artikel.get("prijs_incl", 0))  # Prijs per stuk
+        
+        # Bereken prijzen voor order_artikelen (9% BTW)
+        btw_pct = 9.00
+        prijs_excl = round(prijs_incl / 1.09, 2)
+        btw_bedrag = round(prijs_incl - prijs_excl, 2)
         
         # Voeg artikel toe
         cur.execute("""
