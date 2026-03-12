@@ -312,6 +312,59 @@ async def add_bevestig_token_column(verified: bool = Depends(verify_admin_token)
             conn.close()
 
 
+@setup_router.get("/toon-orders")
+async def toon_orders(request: Request):
+    """Tijdelijk endpoint om alle orders te tonen"""
+    token = request.query_params.get("token")
+    if token != SESSION_SECRET:
+        raise HTTPException(status_code=403)
+    
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cur.execute("""
+            SELECT 
+                o.id,
+                o.ordernummer,
+                c.naam as klant_naam,
+                o.created_at as aangemaakt_op,
+                o.totaal_bedrag,
+                o.status,
+                o.portaal_status
+            FROM orders o
+            LEFT JOIN contacten c ON o.klant_id = c.id
+            ORDER BY o.created_at DESC
+        """)
+        
+        orders = cur.fetchall()
+        
+        # Converteer naar dict lijst
+        result = []
+        for order in orders:
+            result.append({
+                "id": str(order.get("id")),
+                "ordernummer": order.get("ordernummer"),
+                "klant_naam": order.get("klant_naam"),
+                "aangemaakt_op": str(order.get("aangemaakt_op")) if order.get("aangemaakt_op") else None,
+                "totaal_bedrag": float(order.get("totaal_bedrag", 0)) if order.get("totaal_bedrag") else 0.0,
+                "status": order.get("status"),
+                "portaal_status": order.get("portaal_status")
+            })
+        
+        return JSONResponse({"orders": result, "aantal": len(result)})
+        
+    except Exception as e:
+        _LOG.error(f"Fout bij ophalen orders: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
 @setup_router.post("/init-db")
 async def init_database(verified: bool = Depends(verify_admin_token)):
     """
