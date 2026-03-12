@@ -526,16 +526,15 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     """, (naam,))
                     return cur.fetchone()
                 
-                # Helper functie om order_artikel regel toe te voegen (zonder prijzen - worden later berekend)
-                def add_order_artikel(artikel_id, naam, aantal):
+                # Helper functie om order_artikel regel toe te voegen
+                def add_order_artikel(artikel_id, naam, aantal, prijs_incl):
                     cur.execute("""
                         INSERT INTO order_artikelen (
-                            order_id, artikel_id, naam, aantal,
-                            prijs_excl, btw_pct, btw_bedrag, prijs_incl
-                        ) VALUES (%s, %s, %s, %s, 0, 9, 0, 0)
-                    """, (order_id, artikel_id, naam, aantal))
+                            order_id, artikel_id, naam, aantal, prijs_incl
+                        ) VALUES (%s, %s, %s, %s, %s)
+                    """, (order_id, artikel_id, naam, aantal, float(prijs_incl)))
                     conn.commit()
-                    _LOG.info(f"Order artikel toegevoegd: {naam} (aantal: {aantal})")
+                    _LOG.info(f"Order artikel toegevoegd: {naam} (aantal: {aantal}, prijs_incl: {prijs_incl})")
                 
                 # 1. Hoofdartikel (pakket) uit veld "69" (prioriteit) of "57.1"
                 # Aantal = aantal_personen, prijs_incl = prijs per persoon
@@ -545,32 +544,39 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 if artikel_naam:
                     artikel = get_artikel_by_naam(artikel_naam)
                     if artikel:
-                        # Gebruik aantal_personen als aantal
+                        # Gebruik aantal_personen als aantal, prijs_incl uit artikel
                         pakket_aantal = Decimal(str(aantal_personen)) if aantal_personen > 0 else Decimal("1")
+                        pakket_prijs_incl = Decimal(str(artikel[2]))  # prijs_incl per persoon
                         
                         add_order_artikel(
                             artikel[0],  # artikel_id
                             artikel[1],  # naam
-                            pakket_aantal  # aantal = aantal_personen
+                            pakket_aantal,  # aantal = aantal_personen
+                            pakket_prijs_incl  # prijs_incl per persoon
                         )
                     else:
                         _LOG.warning(f"Artikel niet gevonden in artikelen tabel: {artikel_naam}")
                 
                 # 1b. Kinderpakket toevoegen als aantal_kinderen > 0
                 if aantal_kinderen > 0:
+                    kinderpakket_prijs_incl = Decimal("6.50")
                     add_order_artikel(
                         None,  # artikel_id (geen artikel in tabel)
                         "Kinderpakket",  # naam
-                        Decimal(str(aantal_kinderen))  # aantal
+                        Decimal(str(aantal_kinderen)),  # aantal
+                        kinderpakket_prijs_incl  # prijs_incl per stuk
                     )
                 
                 # 2. Reiskosten altijd toevoegen
                 reiskosten_artikel = get_artikel_by_naam("Reiskosten")
+                reiskosten_prijs_incl = Decimal("75.00")
                 if reiskosten_artikel:
+                    reiskosten_prijs_incl = Decimal(str(reiskosten_artikel[2]))  # prijs_incl uit artikel
                     add_order_artikel(
                         reiskosten_artikel[0],  # artikel_id
                         reiskosten_artikel[1],  # naam
-                        Decimal("1")  # altijd 1 stuk
+                        Decimal("1"),  # altijd 1 stuk
+                        reiskosten_prijs_incl  # prijs_incl
                     )
                 else:
                     # Als artikel niet gevonden: maak direct order_artikel regel aan
@@ -578,7 +584,8 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     add_order_artikel(
                         None,  # artikel_id (NULL omdat artikel niet bestaat)
                         "Reiskosten",  # naam
-                        Decimal("1")  # aantal
+                        Decimal("1"),  # aantal
+                        reiskosten_prijs_incl  # prijs_incl
                     )
                 
                 # 3. Broodjes toevoegen als veld "79" gevuld is
@@ -587,10 +594,12 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     # Formaat: "Ja graag!|1" - als gevuld: aantal = 1
                     broodjes_artikel = get_artikel_by_naam("Broodjes")
                     if broodjes_artikel:
+                        broodjes_prijs_incl = Decimal(str(broodjes_artikel[2]))  # prijs_incl uit artikel
                         add_order_artikel(
                             broodjes_artikel[0],  # artikel_id
                             broodjes_artikel[1],  # naam
-                            Decimal("1")  # altijd 1 stuk
+                            Decimal("1"),  # altijd 1 stuk
+                            broodjes_prijs_incl  # prijs_incl
                         )
                     else:
                         _LOG.warning("Broodjes artikel niet gevonden in artikelen tabel")
@@ -601,25 +610,25 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     # Formaat: "Ja graag!|3" - als gevuld: aantal = 1
                     drankjes_artikel = get_artikel_by_naam("Drankjes")
                     if drankjes_artikel:
+                        drankjes_prijs_incl = Decimal(str(drankjes_artikel[2]))  # prijs_incl uit artikel
                         add_order_artikel(
                             drankjes_artikel[0],  # artikel_id
                             drankjes_artikel[1],  # naam
-                            Decimal("1")  # altijd 1 stuk
+                            Decimal("1"),  # altijd 1 stuk
+                            drankjes_prijs_incl  # prijs_incl
                         )
                     else:
                         _LOG.warning("Drankjes artikel niet gevonden in artikelen tabel")
                 
-                # Stap 4: Update prijzen in order_artikelen en bereken totaalprijs
-                # Haal alle order_artikelen op met artikel_id
+                # Stap 4: Bereken totaalprijs op basis van order_artikelen
                 cur.execute("""
-                    SELECT oa.id, oa.artikel_id, oa.naam, oa.aantal, a.prijs_incl
-                    FROM order_artikelen oa
-                    LEFT JOIN artikelen a ON oa.artikel_id = a.id
-                    WHERE oa.order_id = %s
+                    SELECT naam, aantal, prijs_incl
+                    FROM order_artikelen
+                    WHERE order_id = %s
                 """, (order_id,))
                 order_artikelen = cur.fetchall()
                 
-                # Update prijzen voor elk order_artikel
+                # Bereken subtotaal
                 pakketprijs = Decimal("0")
                 kinderpakket_prijs = Decimal("0")
                 broodjes_prijs = Decimal("0")
@@ -627,53 +636,9 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 reiskosten = Decimal("0")
                 
                 for oa in order_artikelen:
-                    oa_id = oa[0]
-                    artikel_id = oa[1]
-                    naam = oa[2]
-                    aantal = Decimal(str(oa[3]))
-                    prijs_incl_artikel = Decimal(str(oa[4])) if oa[4] else Decimal("0")
-                    
-                    # Bepaal prijs_incl per stuk
-                    if naam == "Kinderpakket":
-                        prijs_incl_per_stuk = Decimal("6.50")
-                    elif naam == "Reiskosten":
-                        prijs_incl_per_stuk = Decimal("75.00")
-                    elif artikel_id and prijs_incl_artikel > 0:
-                        prijs_incl_per_stuk = prijs_incl_artikel
-                    else:
-                        # Fallback: gebruik prijs_incl uit artikelen tabel
-                        if artikel_id:
-                            cur.execute("SELECT prijs_incl FROM artikelen WHERE id = %s", (artikel_id,))
-                            art_result = cur.fetchone()
-                            if art_result and art_result[0]:
-                                prijs_incl_per_stuk = Decimal(str(art_result[0]))
-                            else:
-                                prijs_incl_per_stuk = Decimal("0")
-                        else:
-                            prijs_incl_per_stuk = Decimal("0")
-                    
-                    # Bereken prijzen voor order_artikel (9% BTW)
-                    btw_pct = Decimal("9")
-                    prijs_excl_per_stuk = round(prijs_incl_per_stuk / Decimal("1.09"), 2)
-                    btw_bedrag_per_stuk = round(prijs_incl_per_stuk - prijs_excl_per_stuk, 2)
-                    
-                    # Update order_artikel met prijzen
-                    cur.execute("""
-                        UPDATE order_artikelen
-                        SET prijs_excl = %s,
-                            btw_pct = %s,
-                            btw_bedrag = %s,
-                            prijs_incl = %s
-                        WHERE id = %s
-                    """, (
-                        float(prijs_excl_per_stuk),
-                        float(btw_pct),
-                        float(btw_bedrag_per_stuk),
-                        float(prijs_incl_per_stuk),
-                        oa_id
-                    ))
-                    
-                    # Bereken totaal voor deze regel
+                    naam = oa[0]
+                    aantal = Decimal(str(oa[1]))
+                    prijs_incl_per_stuk = Decimal(str(oa[2]))
                     totaal_regel = aantal * prijs_incl_per_stuk
                     
                     if naam == "Reiskosten":
@@ -687,8 +652,6 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     else:
                         # Pakket artikel
                         pakketprijs += totaal_regel
-                
-                conn.commit()
                 
                 # Bereken subtotaal
                 subtotaal = pakketprijs + kinderpakket_prijs + broodjes_prijs + drankjes_prijs

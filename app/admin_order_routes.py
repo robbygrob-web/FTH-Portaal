@@ -56,9 +56,7 @@ def calculate_order_totals(order_id: str, conn) -> dict:
     
     cur.execute("""
         SELECT 
-            COALESCE(SUM(prijs_incl), 0) as totaal_incl,
-            COALESCE(SUM(prijs_excl), 0) as totaal_excl,
-            COALESCE(SUM(btw_bedrag), 0) as totaal_btw
+            COALESCE(SUM(prijs_incl * aantal), 0) as totaal_incl
         FROM order_artikelen
         WHERE order_id = %s
     """, (order_id,))
@@ -66,10 +64,15 @@ def calculate_order_totals(order_id: str, conn) -> dict:
     result = cur.fetchone()
     cur.close()
     
+    # Bereken prijs_excl en btw_bedrag on-the-fly (9% BTW)
+    totaal_incl = float(result["totaal_incl"]) if result["totaal_incl"] else 0.00
+    totaal_excl = round(totaal_incl / 1.09, 2)
+    totaal_btw = round(totaal_incl - totaal_excl, 2)
+    
     return {
-        "totaal_bedrag": float(result["totaal_incl"]) if result["totaal_incl"] else 0.00,
-        "bedrag_excl_btw": float(result["totaal_excl"]) if result["totaal_excl"] else 0.00,
-        "bedrag_btw": float(result["totaal_btw"]) if result["totaal_btw"] else 0.00
+        "totaal_bedrag": totaal_incl,
+        "bedrag_excl_btw": totaal_excl,
+        "bedrag_btw": totaal_btw
     }
 
 
@@ -307,7 +310,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         
         # Haal beschikbare artikelen op voor dropdown
         cur.execute("""
-            SELECT id, naam, prijs_incl, prijs_excl, btw_pct
+            SELECT id, naam, prijs_incl
             FROM artikelen
             WHERE actief = TRUE
             ORDER BY naam
@@ -996,21 +999,15 @@ async def artikel_toevoegen(
         # Haal prijs_incl op uit artikelen tabel
         prijs_incl = float(artikel.get("prijs_incl", 0))  # Prijs per stuk
         
-        # Bereken prijzen voor order_artikelen (9% BTW)
-        btw_pct = 9.00
-        prijs_excl = round(prijs_incl / 1.09, 2)
-        btw_bedrag = round(prijs_incl - prijs_excl, 2)
-        
-        # Voeg artikel toe
+        # Voeg artikel toe (alleen prijs_incl, geen berekende velden)
         cur.execute("""
             INSERT INTO order_artikelen (
-                order_id, artikel_id, naam, aantal, prijs_excl, btw_pct, btw_bedrag, prijs_incl
+                order_id, artikel_id, naam, aantal, prijs_incl
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s
             )
         """, (
-            order_id, artikel_id, artikel.get("naam"), aantal,
-            prijs_excl, btw_pct, btw_bedrag, prijs_incl
+            order_id, artikel_id, artikel.get("naam"), aantal, prijs_incl
         ))
         
         # Herbereken totaalprijs

@@ -129,6 +129,32 @@ def run_migration_004():
         conn.commit()
         print("[MIGRATION 004] ✓ artikelen geseed")
         
+        # Verwijder kolommen uit order_artikelen tabel
+        print("[MIGRATION 004] Verwijder prijs_excl, btw_pct, btw_bedrag uit order_artikelen...")
+        try:
+            cur.execute("ALTER TABLE order_artikelen DROP COLUMN IF EXISTS prijs_excl;")
+            conn.commit()
+            print("[MIGRATION 004] ✓ prijs_excl verwijderd uit order_artikelen")
+        except psycopg2.ProgrammingError as e:
+            print(f"[MIGRATION 004] Opmerking bij verwijderen prijs_excl uit order_artikelen: {e}")
+            conn.rollback()
+        
+        try:
+            cur.execute("ALTER TABLE order_artikelen DROP COLUMN IF EXISTS btw_pct;")
+            conn.commit()
+            print("[MIGRATION 004] ✓ btw_pct verwijderd uit order_artikelen")
+        except psycopg2.ProgrammingError as e:
+            print(f"[MIGRATION 004] Opmerking bij verwijderen btw_pct uit order_artikelen: {e}")
+            conn.rollback()
+        
+        try:
+            cur.execute("ALTER TABLE order_artikelen DROP COLUMN IF EXISTS btw_bedrag;")
+            conn.commit()
+            print("[MIGRATION 004] ✓ btw_bedrag verwijderd uit order_artikelen")
+        except psycopg2.ProgrammingError as e:
+            print(f"[MIGRATION 004] Opmerking bij verwijderen btw_bedrag uit order_artikelen: {e}")
+            conn.rollback()
+        
         print("[MIGRATION 004] Migratie voltooid!")
         return True
         
