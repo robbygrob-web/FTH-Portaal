@@ -568,8 +568,16 @@ async def mollie_webhook(request: Request):
     """Mollie betaling webhook - ontvangt betaling bevestigingen"""
     conn = None
     try:
-        body = await request.json()
-        payment_id = body.get("id")
+        # Mollie stuurt form-encoded data (id=tr_xxxx), niet JSON
+        form = await request.form()
+        payment_id = form.get("id")
+        
+        # Fallback: probeer body direct te parsen als form data niet werkt
+        if not payment_id:
+            body = await request.body()
+            body_str = body.decode()
+            if "=" in body_str:
+                payment_id = body_str.split("=")[1]
         
         if not payment_id:
             _LOG.warning("Mollie webhook zonder payment ID")
