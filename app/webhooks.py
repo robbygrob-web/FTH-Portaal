@@ -703,11 +703,11 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 # Totaal = subtotaal + reiskosten
                 totaal_bedrag_calc = subtotaal + reiskosten
                 
-                # Bereken prijs_partner
-                if subtotaal == Decimal("500"):
-                    prijs_partner = round(Decimal("500") * Decimal("0.15"), 2)
+                # Bereken prijs_partner (wat partner ontvangt, niet commissie)
+                if subtotaal <= Decimal("500"):
+                    prijs_partner = round(Decimal("500") * Decimal("0.85"), 2)
                 else:
-                    prijs_partner = round(subtotaal * Decimal("0.20"), 2)
+                    prijs_partner = round(subtotaal * Decimal("0.80"), 2)
                 
                 # Bereken BTW bedragen
                 btw_pct = Decimal("9")

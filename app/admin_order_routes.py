@@ -854,11 +854,11 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             
                             let nieuwePrijsPartner;
                             if (subtotaal <= 500) {{
-                                nieuwePrijsPartner = (500 * 0.15).toFixed(2);
-                                console.log('Subtotaal <= 500, gebruik 15% van 500');
+                                nieuwePrijsPartner = (500 * 0.85).toFixed(2);
+                                console.log('Subtotaal <= 500, partner ontvangt 85% van 500');
                             }} else {{
-                                nieuwePrijsPartner = (subtotaal * 0.20).toFixed(2);
-                                console.log('Subtotaal > 500, gebruik 20% van subtotaal');
+                                nieuwePrijsPartner = (subtotaal * 0.80).toFixed(2);
+                                console.log('Subtotaal > 500, partner ontvangt 80% van subtotaal');
                             }}
                             
                             console.log('Nieuwe prijs partner:', nieuwePrijsPartner);
