@@ -656,21 +656,19 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 # Bereken subtotaal
                 subtotaal = pakketprijs + kinderpakket_prijs + broodjes_prijs + drankjes_prijs
                 
-                # Minimum subtotaal = 500 (als subtotaal <= 500, dan subtotaal = 500)
-                if subtotaal <= Decimal("500"):
-                    subtotaal = Decimal("500")
-                
-                # Reiskosten = altijd 75.00 (apart, telt NIET mee voor minimum)
+                # Reiskosten = altijd 75.00
                 reiskosten = Decimal("75.00")
                 
                 # Totaal = subtotaal + reiskosten
                 totaal_bedrag_calc = subtotaal + reiskosten
                 
                 # Bereken prijs_partner (wat partner ontvangt, niet commissie)
-                if subtotaal <= Decimal("500"):
-                    prijs_partner = round(Decimal("500") * Decimal("0.85"), 2)
-                else:
-                    prijs_partner = round(subtotaal * Decimal("0.80"), 2)
+                # Commissie: 15% tot 575, daarna 20%
+                totaal_decimal = Decimal(str(totaal_bedrag_calc))
+                commissie_deel_1 = min(totaal_decimal, Decimal("575")) * Decimal("0.15")
+                commissie_deel_2 = max(totaal_decimal - Decimal("575"), Decimal("0")) * Decimal("0.20")
+                commissie_totaal = commissie_deel_1 + commissie_deel_2
+                prijs_partner = round(totaal_decimal - commissie_totaal, 2)
                 
                 # Bereken BTW bedragen
                 btw_pct = Decimal("9")

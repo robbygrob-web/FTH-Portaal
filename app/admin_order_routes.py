@@ -349,6 +349,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         # Build artikelen tabel
         artikelen_rows = ""
         totaal_prijs = 0.00
+        totaal_excl_reiskosten = 0.00
         for artikel in artikelen:
             artikel_id = str(artikel.get("id"))
             naam = artikel.get("naam") or artikel.get("artikel_naam") or "-"
@@ -356,6 +357,9 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
             prijs_incl = float(artikel.get("prijs_incl", 0))
             totaal_regel = aantal * prijs_incl
             totaal_prijs += totaal_regel
+            # Tel alleen mee voor minimum check als het geen reiskosten is
+            if naam != "Reiskosten":
+                totaal_excl_reiskosten += totaal_regel
             
             artikelen_rows += f"""
             <tr>
@@ -673,6 +677,8 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                         </tr>
                     </tbody>
                 </table>
+                
+                {f'<div style="background:#fee;border:2px solid #fcc;border-radius:8px;padding:15px;margin-top:15px;color:#c00;"><strong>⚠ Minimumprijs €500 niet bereikt</strong><br>Huidige totaal (excl. reiskosten): € {totaal_excl_reiskosten:,.2f}<br>Pas de prijs aan om het minimum te bereiken.</div>' if totaal_excl_reiskosten < 500 else ''}
                 
                 <form method="post" action="/admin/order/{order_id}/artikel-toevoegen?token={SESSION_SECRET}" class="add-artikel-form">
                     <select name="artikel_id" required>
