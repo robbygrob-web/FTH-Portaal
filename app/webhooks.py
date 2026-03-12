@@ -7,6 +7,7 @@ import uuid
 import json
 import random
 from datetime import datetime, timedelta
+from decimal import Decimal
 from fastapi import APIRouter, Request, HTTPException, Header, Query
 from fastapi.responses import JSONResponse
 import psycopg2
@@ -521,6 +522,107 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
             
             order_id = result[0]
             conn.commit()
+            
+            # Stap 3: Voeg artikelen toe aan order_artikelen
+            try:
+                # Helper functie om artikel op te halen op basis van naam
+                def get_artikel_by_naam(naam):
+                    cur.execute("""
+                        SELECT id, naam, prijs_excl, btw_pct, btw_bedrag, prijs_incl
+                        FROM artikelen
+                        WHERE naam = %s AND actief = TRUE
+                        LIMIT 1
+                    """, (naam,))
+                    return cur.fetchone()
+                
+                # Helper functie om order_artikel regel toe te voegen
+                def add_order_artikel(artikel_id, naam, aantal, prijs_excl, btw_pct, btw_bedrag, prijs_incl):
+                    cur.execute("""
+                        INSERT INTO order_artikelen (
+                            order_id, artikel_id, naam, aantal,
+                            prijs_excl, btw_pct, btw_bedrag, prijs_incl
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (order_id, artikel_id, naam, aantal, prijs_excl, btw_pct, btw_bedrag, prijs_incl))
+                    conn.commit()
+                    _LOG.info(f"Order artikel toegevoegd: {naam} (aantal: {aantal})")
+                
+                # 1. Hoofdartikel uit veld "57.1" met aantal uit "57.3"
+                artikel_naam = body.get("57.1")
+                if artikel_naam:
+                    artikel = get_artikel_by_naam(artikel_naam)
+                    if artikel:
+                        aantal_artikel = body.get("57.3") or "1"
+                        try:
+                            aantal_artikel = Decimal(str(aantal_artikel))
+                        except (ValueError, TypeError):
+                            aantal_artikel = Decimal("1")
+                        
+                        add_order_artikel(
+                            artikel[0],  # artikel_id
+                            artikel[1],  # naam
+                            aantal_artikel,
+                            Decimal(str(artikel[2])),  # prijs_excl
+                            Decimal(str(artikel[3])),  # btw_pct
+                            Decimal(str(artikel[4])),  # btw_bedrag
+                            Decimal(str(artikel[5]))   # prijs_incl
+                        )
+                    else:
+                        _LOG.warning(f"Artikel niet gevonden in artikelen tabel: {artikel_naam}")
+                
+                # 2. Reiskosten altijd toevoegen
+                reiskosten_artikel = get_artikel_by_naam("Reiskosten")
+                if reiskosten_artikel:
+                    add_order_artikel(
+                        reiskosten_artikel[0],  # artikel_id
+                        reiskosten_artikel[1],  # naam
+                        Decimal("1"),  # altijd 1 stuk
+                        Decimal(str(reiskosten_artikel[2])),  # prijs_excl
+                        Decimal(str(reiskosten_artikel[3])),  # btw_pct
+                        Decimal(str(reiskosten_artikel[4])),  # btw_bedrag
+                        Decimal(str(reiskosten_artikel[5]))   # prijs_incl
+                    )
+                else:
+                    _LOG.warning("Reiskosten artikel niet gevonden in artikelen tabel")
+                
+                # 3. Broodjes toevoegen als veld "79" gevuld is
+                broodjes_veld = body.get("79")
+                if broodjes_veld and broodjes_veld.strip() and broodjes_veld != "0":
+                    # Formaat: "Ja graag!|1" - als gevuld: aantal = 1
+                    broodjes_artikel = get_artikel_by_naam("Broodjes")
+                    if broodjes_artikel:
+                        add_order_artikel(
+                            broodjes_artikel[0],  # artikel_id
+                            broodjes_artikel[1],  # naam
+                            Decimal("1"),  # altijd 1 stuk
+                            Decimal(str(broodjes_artikel[2])),  # prijs_excl
+                            Decimal(str(broodjes_artikel[3])),  # btw_pct
+                            Decimal(str(broodjes_artikel[4])),  # btw_bedrag
+                            Decimal(str(broodjes_artikel[5]))   # prijs_incl
+                        )
+                    else:
+                        _LOG.warning("Broodjes artikel niet gevonden in artikelen tabel")
+                
+                # 4. Drankjes toevoegen als veld "44" gevuld is
+                drankjes_veld = body.get("44")
+                if drankjes_veld and drankjes_veld.strip() and drankjes_veld != "0":
+                    # Formaat: "Ja graag!|3" - als gevuld: aantal = 1
+                    drankjes_artikel = get_artikel_by_naam("Drankjes")
+                    if drankjes_artikel:
+                        add_order_artikel(
+                            drankjes_artikel[0],  # artikel_id
+                            drankjes_artikel[1],  # naam
+                            Decimal("1"),  # altijd 1 stuk
+                            Decimal(str(drankjes_artikel[2])),  # prijs_excl
+                            Decimal(str(drankjes_artikel[3])),  # btw_pct
+                            Decimal(str(drankjes_artikel[4])),  # btw_bedrag
+                            Decimal(str(drankjes_artikel[5]))   # prijs_incl
+                        )
+                    else:
+                        _LOG.warning("Drankjes artikel niet gevonden in artikelen tabel")
+                        
+            except psycopg2.Error as e:
+                _LOG.warning(f"Fout bij toevoegen order artikelen: {e}")
+                # Niet kritiek, doorgaan met order
             
             # Verbeterde logging voor nieuwe orders
             _LOG.info("=" * 60)
