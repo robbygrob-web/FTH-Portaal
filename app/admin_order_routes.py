@@ -689,6 +689,12 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             saveBtn.className = 'save-btn orange';
                             saveBtn.textContent = 'Opslaan';
                         }});
+                        field.addEventListener('change', function() {{
+                            hasChanges = true;
+                            saveBtn.disabled = false;
+                            saveBtn.className = 'save-btn orange';
+                            saveBtn.textContent = 'Opslaan';
+                        }});
                     }});
 
                     saveBtn.addEventListener('click', function() {{
