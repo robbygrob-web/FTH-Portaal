@@ -1514,7 +1514,7 @@ async def get_order_totaal(
         
         totaal_bedrag = float(order.get("totaal_bedrag", 0)) if order.get("totaal_bedrag") else 0.00
         
-        return JSONResponse(content={"totaal_bedrag": totaal_bedrag})
+        return JSONResponse(content={"totaal": totaal_bedrag})
         
     except HTTPException:
         raise
