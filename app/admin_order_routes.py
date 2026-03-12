@@ -1778,21 +1778,64 @@ async def verstuur_factuur_nogmaals(
         ordertype = order.get("ordertype") or "b2c"
         klant_naam = order.get("klant_naam", "")
         
-        # Haal bestaande factuur op voor factuurnummer en checkout URL
+        # Haal volledige factuur op incl. bedrag en payment ID
         cur.execute("""
-            SELECT factuurnummer, mollie_checkout_url
+            SELECT id, factuurnummer, mollie_checkout_url,
+                   mollie_payment_id, bedrag
             FROM facturen
             WHERE order_id = %s
-            ORDER BY created_at DESC
-            LIMIT 1
+            ORDER BY created_at DESC LIMIT 1
         """, (order_id,))
         
         factuur = cur.fetchone()
         if not factuur:
-            raise HTTPException(status_code=404, detail="Geen factuur gevonden voor deze order")
+            raise HTTPException(status_code=404, 
+                detail="Geen factuur gevonden")
         
         factuurnummer = factuur.get("factuurnummer", "")
-        mollie_checkout_url = factuur.get("mollie_checkout_url")
+        factuur_bedrag = float(factuur.get("bedrag") or 0)
+        
+        print(f"VERS BEDRAG: {vers_bedrag}")
+        print(f"FACTUUR BEDRAG: {factuur_bedrag}")
+        
+        # Als bedrag gewijzigd: nieuwe Mollie payment
+        if abs(vers_bedrag - factuur_bedrag) > 0.01:
+            # Annuleer oude payment
+            oud_payment_id = factuur.get("mollie_payment_id")
+            if oud_payment_id:
+                try:
+                    cancel_payment(oud_payment_id)
+                except Exception as e:
+                    print(f"Cancel mislukt (ok): {e}")
+            
+            # Nieuwe Mollie payment
+            nieuw_payment = create_payment(
+                amount=vers_bedrag,
+                description=f"Factuur {factuurnummer}",
+                redirect_url="https://fth-portaal-production.up.railway.app/betaling/bedankt",
+                webhook_url="https://fth-portaal-production.up.railway.app/webhooks/mollie",
+                metadata={"order_id": str(order_id)}
+            )
+            mollie_checkout_url = nieuw_payment["checkout_url"]
+            nieuw_payment_id = nieuw_payment["id"]
+            
+            # Update factuur in DB
+            cur.execute("""
+                UPDATE facturen 
+                SET mollie_payment_id = %s,
+                    mollie_checkout_url = %s,
+                    bedrag = %s
+                WHERE id = %s
+            """, (nieuw_payment_id, mollie_checkout_url, 
+                  vers_bedrag, factuur["id"]))
+            conn.commit()
+            
+            print(f"NIEUWE URL: {mollie_checkout_url}")
+            mail_onderwerp = f"Aangepaste factuur {ordernummer}"
+        else:
+            mollie_checkout_url = factuur.get("mollie_checkout_url")
+            mail_onderwerp = f"Factuur {factuurnummer} - {ordernummer}"
+            print(f"ZELFDE BEDRAG, oude URL: {mollie_checkout_url}")
         
         if not mollie_checkout_url:
             raise HTTPException(status_code=400, detail="Factuur heeft geen Mollie betaallink")
@@ -1834,7 +1877,7 @@ async def verstuur_factuur_nogmaals(
         background_tasks.add_task(
             stuur_mail,
             naar=klant_email,
-            onderwerp=f"Factuur {factuurnummer} - {ordernummer}",
+            onderwerp=mail_onderwerp,
             inhoud=mail_body,
             order_id=order_id,
             template_naam="Factuur"
