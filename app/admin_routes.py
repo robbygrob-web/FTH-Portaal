@@ -703,7 +703,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                             <th>Leverdatum + tijd</th>
                             <th>Aantal personen / kinderen</th>
                             <th>Totaalprijs incl. BTW</th>
-                            <th>Status aanvraag</th>
+                            <th>Status portaal</th>
                             <th>Status offerte</th>
                             <th>Partner</th>
                             <th>Status betaling</th>
@@ -885,10 +885,10 @@ async def verwerk_nieuwe_aanvraag(
         # Parse leverdatum
         leverdatum_dt = datetime.strptime(leverdatum, "%Y-%m-%dT%H:%M")
         
-        # Genereer ordernummer: FTH-YYYYMMDD-{random 4 cijfers}
+        # Genereer ordernummer: FTHYYYYMMDDXXXX (zonder streepjes)
         today = datetime.now()
         random_suffix = random.randint(1000, 9999)
-        ordernummer = f"FTH-{today.strftime('%Y%m%d')}-{random_suffix}"
+        ordernummer = f"FTH{today.strftime('%Y%m%d')}{random_suffix:04d}"
         
         # Check of contact al bestaat op email
         cur.execute("SELECT id FROM contacten WHERE email = %s LIMIT 1", (klant_email,))

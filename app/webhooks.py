@@ -184,10 +184,10 @@ def get_or_create_contact(gravity_data: dict, cur, conn) -> str:
 
 def generate_ordernummer() -> str:
     """Genereer uniek ordernummer"""
-    # Format: GF-YYYYMMDD-HHMMSS-UUID(8)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    short_uuid = str(uuid.uuid4())[:8].upper()
-    return f"GF-{timestamp}-{short_uuid}"
+    # Format: FTHYYYYMMDDXXXX (zonder streepjes)
+    today = datetime.now()
+    random_suffix = random.randint(1000, 9999)
+    return f"FTH{today.strftime('%Y%m%d')}{random_suffix:04d}"
 
 
 @router.post("/gravity/aanvraag")
@@ -346,12 +346,55 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
             ""
         )
         
+        # Haal prijsbedragen op (veld '7' en '10' bevatten prijsdata)
+        # Probeer verschillende mogelijke veldnamen voor totaal bedrag
+        totaal_bedrag_raw = (
+            body.get("7") or  # Veld '7' bevat totaal bedrag
+            body.get("totaal_bedrag") or
+            body.get("Totaal bedrag") or
+            body.get("total") or
+            body.get("Total") or
+            0
+        )
+        
+        # Probeer prijsbedrag te converteren naar float
+        try:
+            totaal_bedrag = float(totaal_bedrag_raw)
+        except (ValueError, TypeError):
+            totaal_bedrag = 0.00
+        
+        # Als veld '10' ook een prijs is, gebruik de hoogste waarde
+        prijs_veld_10 = (
+            body.get("10") or  # Veld '10' bevat mogelijk ook prijs
+            0
+        )
+        try:
+            prijs_veld_10_float = float(prijs_veld_10)
+            # Gebruik de hoogste waarde als beide gevuld zijn
+            if prijs_veld_10_float > totaal_bedrag:
+                totaal_bedrag = prijs_veld_10_float
+        except (ValueError, TypeError):
+            pass
+        
+        # Bereken bedragen (9% BTW voor eten/drank)
+        btw_pct = 9.0
+        if totaal_bedrag > 0:
+            # Als totaal_bedrag inclusief BTW is, bereken excl BTW
+            # Anders is het al excl BTW
+            # We gaan ervan uit dat het inclusief BTW is als het een rond getal is
+            # Anders exclusief BTW
+            bedrag_excl_btw = round(totaal_bedrag / (1 + btw_pct / 100), 2)
+            bedrag_btw = round(bedrag_excl_btw * (btw_pct / 100), 2)
+            totaal_bedrag_calc = round(bedrag_excl_btw + bedrag_btw, 2)
+        else:
+            bedrag_excl_btw = 0.00
+            bedrag_btw = 0.00
+            totaal_bedrag_calc = 0.00
+        
         # Haal UTM tracking data op (AFL UTM Tracker plugin)
-        # Veld '7' en '10' bevatten UTM data volgens context
-        # Probeer verschillende mogelijke veldnamen/nummers
+        # UTM data komt uit directe veldnamen, niet uit veldnummers
         utm_source = (
             body.get("utm_source") or
-            body.get("7") or  # Mogelijk UTM source veld
             body.get("utm_source_field") or
             None
         )
@@ -367,12 +410,11 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
         )
         utm_content = (
             body.get("utm_content") or
-            body.get("10") or  # Mogelijk UTM content veld
             body.get("utm_content_field") or
             None
         )
         
-        # Als veld '7' of '10' een JSON string is, parse deze
+        # Als UTM velden JSON strings zijn, parse deze
         if isinstance(utm_source, str) and (utm_source.startswith("{") or utm_source.startswith("[")):
             try:
                 import json
@@ -405,11 +447,11 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     status, portaal_status, type_naam,
                     klant_id, plaats, aantal_personen, aantal_kinderen,
                     ordertype, opmerkingen,
-                    utm_source, utm_medium, utm_campaign, utm_content,
-                    totaal_bedrag, bedrag_excl_btw, bedrag_btw
-                ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                ) RETURNING id
+                utm_source, utm_medium, utm_campaign, utm_content,
+                totaal_bedrag, bedrag_excl_btw, bedrag_btw
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            ) RETURNING id
             """, (
                 ordernummer,
                 datetime.now(),  # order_datum
@@ -423,13 +465,13 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 aantal_kinderen,
                 "b2c",  # ordertype (standaard b2c voor Gravity Forms)
                 opmerkingen,
-                utm_source,  # utm_source
+                utm_source,  # utm_source (echte UTM tracking data)
                 utm_medium,  # utm_medium
                 utm_campaign,  # utm_campaign
                 utm_content,  # utm_content
-                0.00,  # totaal_bedrag (nog niet berekend)
-                0.00,  # bedrag_excl_btw
-                0.00   # bedrag_btw
+                totaal_bedrag_calc,  # totaal_bedrag (berekend uit veld '7' of '10')
+                bedrag_excl_btw,  # bedrag_excl_btw (berekend)
+                bedrag_btw  # bedrag_btw (berekend)
             ))
             
             result = cur.fetchone()
@@ -449,9 +491,13 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
             _LOG.info(f"  Aantal personen: {aantal_personen}")
             _LOG.info(f"  Aantal kinderen: {aantal_kinderen}")
             _LOG.info(f"  Leverdatum: {leverdatum}")
+            _LOG.info(f"  Totaal bedrag: €{totaal_bedrag_calc:.2f}")
+            _LOG.info(f"  Bedrag excl BTW: €{bedrag_excl_btw:.2f}")
+            _LOG.info(f"  BTW bedrag: €{bedrag_btw:.2f}")
             _LOG.info(f"  UTM Source: {utm_source or 'Geen'}")
             _LOG.info(f"  UTM Medium: {utm_medium or 'Geen'}")
             _LOG.info(f"  UTM Campaign: {utm_campaign or 'Geen'}")
+            _LOG.info(f"  UTM Content: {utm_content or 'Geen'}")
             _LOG.info("=" * 60)
             
         except psycopg2.IntegrityError as e:
