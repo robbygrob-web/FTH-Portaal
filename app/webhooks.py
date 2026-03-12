@@ -590,20 +590,34 @@ async def mollie_webhook(request: Request):
         payment = get_payment(payment_id)
         
         payment_status = payment.get("status")
-        metadata = payment.get("metadata", {})
-        order_id = metadata.get("order_id")
-        
-        if not order_id:
-            _LOG.warning(f"Mollie payment {payment_id} heeft geen order_id in metadata")
-            return JSONResponse({"status": "ok", "message": "Geen order_id gevonden"})
         
         # Connect naar database
         database_url = get_database_url()
         conn = psycopg2.connect(database_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Als status = 'paid', update order betaal_status
+        # Als status = 'paid', controleer of payment ID matcht met actieve factuur
         if payment_status == "paid":
+            # Zoek factuur op via payment ID
+            cur.execute("""
+                SELECT f.id, f.order_id, o.betaal_status
+                FROM facturen f
+                JOIN orders o ON o.id = f.order_id
+                WHERE f.mollie_payment_id = %s
+            """, (payment_id,))
+            
+            factuur = cur.fetchone()
+            
+            if not factuur:
+                # Geen factuur gevonden met dit payment ID
+                print(f"ONBEKEND PAYMENT: {payment_id} - geen factuur gevonden")
+                _LOG.warning(f"ONBEKEND PAYMENT: {payment_id} - geen factuur gevonden")
+                return JSONResponse({"status": "ok", "message": "Payment ID niet gevonden in facturen"})
+            
+            # Factuur gevonden - update betaalstatus
+            order_id = factuur.get("order_id")
+            factuur_id = factuur.get("id")
+            
             cur.execute("""
                 UPDATE orders
                 SET betaal_status = 'betaald', updated_at = CURRENT_TIMESTAMP
@@ -614,8 +628,8 @@ async def mollie_webhook(request: Request):
             cur.execute("""
                 UPDATE facturen
                 SET betalingsstatus = 'paid', updated_at = CURRENT_TIMESTAMP
-                WHERE order_id = %s
-            """, (order_id,))
+                WHERE id = %s
+            """, (factuur_id,))
             
             conn.commit()
             
@@ -631,7 +645,8 @@ async def mollie_webhook(request: Request):
             ))
             conn.commit()
             
-            _LOG.info(f"Betaling bevestigd voor order {order_id} - Payment {payment_id}")
+            print(f"BETAALD: {payment_id} matched factuur {factuur_id} voor order {order_id}")
+            _LOG.info(f"Betaling bevestigd voor order {order_id} - Payment {payment_id} matched factuur {factuur_id}")
         
         return JSONResponse({"status": "ok"})
         
