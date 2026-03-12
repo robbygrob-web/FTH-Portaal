@@ -849,23 +849,17 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             console.log('Reset knop geklikt!');
                             
                             // Bereken prijs_partner opnieuw
-                            const totaalBedrag = parseFloat({order.get('totaal_bedrag', 0) or 0});
-                            console.log('Totaal bedrag:', totaalBedrag);
+                            const totaal = parseFloat({order.get('totaal_bedrag', 0) or 0});
+                            console.log('Totaal bedrag:', totaal);
                             
-                            const subtotaal = totaalBedrag - 75; // Reiskosten aftrekken
-                            console.log('Subtotaal (na reiskosten):', subtotaal);
+                            // Commissie berekening: 15% tot 575, daarna 20%
+                            const commissie = (Math.min(totaal, 575) * 0.15) + (Math.max(totaal - 575, 0) * 0.20);
+                            console.log('Commissie:', commissie);
                             
-                            let nieuwePrijsPartner;
-                            if (subtotaal <= 500) {{
-                                nieuwePrijsPartner = (500 * 0.85).toFixed(2);
-                                console.log('Subtotaal <= 500, partner ontvangt 85% van 500');
-                            }} else {{
-                                nieuwePrijsPartner = (subtotaal * 0.80).toFixed(2);
-                                console.log('Subtotaal > 500, partner ontvangt 80% van subtotaal');
-                            }}
-                            
+                            // Prijs partner = totaal - commissie
+                            const nieuwePrijsPartner = Math.round((totaal - commissie) * 100) / 100;
                             console.log('Nieuwe prijs partner:', nieuwePrijsPartner);
-                            prijsPartner.value = nieuwePrijsPartner;
+                            prijsPartner.value = nieuwePrijsPartner.toFixed(2);
                             
                             // Trigger change event om save knop te activeren
                             prijsPartner.dispatchEvent(new Event('input'));
