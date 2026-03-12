@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
+from typing import Optional
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from app.config import SESSION_SECRET
