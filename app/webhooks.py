@@ -584,7 +584,22 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                         Decimal(str(reiskosten_artikel[5]))   # prijs_incl
                     )
                 else:
-                    _LOG.warning("Reiskosten artikel niet gevonden in artikelen tabel")
+                    # Als artikel niet gevonden: maak direct order_artikel regel aan
+                    _LOG.warning("Reiskosten artikel niet gevonden in artikelen tabel, voeg direct toe aan order")
+                    reiskosten_prijs_incl = Decimal("75.00")
+                    reiskosten_btw_pct = Decimal("9")
+                    reiskosten_prijs_excl = reiskosten_prijs_incl / (Decimal("1") + reiskosten_btw_pct / Decimal("100"))
+                    reiskosten_btw_bedrag = reiskosten_prijs_incl - reiskosten_prijs_excl
+                    
+                    add_order_artikel(
+                        None,  # artikel_id (NULL omdat artikel niet bestaat)
+                        "Reiskosten",  # naam
+                        Decimal("1"),  # aantal
+                        reiskosten_prijs_excl,
+                        reiskosten_btw_pct,
+                        reiskosten_btw_bedrag,
+                        reiskosten_prijs_incl
+                    )
                 
                 # 3. Broodjes toevoegen als veld "79" gevuld is
                 broodjes_veld = body.get("79")

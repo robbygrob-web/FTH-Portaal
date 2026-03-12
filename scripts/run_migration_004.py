@@ -72,17 +72,26 @@ def run_migration_004():
             else:
                 raise
         
+        print("[MIGRATION 004] Maak odoo_id nullable in artikelen...")
+        try:
+            cur.execute("ALTER TABLE artikelen ALTER COLUMN odoo_id DROP NOT NULL;")
+            conn.commit()
+            print("[MIGRATION 004] ✓ odoo_id is nu nullable")
+        except psycopg2.ProgrammingError as e:
+            print(f"[MIGRATION 004] Opmerking bij odoo_id wijziging: {e}")
+            conn.rollback()
+        
         print("[MIGRATION 004] Seed artikelen...")
         cur.execute("""
-            INSERT INTO artikelen (naam, prijs_excl, btw_pct, btw_bedrag, prijs_incl, actief, odoo_id)
+            INSERT INTO artikelen (naam, prijs_excl, btw_pct, btw_bedrag, prijs_incl, odoo_id, actief)
             VALUES
-              ('Frietpakket', 4.59, 9, 0.41, 5.00, true, 0),
-              ('Verse Friet & Snack', 6.88, 9, 0.62, 7.50, true, 0),
-              ('Verse Friet & Snacks (onbeperkt)', 9.63, 9, 0.87, 10.50, true, 0),
-              ('Verse Friet, Snacks & Burger (onbeperkt)', 10.78, 9, 0.97, 11.75, true, 0),
-              ('Broodjes', 0.92, 9, 0.08, 1.00, true, 0),
-              ('Drankjes', 2.75, 9, 0.25, 3.00, true, 0),
-              ('Reiskosten', 68.81, 9, 6.19, 75.00, true, 0)
+              ('Frietpakket', 4.59, 9, 0.41, 5.00, NULL, true),
+              ('Verse Friet & Snack', 6.88, 9, 0.62, 7.50, NULL, true),
+              ('Verse Friet & Snacks (onbeperkt)', 9.63, 9, 0.87, 10.50, NULL, true),
+              ('Verse Friet, Snacks & Burger (onbeperkt)', 10.78, 9, 0.97, 11.75, NULL, true),
+              ('Broodjes', 0.92, 9, 0.08, 1.00, NULL, true),
+              ('Drankjes', 2.75, 9, 0.25, 3.00, NULL, true),
+              ('Reiskosten', 68.81, 9, 6.19, 75.00, NULL, true)
             ON CONFLICT (naam) DO NOTHING;
         """)
         conn.commit()
