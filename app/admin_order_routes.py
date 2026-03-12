@@ -1294,8 +1294,17 @@ async def verstuur_factuur(
         if not klant_email:
             raise HTTPException(status_code=400, detail="Geen email adres gevonden voor klant")
         
+        # Haal ALTIJD vers bedrag op uit DB
+        cur.execute("SELECT totaal_bedrag, bedrag_excl_btw, bedrag_btw FROM orders WHERE id = %s", (order_id,))
+        vers_order = cur.fetchone()
+        if not vers_order:
+            raise HTTPException(status_code=404, detail="Order niet gevonden")
+        
+        vers_bedrag = float(vers_order.get("totaal_bedrag", 0)) if vers_order.get("totaal_bedrag") else 0.00
+        vers_bedrag_excl_btw = float(vers_order.get("bedrag_excl_btw", 0)) if vers_order.get("bedrag_excl_btw") else 0.00
+        vers_bedrag_btw = float(vers_order.get("bedrag_btw", 0)) if vers_order.get("bedrag_btw") else 0.00
+        
         ordernummer = order.get("ordernummer", "")
-        totaal_bedrag = float(order.get("totaal_bedrag", 0))
         ordertype = order.get("ordertype") or "b2c"
         
         # Genereer factuurnummer: FTHINVYYYYMMDDXXXX
@@ -1303,10 +1312,10 @@ async def verstuur_factuur(
         random_suffix = random.randint(1000, 9999)
         factuurnummer = f"FTHINV{today.strftime('%Y%m%d')}{random_suffix:04d}"
         
-        # Maak Mollie payment
+        # Maak Mollie payment met vers bedrag
         try:
             payment = create_payment(
-                amount=totaal_bedrag,
+                amount=vers_bedrag,
                 description=f"Factuur {ordernummer}",
                 redirect_url="https://fth-portaal-production.up.railway.app/betaling/bedankt",
                 webhook_url="https://fth-portaal-production.up.railway.app/webhooks/mollie",
@@ -1319,7 +1328,7 @@ async def verstuur_factuur(
         mollie_payment_id = payment["id"]
         mollie_checkout_url = payment["checkout_url"]
         
-        # Sla factuur op in database
+        # Sla factuur op in database met vers bedrag
         cur.execute("""
             INSERT INTO facturen (
                 factuurnummer, factuurdatum, klant_id, order_id,
@@ -1334,9 +1343,9 @@ async def verstuur_factuur(
             today.date(),
             order.get("klant_id"),
             order_id,
-            totaal_bedrag,
-            float(order.get("bedrag_excl_btw", 0)),
-            float(order.get("bedrag_btw", 0)),
+            vers_bedrag,
+            vers_bedrag_excl_btw,
+            vers_bedrag_btw,
             "posted",  # status
             "not_paid",  # betalingsstatus
             "Invoice",  # type_naam
@@ -1355,7 +1364,7 @@ async def verstuur_factuur(
         
         conn.commit()
         
-        # Maak mail body
+        # Maak mail body met vers bedrag
         if ordertype == "b2b":
             mail_body = f"""
             <html>
@@ -1363,7 +1372,7 @@ async def verstuur_factuur(
                 <h2>Factuur {factuurnummer}</h2>
                 <p>Beste {order.get('klant_naam', '')},</p>
                 <p>Bij deze ontvangt u de factuur voor uw bestelling {ordernummer}.</p>
-                <p><strong>Te betalen bedrag: € {totaal_bedrag:,.2f}</strong></p>
+                <p><strong>Te betalen bedrag: € {vers_bedrag:,.2f}</strong></p>
                 <p>U kunt betalen via de onderstaande betaallink:</p>
                 <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
                 <p>Of maak het bedrag over naar:</p>
@@ -1380,7 +1389,7 @@ async def verstuur_factuur(
                 <h2>Factuur {factuurnummer}</h2>
                 <p>Beste {order.get('klant_naam', '')},</p>
                 <p>Bij deze ontvangt u de factuur voor uw bestelling {ordernummer}.</p>
-                <p><strong>Te betalen bedrag: € {totaal_bedrag:,.2f}</strong></p>
+                <p><strong>Te betalen bedrag: € {vers_bedrag:,.2f}</strong></p>
                 <p>U kunt betalen via de onderstaande betaallink:</p>
                 <p><a href="{mollie_checkout_url}" style="background:#fec82a;color:#333;padding:12px 24px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:bold;">Betaal nu</a></p>
                 <p>Met vriendelijke groet,<br>FTH Portaal</p>
