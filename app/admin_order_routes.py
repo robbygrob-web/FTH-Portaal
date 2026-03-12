@@ -157,6 +157,10 @@ def update_factuur_bij_orderwijziging(order_id: str, nieuwe_totaal: float, conn,
         nieuwe_mollie_payment_id = payment["id"]
         nieuwe_mollie_checkout_url = payment["checkout_url"]
         
+        # Debug logging
+        _LOG.info(f"Update factuur {factuur_id} voor order {order_id}: nieuwe payment_id={nieuwe_mollie_payment_id}, checkout_url={nieuwe_mollie_checkout_url}")
+        print(f"Nieuwe Mollie URL: {nieuwe_mollie_checkout_url}")
+        
         # Update factuur record
         cur.execute("""
             UPDATE facturen
@@ -177,6 +181,17 @@ def update_factuur_bij_orderwijziging(order_id: str, nieuwe_totaal: float, conn,
         ))
         
         conn.commit()
+        
+        # Verifieer dat checkout URL is opgeslagen
+        cur.execute("SELECT mollie_checkout_url FROM facturen WHERE id = %s", (factuur_id,))
+        saved_factuur = cur.fetchone()
+        if saved_factuur:
+            saved_url = saved_factuur.get("mollie_checkout_url")
+            _LOG.info(f"Factuur {factuur_id} geupdate met checkout_url: {saved_url}")
+            if saved_url != nieuwe_mollie_checkout_url:
+                _LOG.warning(f"WAARSCHUWING: Opgeslagen URL ({saved_url}) verschilt van nieuwe URL ({nieuwe_mollie_checkout_url})")
+                # Gebruik de opgeslagen URL voor mail
+                nieuwe_mollie_checkout_url = saved_url if saved_url else nieuwe_mollie_checkout_url
         
         # Stuur nieuwe factuurmail
         if ordertype == "b2b":
