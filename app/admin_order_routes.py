@@ -724,7 +724,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
             <script>
                 document.addEventListener('DOMContentLoaded', function() {{
                     const saveBtn = document.getElementById('save-btn');
-                    const fields = document.querySelectorAll('.editable-field');
+                    const fields = Array.from(document.querySelectorAll('.editable-field'));
                     let hasChanges = false;
                     let factuurVerstuurd = false;
                     const origineelBedrag = parseFloat({order.get('totaal_bedrag', 0) or 0});
