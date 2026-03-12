@@ -331,7 +331,11 @@ async def toon_orders(request: Request):
                 o.ordernummer,
                 c.naam as klant_naam,
                 o.created_at as aangemaakt_op,
-                o.totaal_bedrag,
+                COALESCE((
+                    SELECT SUM(oa.prijs_incl * oa.aantal)
+                    FROM order_artikelen oa
+                    WHERE oa.order_id = o.id
+                ), 0) as totaal_bedrag,
                 o.status,
                 o.portaal_status
             FROM orders o

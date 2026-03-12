@@ -278,9 +278,15 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
         # Haal order op met contact informatie en partner
+        # Totaal wordt berekend uit order_artikelen via subquery
         cur.execute("""
             SELECT 
                 o.*,
+                COALESCE((
+                    SELECT SUM(oa.prijs_incl * oa.aantal)
+                    FROM order_artikelen oa
+                    WHERE oa.order_id = o.id
+                ), 0) as totaal_bedrag,
                 c.naam as klant_naam,
                 c.email as klant_email,
                 c.telefoon as klant_telefoon,
@@ -795,7 +801,23 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     const fields = Array.from(document.querySelectorAll('.editable-field'));
                     let hasChanges = false;
                     let factuurVerstuurd = false;
-                    const origineelBedrag = parseFloat({order.get('totaal_bedrag', 0) or 0});
+                    // Bereken origineel bedrag uit artikelen tabel
+                    let origineelBedrag = 0;
+                    document.querySelectorAll('table tbody tr').forEach(function(row) {{
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length >= 4) {{
+                            const totaalCell = cells[3];
+                            const totaalText = totaalCell.textContent.trim();
+                            if (totaalText.startsWith('€')) {{
+                                const bedrag = parseFloat(totaalText.replace('€', '').replace(/[.,]/g, function(match, offset, string) {{
+                                    return match === '.' ? '' : '.';
+                                }}));
+                                if (!isNaN(bedrag)) {{
+                                    origineelBedrag += bedrag;
+                                }}
+                            }}
+                        }}
+                    }});
                     let huidigBedrag = origineelBedrag;
                     let betaalStatus = '{order.get("betaal_status") or ""}';
                     const orderId = '{order_id}';
@@ -913,9 +935,24 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             e.preventDefault();
                             console.log('Reset knop geklikt!');
                             
-                            // Bereken prijs_partner opnieuw
-                            const totaal = parseFloat({order.get('totaal_bedrag', 0) or 0});
-                            console.log('Totaal bedrag:', totaal);
+                            // Bereken totaal uit artikelen tabel op pagina
+                            let totaal = 0;
+                            document.querySelectorAll('table tbody tr').forEach(function(row) {{
+                                const cells = row.querySelectorAll('td');
+                                if (cells.length >= 4) {{
+                                    const totaalCell = cells[3];
+                                    const totaalText = totaalCell.textContent.trim();
+                                    if (totaalText.startsWith('€')) {{
+                                        const bedrag = parseFloat(totaalText.replace('€', '').replace(/[.,]/g, function(match, offset, string) {{
+                                            return match === '.' ? '' : '.';
+                                        }}));
+                                        if (!isNaN(bedrag)) {{
+                                            totaal += bedrag;
+                                        }}
+                                    }}
+                                }}
+                            }});
+                            console.log('Totaal bedrag (uit artikelen tabel):', totaal);
                             
                             // Commissie berekening: 15% tot 575, daarna 20%
                             const commissie = (Math.min(totaal, 575) * 0.15) + (Math.max(totaal - 575, 0) * 0.20);
@@ -1069,15 +1106,7 @@ async def artikel_toevoegen(
             order_id, artikel_id, artikel.get("naam"), aantal, prijs_incl
         ))
         
-        # Herbereken totaalprijs
-        totals = calculate_order_totals(order_id, conn)
-        
-        cur.execute("""
-            UPDATE orders
-            SET totaal_bedrag = %s, bedrag_excl_btw = %s, bedrag_btw = %s, updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s
-        """, (totals["totaal_bedrag"], totals["bedrag_excl_btw"], totals["bedrag_btw"], order_id))
-        
+        # Totaal wordt altijd berekend uit order_artikelen, geen update nodig
         conn.commit()
         
         return RedirectResponse(url=f"/admin/order/{order_id}?saved=1&token={SESSION_SECRET}", status_code=303)
@@ -1116,15 +1145,7 @@ async def artikel_verwijderen(
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Artikel regel niet gevonden")
         
-        # Herbereken totaalprijs
-        totals = calculate_order_totals(order_id, conn)
-        
-        cur.execute("""
-            UPDATE orders
-            SET totaal_bedrag = %s, bedrag_excl_btw = %s, bedrag_btw = %s, updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s
-        """, (totals["totaal_bedrag"], totals["bedrag_excl_btw"], totals["bedrag_btw"], order_id))
-        
+        # Totaal wordt altijd berekend uit order_artikelen, geen update nodig
         conn.commit()
         
         return RedirectResponse(url=f"/admin/order/{order_id}?saved=1&token={SESSION_SECRET}", status_code=303)
@@ -1379,7 +1400,15 @@ async def verstuur_factuur(
         
         # Haal order op met contact
         cur.execute("""
-            SELECT o.*, c.email as klant_email, c.naam as klant_naam
+            SELECT 
+                o.*,
+                COALESCE((
+                    SELECT SUM(oa.prijs_incl * oa.aantal)
+                    FROM order_artikelen oa
+                    WHERE oa.order_id = o.id
+                ), 0) as totaal_bedrag,
+                c.email as klant_email, 
+                c.naam as klant_naam
             FROM orders o
             LEFT JOIN contacten c ON o.klant_id = c.id
             WHERE o.id = %s
@@ -1490,15 +1519,21 @@ async def verstuur_factuur(
         if not klant_email:
             raise HTTPException(status_code=400, detail="Geen email adres gevonden voor klant")
         
-        # Haal ALTIJD vers bedrag op uit DB
-        cur.execute("SELECT totaal_bedrag, bedrag_excl_btw, bedrag_btw FROM orders WHERE id = %s", (order_id,))
+        # Haal ALTIJD vers bedrag op uit order_artikelen
+        cur.execute("""
+            SELECT 
+                COALESCE(SUM(prijs_incl * aantal), 0) as totaal_bedrag
+            FROM order_artikelen
+            WHERE order_id = %s
+        """, (order_id,))
         vers_order = cur.fetchone()
         if not vers_order:
             raise HTTPException(status_code=404, detail="Order niet gevonden")
         
         vers_bedrag = float(vers_order.get("totaal_bedrag", 0)) if vers_order.get("totaal_bedrag") else 0.00
-        vers_bedrag_excl_btw = float(vers_order.get("bedrag_excl_btw", 0)) if vers_order.get("bedrag_excl_btw") else 0.00
-        vers_bedrag_btw = float(vers_order.get("bedrag_btw", 0)) if vers_order.get("bedrag_btw") else 0.00
+        # Bereken BTW bedragen on-the-fly (9% BTW)
+        vers_bedrag_excl_btw = round(vers_bedrag / 1.09, 2)
+        vers_bedrag_btw = round(vers_bedrag - vers_bedrag_excl_btw, 2)
         
         ordernummer = order.get("ordernummer", "")
         ordertype = order.get("ordertype") or "b2c"
@@ -1750,8 +1785,12 @@ async def opslaan_order(
         
         conn.commit()
         
-        # Haal totaal bedrag op voor response
-        cur.execute("SELECT totaal_bedrag FROM orders WHERE id = %s", (order_id,))
+        # Haal totaal bedrag op uit order_artikelen
+        cur.execute("""
+            SELECT COALESCE(SUM(prijs_incl * aantal), 0) as totaal_bedrag
+            FROM order_artikelen
+            WHERE order_id = %s
+        """, (order_id,))
         totaal_result = cur.fetchone()
         totaal_bedrag = float(totaal_result.get("totaal_bedrag", 0)) if totaal_result else 0.00
         
@@ -1786,7 +1825,17 @@ async def get_order_totaal(
         conn = psycopg2.connect(database_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        cur.execute("SELECT totaal_bedrag, betaal_status FROM orders WHERE id = %s", (order_id,))
+        cur.execute("""
+            SELECT 
+                COALESCE((
+                    SELECT SUM(oa.prijs_incl * oa.aantal)
+                    FROM order_artikelen oa
+                    WHERE oa.order_id = o.id
+                ), 0) as totaal_bedrag,
+                o.betaal_status
+            FROM orders o
+            WHERE o.id = %s
+        """, (order_id,))
         order = cur.fetchone()
         
         if not order:
@@ -1822,10 +1871,19 @@ async def update_factuur_pagina_verlaten(
         conn = psycopg2.connect(database_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Haal order op
+        # Haal order op met totaal uit order_artikelen
         cur.execute("""
-            SELECT o.totaal_bedrag, o.betaal_status, o.ordernummer, o.ordertype,
-                   c.email as klant_email, c.naam as klant_naam
+            SELECT 
+                COALESCE((
+                    SELECT SUM(oa.prijs_incl * oa.aantal)
+                    FROM order_artikelen oa
+                    WHERE oa.order_id = o.id
+                ), 0) as totaal_bedrag,
+                o.betaal_status, 
+                o.ordernummer, 
+                o.ordertype,
+                c.email as klant_email, 
+                c.naam as klant_naam
             FROM orders o
             LEFT JOIN contacten c ON o.klant_id = c.id
             WHERE o.id = %s
