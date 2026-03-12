@@ -886,9 +886,7 @@ async def verwerk_nieuwe_aanvraag(
         leverdatum_dt = datetime.strptime(leverdatum, "%Y-%m-%dT%H:%M")
         
         # Genereer ordernummer: FTHYYYYMMDDXXXX (zonder streepjes)
-        today = datetime.now()
-        random_suffix = random.randint(1000, 9999)
-        ordernummer = f"FTH{today.strftime('%Y%m%d')}{random_suffix:04d}"
+        ordernummer = "FTH" + datetime.now().strftime("%Y%m%d") + str(random.randint(1000, 9999))
         
         # Check of contact al bestaat op email
         cur.execute("SELECT id FROM contacten WHERE email = %s LIMIT 1", (klant_email,))

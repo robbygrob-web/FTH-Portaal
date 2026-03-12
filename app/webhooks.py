@@ -186,9 +186,7 @@ def get_or_create_contact(gravity_data: dict, cur, conn) -> str:
 def generate_ordernummer() -> str:
     """Genereer uniek ordernummer"""
     # Format: FTHYYYYMMDDXXXX (zonder streepjes)
-    today = datetime.now()
-    random_suffix = random.randint(1000, 9999)
-    return f"FTH{today.strftime('%Y%m%d')}{random_suffix:04d}"
+    return "FTH" + datetime.now().strftime("%Y%m%d") + str(random.randint(1000, 9999))
 
 
 @router.post("/gravity/aanvraag")
