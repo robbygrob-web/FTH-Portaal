@@ -744,7 +744,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                         if (savedBedrag) {{
                             huidigBedrag = parseFloat(savedBedrag);
                             sessionStorage.removeItem('bedrag_voor_redirect');
-                        }} else {{
+                        }                        } else {{
                             // Haal totaal op via API
                             fetch(window.location.pathname + '/totaal' + window.location.search)
                                 .then(function(r) {{ return r.json(); }})
@@ -754,9 +754,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                                     }} else if (result.totaal_bedrag !== undefined) {{
                                         huidigBedrag = parseFloat(result.totaal_bedrag);
                                     }}
-                                    if (huidigBedrag !== origineelBedrag) {{
-                                        updateFactuurKnop();
-                                    }}
+                                    updateFactuurKnop();
                                 }});
                         }}
                     }}
