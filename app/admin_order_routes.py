@@ -821,7 +821,9 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                                 }}
                                 
                                 // Update factuur knop als bedrag gewijzigd
-                                updateFactuurKnop();
+                                if (Math.abs(huidigBedrag - origineelBedrag) >= 0.01 && betaalStatus === 'factuur_verstuurd') {{
+                                    updateFactuurKnop();
+                                }}
                                 
                                 setTimeout(function() {{
                                     saveBtn.disabled = true;
