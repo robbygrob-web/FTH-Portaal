@@ -544,6 +544,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                 o.aantal_kinderen,
                 o.ordertype,
                 o.opmerkingen,
+                c.id as klant_id,
                 c.naam as klant_naam,
                 c.email as klant_email,
                 c.telefoon as klant_telefoon,
@@ -589,7 +590,9 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             portaal_status_text, portaal_status_color = format_portaal_status(order.get("portaal_status", "nieuw"))
             order_status_text, order_status_color = format_order_status(order.get("status", "draft"))
             
+            ordernummer = order.get("ordernummer") or "-"
             klant_naam = order.get("klant_naam") or "-"
+            klant_id = order.get("klant_id")
             plaats = order.get("plaats") or "-"
             leverdatum = format_datetime(order.get("leverdatum"))
             personen = order.get("aantal_personen", 0)
@@ -598,9 +601,11 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             partner_naam = order.get("partner_naam") or "-"
             
             order_id = str(order.get("id"))
+            klant_link = f"/admin/klant/{klant_id}?token={SESSION_SECRET}" if klant_id else "#"
             table_rows += f"""
             <tr>
-                <td><a href="/admin/order/{order_id}?token={SESSION_SECRET}" style="color:#333;text-decoration:none;font-weight:500;">{klant_naam}</a></td>
+                <td><a href="/admin/order/{order_id}?token={SESSION_SECRET}" style="color:#333;text-decoration:none;font-weight:500;">{ordernummer}</a></td>
+                <td><a href="{klant_link}" style="color:#333;text-decoration:none;font-weight:500;">{klant_naam}</a></td>
                 <td>{plaats}</td>
                 <td>{leverdatum}</td>
                 <td>{personen} / {kinderen}</td>
@@ -692,6 +697,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                 <table>
                     <thead>
                         <tr>
+                            <th>Ordernummer</th>
                             <th>Naam klant</th>
                             <th>Plaats</th>
                             <th>Leverdatum + tijd</th>
@@ -704,7 +710,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                         </tr>
                     </thead>
                     <tbody>
-                        {table_rows if table_rows else '<tr><td colspan="9" style="text-align:center;padding:40px;">Geen aanvragen gevonden</td></tr>'}
+                        {table_rows if table_rows else '<tr><td colspan="10" style="text-align:center;padding:40px;">Geen aanvragen gevonden</td></tr>'}
                     </tbody>
                 </table>
             </div>

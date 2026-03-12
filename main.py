@@ -96,9 +96,11 @@ app.include_router(templates_router)
 try:
     from app.admin_routes import router as admin_router, setup_router as admin_setup_router
     from app.admin_order_routes import router as admin_order_router
+    from app.admin_klant_routes import router as admin_klant_router
     app.include_router(admin_router)
     app.include_router(admin_setup_router)
     app.include_router(admin_order_router)
+    app.include_router(admin_klant_router)
     print(f"[DEBUG] Admin routers geregistreerd in app")
 except Exception as e:
     print(f"[WARNING] Admin router niet beschikbaar: {e}")

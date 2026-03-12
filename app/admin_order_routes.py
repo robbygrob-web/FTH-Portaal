@@ -7,7 +7,7 @@ import json
 import uuid
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, Depends, Request, Form
+from fastapi import APIRouter, HTTPException, Depends, Request, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import Optional
 import psycopg2
@@ -608,6 +608,7 @@ async def claim_order(
 async def verstuur_offerte(
     request: Request,
     order_id: str,
+    background_tasks: BackgroundTasks,
     verified: bool = Depends(verify_admin_session)
 ):
     """Verstuur offerte via email"""
@@ -668,19 +669,7 @@ async def verstuur_offerte(
             bevestig_html = f'<p style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px;"><strong>Bevestig uw aanvraag:</strong><br><a href="{bevestig_link}" style="color: #fec82a; font-weight: bold; text-decoration: none;">Klik hier om uw aanvraag te bevestigen</a></p>'
             template_html = template_html + bevestig_html
         
-        # Verstuur mail
-        result = stuur_mail(
-            naar=klant_email,
-            onderwerp=f"Offerte {order.get('ordernummer', '')}",
-            inhoud=template_html,
-            order_id=order_id,
-            template_naam=template_name
-        )
-        
-        if not result.get("success"):
-            raise HTTPException(status_code=500, detail=f"Mail verzending gefaald: {result.get('error')}")
-        
-        # Update order status
+        # Update order status direct (voor redirect)
         cur.execute("""
             UPDATE orders
             SET status = 'sent', updated_at = CURRENT_TIMESTAMP
@@ -688,6 +677,16 @@ async def verstuur_offerte(
         """, (order_id,))
         
         conn.commit()
+        
+        # Verstuur mail in background (niet blokkerend)
+        background_tasks.add_task(
+            stuur_mail,
+            naar=klant_email,
+            onderwerp=f"Offerte {order.get('ordernummer', '')}",
+            inhoud=template_html,
+            order_id=order_id,
+            template_naam=template_name
+        )
         
         return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
         
