@@ -380,7 +380,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                 factuur_knoppen = '<p style="color:#666;">Order al betaald - geen wijzigingen mogelijk</p>'
             elif betaal_status == "factuur_verstuurd" and heeft_factuur:
                 # Factuur al verstuurd, toon "nogmaals versturen" knop
-                factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur-nogmaals?token={SESSION_SECRET}" style="display:inline;" onsubmit="window.factuurVerstuurd = true;"><button type="submit" class="btn">Verstuur factuur nogmaals</button></form>'
+                factuur_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-factuur-nogmaals?token={SESSION_SECRET}" style="display:inline;" onsubmit="window.factuurVerstuurd = true;"><button type="submit" id="verstuur-factuur-btn" class="btn">Verstuur factuur nogmaals</button></form>'
             elif not betaal_status or betaal_status == "onbetaald":
                 # Nog geen factuur verstuurd, toon normale knop
                 if not heeft_factuur:
@@ -691,6 +691,35 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     // Expose factuurVerstuurd voor onsubmit handler
                     window.factuurVerstuurd = false;
 
+                    // Functie om factuur knop aan te passen
+                    function updateFactuurKnop() {{
+                        const factuurBtn = document.getElementById('verstuur-factuur-btn');
+                        if (!factuurBtn) return;
+                        
+                        if (betaalStatus === 'factuur_verstuurd' && Math.abs(huidigBedrag - origineelBedrag) >= 0.01) {{
+                            factuurBtn.textContent = 'Verstuur aangepaste factuur';
+                            factuurBtn.className = 'btn orange';
+                            factuurBtn.setAttribute('data-aangepast', 'true');
+                        }} else {{
+                            factuurBtn.textContent = 'Verstuur factuur nogmaals';
+                            factuurBtn.className = 'btn';
+                            factuurBtn.removeAttribute('data-aangepast');
+                        }}
+                    }}
+
+                    // Event listener voor factuur knop klik
+                    const factuurBtn = document.getElementById('verstuur-factuur-btn');
+                    if (factuurBtn) {{
+                        factuurBtn.addEventListener('click', function() {{
+                            if (factuurBtn.getAttribute('data-aangepast') === 'true') {{
+                                window.factuurVerstuurd = true;
+                                factuurBtn.textContent = 'Factuur verstuurd';
+                                factuurBtn.className = 'btn';
+                                factuurBtn.disabled = true;
+                            }}
+                        }});
+                    }}
+
                     // Check URL parameter voor saved status
                     const urlParams = new URLSearchParams(window.location.search);
                     if (urlParams.get('saved') === '1') {{
@@ -713,12 +742,18 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                             fetch(window.location.pathname + '/totaal' + window.location.search)
                                 .then(function(r) {{ return r.json(); }})
                                 .then(function(result) {{
-                                    if (result.totaal_bedrag !== undefined) {{
+                                    if (result.totaal !== undefined) {{
+                                        huidigBedrag = parseFloat(result.totaal);
+                                    }} else if (result.totaal_bedrag !== undefined) {{
                                         huidigBedrag = parseFloat(result.totaal_bedrag);
                                     }}
+                                    updateFactuurKnop();
                                 }});
                         }}
                     }}
+                    
+                    // Initialiseer factuur knop status
+                    updateFactuurKnop();
 
                     fields.forEach(function(field) {{
                         field.addEventListener('input', function() {{
@@ -760,6 +795,9 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                                 if (result.totaal_bedrag !== undefined) {{
                                     huidigBedrag = parseFloat(result.totaal_bedrag);
                                 }}
+                                
+                                // Update factuur knop als bedrag gewijzigd
+                                updateFactuurKnop();
                                 
                                 setTimeout(function() {{
                                     saveBtn.disabled = true;
