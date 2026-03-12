@@ -416,20 +416,11 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
         except (ValueError, TypeError):
             pass
         
-        # Bereken bedragen (9% BTW voor eten/drank)
-        btw_pct = 9.0
-        if totaal_bedrag > 0:
-            # Als totaal_bedrag inclusief BTW is, bereken excl BTW
-            # Anders is het al excl BTW
-            # We gaan ervan uit dat het inclusief BTW is als het een rond getal is
-            # Anders exclusief BTW
-            bedrag_excl_btw = round(totaal_bedrag / (1 + btw_pct / 100), 2)
-            bedrag_btw = round(bedrag_excl_btw * (btw_pct / 100), 2)
-            totaal_bedrag_calc = round(bedrag_excl_btw + bedrag_btw, 2)
-        else:
-            bedrag_excl_btw = 0.00
-            bedrag_btw = 0.00
-            totaal_bedrag_calc = 0.00
+        # Prijs wordt berekend na het toevoegen van artikelen
+        # Initieel op 0, wordt geupdate na artikel toevoeging
+        bedrag_excl_btw = 0.00
+        bedrag_btw = 0.00
+        totaal_bedrag_calc = 0.00
         
         # Haal UTM tracking data op (AFL UTM Tracker plugin)
         # UTM data komt uit directe veldnamen, niet uit veldnummers
@@ -546,30 +537,49 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     conn.commit()
                     _LOG.info(f"Order artikel toegevoegd: {naam} (aantal: {aantal})")
                 
-                # 1. Hoofdartikel uit veld "69" (prioriteit) of "57.1" met aantal uit "57.3"
+                # 1. Hoofdartikel (pakket) uit veld "69" (prioriteit) of "57.1"
+                # Aantal = aantal_personen, prijs_incl = prijs per persoon
                 artikel_naam = body.get("69", "").split("|")[0].strip()
                 if not artikel_naam:
                     artikel_naam = body.get("57.1") or ""
                 if artikel_naam:
                     artikel = get_artikel_by_naam(artikel_naam)
                     if artikel:
-                        aantal_artikel = body.get("57.3") or "1"
-                        try:
-                            aantal_artikel = Decimal(str(aantal_artikel))
-                        except (ValueError, TypeError):
-                            aantal_artikel = Decimal("1")
+                        # Gebruik aantal_personen als aantal, prijs per persoon
+                        pakket_aantal = Decimal(str(aantal_personen)) if aantal_personen > 0 else Decimal("1")
+                        pakket_prijs_per_persoon = Decimal(str(artikel[5]))  # prijs_incl per persoon
+                        pakket_prijs_excl_per_persoon = Decimal(str(artikel[2]))  # prijs_excl per persoon
+                        pakket_btw_pct = Decimal(str(artikel[3]))  # btw_pct
+                        pakket_btw_bedrag_per_persoon = Decimal(str(artikel[4]))  # btw_bedrag per persoon
                         
                         add_order_artikel(
                             artikel[0],  # artikel_id
                             artikel[1],  # naam
-                            aantal_artikel,
-                            Decimal(str(artikel[2])),  # prijs_excl
-                            Decimal(str(artikel[3])),  # btw_pct
-                            Decimal(str(artikel[4])),  # btw_bedrag
-                            Decimal(str(artikel[5]))   # prijs_incl
+                            pakket_aantal,  # aantal = aantal_personen
+                            pakket_prijs_excl_per_persoon,  # prijs_excl per persoon
+                            pakket_btw_pct,  # btw_pct
+                            pakket_btw_bedrag_per_persoon,  # btw_bedrag per persoon
+                            pakket_prijs_per_persoon  # prijs_incl per persoon
                         )
                     else:
                         _LOG.warning(f"Artikel niet gevonden in artikelen tabel: {artikel_naam}")
+                
+                # 1b. Kinderpakket toevoegen als aantal_kinderen > 0
+                if aantal_kinderen > 0:
+                    kinderpakket_prijs_per_stuk = Decimal("6.50")
+                    kinderpakket_btw_pct = Decimal("9")
+                    kinderpakket_prijs_excl = kinderpakket_prijs_per_stuk / (Decimal("1") + kinderpakket_btw_pct / Decimal("100"))
+                    kinderpakket_btw_bedrag = kinderpakket_prijs_per_stuk - kinderpakket_prijs_excl
+                    
+                    add_order_artikel(
+                        None,  # artikel_id (geen artikel in tabel)
+                        "Kinderpakket",  # naam
+                        Decimal(str(aantal_kinderen)),  # aantal
+                        kinderpakket_prijs_excl,
+                        kinderpakket_btw_pct,
+                        kinderpakket_btw_bedrag,
+                        kinderpakket_prijs_per_stuk
+                    )
                 
                 # 2. Reiskosten altijd toevoegen
                 reiskosten_artikel = get_artikel_by_naam("Reiskosten")
@@ -636,6 +646,97 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                         )
                     else:
                         _LOG.warning("Drankjes artikel niet gevonden in artikelen tabel")
+                
+                # Stap 4: Bereken totaalprijs volgens nieuwe logica
+                # Haal alle order_artikelen op (zonder reiskosten)
+                cur.execute("""
+                    SELECT naam, aantal, prijs_incl
+                    FROM order_artikelen
+                    WHERE order_id = %s AND naam != 'Reiskosten'
+                """, (order_id,))
+                artikelen_zonder_reis = cur.fetchall()
+                
+                # Bereken subtotaal
+                pakketprijs = Decimal("0")
+                kinderpakket_prijs = Decimal("0")
+                broodjes_prijs = Decimal("0")
+                drankjes_prijs = Decimal("0")
+                
+                for art in artikelen_zonder_reis:
+                    naam = art[0]  # naam (eerste kolom)
+                    aantal = Decimal(str(art[1]))  # aantal (tweede kolom)
+                    prijs_per_stuk = Decimal(str(art[2]))  # prijs_incl (derde kolom)
+                    totaal_regel = aantal * prijs_per_stuk
+                    
+                    if "Kinderpakket" in naam:
+                        kinderpakket_prijs += totaal_regel
+                    elif naam == "Broodjes":
+                        broodjes_prijs += totaal_regel
+                    elif naam == "Drankjes":
+                        drankjes_prijs += totaal_regel
+                    else:
+                        # Pakket artikel
+                        pakketprijs += totaal_regel
+                
+                # Als pakketprijs 0 is maar er wel personen zijn, gebruik fallback
+                if pakketprijs == 0 and aantal_personen > 0:
+                    # Zoek pakket artikel opnieuw
+                    artikel_naam = body.get("69", "").split("|")[0].strip()
+                    if not artikel_naam:
+                        artikel_naam = body.get("57.1") or ""
+                    if artikel_naam:
+                        artikel = get_artikel_by_naam(artikel_naam)
+                        if artikel:
+                            pakket_prijs_per_persoon = Decimal(str(artikel[5]))
+                            pakketprijs = pakket_prijs_per_persoon * Decimal(str(aantal_personen))
+                
+                # Bereken subtotaal
+                subtotaal = pakketprijs + kinderpakket_prijs + broodjes_prijs + drankjes_prijs
+                
+                # Minimum subtotaal = 500
+                if subtotaal < Decimal("500"):
+                    subtotaal = Decimal("500")
+                
+                # Reiskosten = altijd 75.00 (apart, telt NIET mee voor minimum)
+                reiskosten = Decimal("75.00")
+                
+                # Totaal = subtotaal + reiskosten
+                totaal_bedrag_calc = subtotaal + reiskosten
+                
+                # Bereken BTW bedragen
+                btw_pct = Decimal("9")
+                bedrag_excl_btw = totaal_bedrag_calc / (Decimal("1") + btw_pct / Decimal("100"))
+                bedrag_btw = totaal_bedrag_calc - bedrag_excl_btw
+                
+                # Update orders tabel met berekende bedragen
+                cur.execute("""
+                    UPDATE orders
+                    SET totaal_bedrag = %s,
+                        bedrag_excl_btw = %s,
+                        bedrag_btw = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (
+                    float(totaal_bedrag_calc),
+                    float(bedrag_excl_btw),
+                    float(bedrag_btw),
+                    order_id
+                ))
+                conn.commit()
+                
+                # Log berekening duidelijk
+                _LOG.info("=" * 60)
+                _LOG.info(f"[PRIJSBEREKENING] Order {ordernummer}")
+                _LOG.info(f"  Pakketprijs: € {float(pakketprijs):,.2f} ({aantal_personen} personen)")
+                _LOG.info(f"  Kinderpakket: € {float(kinderpakket_prijs):,.2f} ({aantal_kinderen} kinderen)")
+                _LOG.info(f"  Broodjes: € {float(broodjes_prijs):,.2f}")
+                _LOG.info(f"  Drankjes: € {float(drankjes_prijs):,.2f}")
+                _LOG.info(f"  Subtotaal: € {float(subtotaal):,.2f}")
+                _LOG.info(f"  Reiskosten: € {float(reiskosten):,.2f}")
+                _LOG.info(f"  TOTAAL: € {float(totaal_bedrag_calc):,.2f}")
+                _LOG.info(f"  Bedrag excl BTW: € {float(bedrag_excl_btw):,.2f}")
+                _LOG.info(f"  BTW bedrag: € {float(bedrag_btw):,.2f}")
+                _LOG.info("=" * 60)
                         
             except psycopg2.Error as e:
                 _LOG.warning(f"Fout bij toevoegen order artikelen: {e}")
@@ -651,9 +752,14 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
             _LOG.info(f"  Aantal personen: {aantal_personen}")
             _LOG.info(f"  Aantal kinderen: {aantal_kinderen}")
             _LOG.info(f"  Leverdatum: {leverdatum}")
-            _LOG.info(f"  Totaal bedrag: €{totaal_bedrag_calc:.2f}")
-            _LOG.info(f"  Bedrag excl BTW: €{bedrag_excl_btw:.2f}")
-            _LOG.info(f"  BTW bedrag: €{bedrag_btw:.2f}")
+            # Totaal bedrag wordt getoond in prijsberekening sectie hierboven
+            # Haal laatste waarden op uit database
+            cur.execute("SELECT totaal_bedrag, bedrag_excl_btw, bedrag_btw FROM orders WHERE id = %s", (order_id,))
+            order_totals = cur.fetchone()
+            if order_totals:
+                _LOG.info(f"  Totaal bedrag: €{float(order_totals[0]):,.2f}")
+                _LOG.info(f"  Bedrag excl BTW: €{float(order_totals[1]):,.2f}")
+                _LOG.info(f"  BTW bedrag: €{float(order_totals[2]):,.2f}")
             _LOG.info(f"  UTM Source: {utm_source or 'Geen'}")
             _LOG.info(f"  UTM Medium: {utm_medium or 'Geen'}")
             _LOG.info(f"  UTM Campaign: {utm_campaign or 'Geen'}")
