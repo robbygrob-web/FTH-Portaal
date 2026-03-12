@@ -365,6 +365,54 @@ async def toon_orders(request: Request):
             conn.close()
 
 
+@setup_router.get("/toon-order-detail")
+async def toon_order_detail(request: Request):
+    """Tijdelijk endpoint om alle kolommen van één order te tonen"""
+    token = request.query_params.get("token")
+    if token != SESSION_SECRET:
+        raise HTTPException(status_code=403)
+    
+    order_id = request.query_params.get("id", "69b29b70-ceb2-4d07-887a-6bf4491e524d")
+    
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cur.execute("""
+            SELECT * FROM orders 
+            WHERE id = %s
+        """, (order_id,))
+        
+        order = cur.fetchone()
+        
+        if not order:
+            return JSONResponse({"error": "Order niet gevonden", "order_id": order_id}, status_code=404)
+        
+        # Converteer naar dict (RealDictCursor geeft al dict terug)
+        result = dict(order)
+        
+        # Converteer UUID en datetime naar strings voor JSON serialisatie
+        for key, value in result.items():
+            if value is None:
+                continue
+            if hasattr(value, 'isoformat'):  # datetime/date
+                result[key] = value.isoformat()
+            elif hasattr(value, '__str__') and not isinstance(value, (str, int, float, bool)):
+                result[key] = str(value)
+        
+        return JSONResponse({"order": result})
+        
+    except Exception as e:
+        _LOG.error(f"Fout bij ophalen order detail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
 @setup_router.post("/init-db")
 async def init_database(verified: bool = Depends(verify_admin_token)):
     """
