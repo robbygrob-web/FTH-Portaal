@@ -301,6 +301,23 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         if not order:
             raise HTTPException(status_code=404, detail="Order niet gevonden")
         
+        # Haal vorige en volgende order op voor navigatie
+        cur.execute("""
+            SELECT id FROM orders 
+            WHERE created_at < (SELECT created_at FROM orders WHERE id = %s)
+            ORDER BY created_at DESC LIMIT 1
+        """, (order_id,))
+        vorige_order = cur.fetchone()
+        vorige_order_id = str(vorige_order.get("id")) if vorige_order else None
+        
+        cur.execute("""
+            SELECT id FROM orders 
+            WHERE created_at > (SELECT created_at FROM orders WHERE id = %s)
+            ORDER BY created_at ASC LIMIT 1
+        """, (order_id,))
+        volgende_order = cur.fetchone()
+        volgende_order_id = str(volgende_order.get("id")) if volgende_order else None
+        
         # Haal order_artikelen op
         cur.execute("""
             SELECT 
@@ -460,15 +477,19 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         
         # Offerte knoppen
         offerte_knoppen = ""
-        if order_status in ["draft", "sent"]:
-            if order_status == "draft":
-                offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-offerte?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur offerte</button></form>'
-            else:
-                offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-offerte?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur gewijzigde offerte</button></form>'
-        
-        # Bevestigingsknop (alleen als status != 'sale')
-        if order_status != "sale":
-            offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/bevestig?token={SESSION_SECRET}" style="display:inline;margin-left:10px;"><button type="submit" class="btn">Bevestig order</button></form>'
+        if order_status != "geannuleerd":
+            if order_status in ["draft", "sent"]:
+                if order_status == "draft":
+                    offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-offerte?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur offerte</button></form>'
+                else:
+                    offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-offerte?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur gewijzigde offerte</button></form>'
+            
+            # Bevestigingsknop (alleen als status != 'sale')
+            if order_status != "sale":
+                offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/bevestig?token={SESSION_SECRET}" style="display:inline;margin-left:10px;"><button type="submit" class="btn">Bevestig order</button></form>'
+            
+            # Annuleer knop (alleen als status niet al geannuleerd)
+            offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/annuleer?token={SESSION_SECRET}" style="display:inline;margin-left:10px;"><button type="submit" class="btn" style="background:#dc3545;">Annuleer order</button></form>'
         
         # Factuur knoppen
         factuur_knoppen = ""
@@ -663,11 +684,28 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
             <div class="header">
                 <a href="/admin?token={SESSION_SECRET}" class="back-link">← Terug naar dashboard</a>
                 <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <h1>Aanvraag: {order.get('ordernummer', 'N/A')}</h1>
-                        {f'<p style="color:#666;margin-top:5px;font-size:14px;">GF Referentie: {order.get("gf_referentie", "-")}</p>' if order.get('gf_referentie') else ''}
+                    <div style="display:flex;align-items:center;gap:15px;">
+                        <div style="display:flex;gap:5px;">
+                            <a href="{f'/admin/order/{vorige_order_id}?token={SESSION_SECRET}' if vorige_order_id else '#'}" 
+                               class="btn" 
+                               style="padding:8px 12px;text-decoration:none;{'pointer-events:none;opacity:0.5;' if not vorige_order_id else ''}"
+                               {'onclick="return false;"' if not vorige_order_id else ''}>←</a>
+                            <a href="{f'/admin/order/{volgende_order_id}?token={SESSION_SECRET}' if volgende_order_id else '#'}" 
+                               class="btn" 
+                               style="padding:8px 12px;text-decoration:none;{'pointer-events:none;opacity:0.5;' if not volgende_order_id else ''}"
+                               {'onclick="return false;"' if not volgende_order_id else ''}>→</a>
+                        </div>
+                        <div>
+                            <h1>Aanvraag: {order.get('ordernummer', 'N/A')}</h1>
+                            {f'<p style="color:#666;margin-top:5px;font-size:14px;">GF Referentie: {order.get("gf_referentie", "-")}</p>' if order.get('gf_referentie') else ''}
+                        </div>
                     </div>
-                    <button id="save-btn" class="save-btn" disabled>Geen wijzigingen</button>
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <form method="post" action="/admin/order/{order_id}/verwijder?token={SESSION_SECRET}" style="display:inline;" onsubmit="return confirm('Weet je zeker dat je deze order wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.');">
+                            <button type="submit" class="btn" style="background:#dc3545;">Verwijder</button>
+                        </form>
+                        <button id="save-btn" class="save-btn" disabled>Geen wijzigingen</button>
+                    </div>
                 </div>
             </div>
             
