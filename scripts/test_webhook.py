@@ -136,7 +136,10 @@ def get_pakket_prijs(pakket_naam):
 
 def create_payload(contact, order_config):
     """Maak Gravity Forms payload voor één order"""
-    voornaam, achternaam = split_naam(contact.get("naam", ""))
+    # Hardcoded contactgegevens voor test orders
+    voornaam = "Robby"
+    achternaam = "Test"
+    email = "robbygrob@gmail.com"
     
     # Gebruik adres of straat (adres heeft prioriteit)
     adres = contact.get("adres") or contact.get("straat") or ""
@@ -162,7 +165,7 @@ def create_payload(contact, order_config):
     
     payload = {
         # Contact gegevens
-        "21": contact.get("email", ""),  # Email
+        "21": email,  # Email
         "24": contact.get("telefoon", ""),  # Telefoon
         "25": voornaam,  # Voornaam
         "26": achternaam,  # Achternaam
