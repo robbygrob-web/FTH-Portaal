@@ -889,8 +889,18 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             leverdatum = format_datetime(order.get("leverdatum"))
             personen = order.get("aantal_personen", 0)
             kinderen = order.get("aantal_kinderen", 0)
-            totaal = float(order.get("totaal_bedrag", 0))
+            totaal = float(order.get("totaal_bedrag", 0)) if order.get("totaal_bedrag") else 0.0
             partner_naam = order.get("partner_naam") or "-"
+            
+            # Bereken BTW (9%): BTW = totaal - (totaal / 1.09)
+            btw_bedrag = round(totaal - (totaal / 1.09), 2) if totaal > 0 else 0.0
+            
+            # Bereken partnerprijs: commissie over totaal (15% tot 575, daarna 20%)
+            # Geen ordertype filter - altijd dezelfde berekening
+            commissie_deel_1 = min(totaal, 575) * 0.15
+            commissie_deel_2 = max(totaal - 575, 0) * 0.20
+            commissie_totaal = commissie_deel_1 + commissie_deel_2
+            prijs_partner = round(totaal - commissie_totaal, 2)
             
             order_id = str(order.get("id"))
             klant_link = f"/admin/klant/{klant_id}?token={SESSION_SECRET}" if klant_id else "#"
@@ -903,6 +913,8 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                 <td>{leverdatum}</td>
                 <td>{personen} / {kinderen}</td>
                 <td>€ {totaal:,.2f}</td>
+                <td>€ {btw_bedrag:,.2f}</td>
+                <td>€ {prijs_partner:,.2f}</td>
                 <td><span style="color:{portaal_status_color};">{portaal_status_text}</span></td>
                 <td><span style="color:{order_status_color};">{order_status_text}</span></td>
                 <td>{partner_naam}</td>
