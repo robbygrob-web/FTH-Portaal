@@ -265,3 +265,29 @@ def format_currency(amount) -> str:
     if not amount:
         return "0,00"
     return f"{float(amount):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def render_offerte_v10(
+    voornaam: str,
+    aantal_personen: int,
+    aantal_kinderen: int,
+    datum_str: str,
+    tijdstip: str,
+    locatie: str,
+    pakket_naam: str,
+    totaal_str: str,
+    bevestig_url: str,
+    notitie_klant: str = ""
+) -> str:
+    html = load_email_template("offerte_v10.html")
+    return html.format(
+        voornaam=voornaam,
+        aantal_personen=aantal_personen,
+        aantal_kinderen=aantal_kinderen,
+        datum_str=datum_str,
+        tijdstip=tijdstip,
+        locatie=locatie,
+        pakket_naam=pakket_naam,
+        totaal_str=totaal_str,
+        bevestig_url=bevestig_url,
+    )
