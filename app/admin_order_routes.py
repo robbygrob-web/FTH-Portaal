@@ -477,7 +477,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
         
         # Offerte knoppen
         offerte_knoppen = ""
-        if order_status != "geannuleerd":
+        if order_status != "cancel":
             if order_status in ["draft", "sent"]:
                 if order_status == "draft":
                     offerte_knoppen += f'<form method="post" action="/admin/order/{order_id}/verstuur-offerte?token={SESSION_SECRET}" style="display:inline;"><button type="submit" class="btn">Verstuur offerte</button></form>'
@@ -802,7 +802,7 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     <div class="info-item">
                         <div class="info-label">Status offerte</div>
                         <div class="info-value">
-                            {f'<span style="background:#dc3545;color:white;padding:4px 8px;border-radius:4px;font-size:12px;">Geannuleerd</span>' if order_status == 'geannuleerd' else order_status}
+                            {f'<span style="background:#dc3545;color:white;padding:4px 8px;border-radius:4px;font-size:12px;">Geannuleerd</span>' if order_status == 'cancel' else order_status}
                         </div>
                     </div>
                     <div class="info-item">
@@ -1795,7 +1795,7 @@ async def annuleer_order(
     order_id: str,
     verified: bool = Depends(verify_admin_session)
 ):
-    """Annuleer order (zet status naar geannuleerd)"""
+    """Annuleer order (zet status naar cancel)"""
     conn = None
     try:
         database_url = get_database_url()
@@ -1809,10 +1809,10 @@ async def annuleer_order(
         if not order:
             raise HTTPException(status_code=404, detail="Order niet gevonden")
         
-        # Update order status naar geannuleerd
+        # Update order status naar cancel
         cur.execute("""
             UPDATE orders
-            SET status = 'geannuleerd', updated_at = CURRENT_TIMESTAMP
+            SET status = 'cancel', updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (order_id,))
         

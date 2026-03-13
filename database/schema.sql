@@ -110,7 +110,7 @@ CREATE TABLE orders (
     -- Odoo sync (tijdelijk)
     odoo_id INTEGER UNIQUE,
     
-    CONSTRAINT orders_status_check CHECK (status IN ('draft', 'sent', 'sale', 'geannuleerd')),
+    CONSTRAINT orders_status_check CHECK (status IN ('sent', 'sale', 'draft', 'cancel')),
     CONSTRAINT orders_portaal_status_check CHECK (portaal_status IN ('nieuw', 'beschikbaar', 'claimed', 'transfer'))
 );
 

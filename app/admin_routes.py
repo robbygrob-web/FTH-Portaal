@@ -861,7 +861,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                 "sale": ("Verkooporder", "#27ae60"),
                 "definitief": ("Definitief", "#27ae60"),  # Groen voor definitief
                 "draft": ("Concept", "#999"),
-                "geannuleerd": ("Geannuleerd", "#dc3545")
+                "cancel": ("Geannuleerd", "#dc3545")
             }
             return status_map.get(status, (status, "#999"))
         
