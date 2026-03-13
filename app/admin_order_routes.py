@@ -16,6 +16,7 @@ from app.config import SESSION_SECRET
 from app.mail import stuur_mail
 from app.admin_routes import verify_admin_session, get_database_url
 from app.mollie_client import create_payment, cancel_payment
+from app.templates import render_offerte_v10, format_dutch_date, format_time, format_currency
 import random
 
 _LOG = logging.getLogger(__name__)
@@ -1392,17 +1393,36 @@ async def verstuur_offerte(
         if not klant_email:
             raise HTTPException(status_code=400, detail="Geen email adres gevonden voor klant")
         
-        # Bepaal template naam
-        order_status = order.get("status", "draft")
-        if order_status == "draft":
-            template_name = "Verkoop: Offerte verzenden test 2.0"
-        else:
-            template_name = "Verkoop: Offerte aanpassing verzenden"
+        klant_naam = order.get("klant_naam", "")
         
-        # Laad template
-        template_html = load_template(template_name)
-        if not template_html:
-            raise HTTPException(status_code=500, detail=f"Template '{template_name}' niet gevonden")
+        # Haal order_artikelen op
+        cur.execute("""
+            SELECT oa.naam, oa.aantal, oa.prijs_incl
+            FROM order_artikelen oa
+            WHERE oa.order_id = %s
+            ORDER BY oa.created_at
+        """, (order_id,))
+        
+        order_artikelen = cur.fetchall()
+        
+        # Bepaal pakket_naam: eerste artikel dat niet 'Reiskosten' of 'Toeslag' is
+        pakket_naam = ""
+        for artikel in order_artikelen:
+            naam = artikel.get("naam", "")
+            if naam and naam.lower() not in ["reiskosten", "toeslag"]:
+                pakket_naam = naam
+                break
+        
+        # Fallback als geen pakket gevonden
+        if not pakket_naam and order_artikelen:
+            pakket_naam = order_artikelen[0].get("naam", "Pakket")
+        
+        # Bereken totaal: SUM(prijs_incl * aantal) uit order_artikelen
+        totaal = 0.0
+        for artikel in order_artikelen:
+            prijs_incl = float(artikel.get("prijs_incl", 0) or 0)
+            aantal = float(artikel.get("aantal", 0) or 0)
+            totaal += prijs_incl * aantal
         
         # Genereer bevestig token (UUID4)
         bevestig_token = str(uuid.uuid4())
@@ -1417,15 +1437,25 @@ async def verstuur_offerte(
         # Maak bevestigingslink
         bevestig_link = f"https://fth-portaal-production.up.railway.app/bevestig/{bevestig_token}"
         
-        # Voeg bevestigingslink toe aan template
-        # Zoek naar einde van body of voeg toe aan einde
-        if "</body>" in template_html:
-            bevestig_html = f'<p style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px;"><strong>Bevestig uw aanvraag:</strong><br><a href="{bevestig_link}" style="color: #fec82a; font-weight: bold; text-decoration: none;">Klik hier om uw aanvraag te bevestigen</a></p>'
-            template_html = template_html.replace("</body>", bevestig_html + "</body>")
+        # Bepaal template naam (voor logging)
+        order_status = order.get("status", "draft")
+        if order_status == "draft":
+            template_name = "Verkoop: Offerte verzenden test 2.0"
         else:
-            # Als geen body tag, voeg toe aan einde
-            bevestig_html = f'<p style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px;"><strong>Bevestig uw aanvraag:</strong><br><a href="{bevestig_link}" style="color: #fec82a; font-weight: bold; text-decoration: none;">Klik hier om uw aanvraag te bevestigen</a></p>'
-            template_html = template_html + bevestig_html
+            template_name = "Verkoop: Offerte aanpassing verzenden"
+        
+        # Render template
+        template_html = render_offerte_v10(
+            voornaam=klant_naam.split()[0] if klant_naam else "klant",
+            aantal_personen=order.get("aantal_personen") or 0,
+            aantal_kinderen=order.get("aantal_kinderen") or 0,
+            datum_str=format_dutch_date(order.get("leverdatum")),
+            tijdstip=format_time(order.get("leverdatum")),
+            locatie=order.get("plaats") or "",
+            pakket_naam=pakket_naam,
+            totaal_str=format_currency(totaal),
+            bevestig_url=bevestig_link,
+        )
         
         # Update order status direct (voor redirect)
         cur.execute("""
