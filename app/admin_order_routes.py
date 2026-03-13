@@ -763,7 +763,9 @@ async def order_detail(request: Request, order_id: str, verified: bool = Depends
                     </div>
                     <div class="info-item">
                         <div class="info-label">Status offerte</div>
-                        <div class="info-value">{order_status}</div>
+                        <div class="info-value">
+                            {f'<span style="background:#dc3545;color:white;padding:4px 8px;border-radius:4px;font-size:12px;">Geannuleerd</span>' if order_status == 'geannuleerd' else order_status}
+                        </div>
                     </div>
                     <div class="info-item">
                         <div class="info-label">Partner</div>
@@ -1743,6 +1745,93 @@ async def bevestig_order(
             conn.rollback()
         _LOG.error(f"Fout bij bevestigen order: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout bij bevestigen order: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/{order_id}/annuleer")
+async def annuleer_order(
+    request: Request,
+    order_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Annuleer order (zet status naar geannuleerd)"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check of order bestaat
+        cur.execute("SELECT id, status FROM orders WHERE id = %s", (order_id,))
+        order = cur.fetchone()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order niet gevonden")
+        
+        # Update order status naar geannuleerd
+        cur.execute("""
+            UPDATE orders
+            SET status = 'geannuleerd', updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (order_id,))
+        
+        conn.commit()
+        
+        return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij annuleren order: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij annuleren order: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/{order_id}/verwijder")
+async def verwijder_order(
+    request: Request,
+    order_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Verwijder order en bijbehorende order_artikelen"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check of order bestaat
+        cur.execute("SELECT id FROM orders WHERE id = %s", (order_id,))
+        order = cur.fetchone()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order niet gevonden")
+        
+        # Verwijder order_artikelen eerst (CASCADE zou dit automatisch doen, maar expliciet is beter)
+        cur.execute("DELETE FROM order_artikelen WHERE order_id = %s", (order_id,))
+        
+        # Verwijder order
+        cur.execute("DELETE FROM orders WHERE id = %s", (order_id,))
+        
+        conn.commit()
+        
+        return RedirectResponse(url=f"/admin?token={SESSION_SECRET}", status_code=303)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij verwijderen order: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij verwijderen order: {str(e)}")
     finally:
         if conn:
             cur.close()
