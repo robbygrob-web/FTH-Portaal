@@ -75,6 +75,8 @@ TEST_ORDERS = [
 def get_last_contact():
     """Haal het laatste contact record op uit de contacten tabel"""
     database_url = os.getenv("DATABASE_URL")
+    if database_url and "railway.internal" in database_url:
+        database_url = os.getenv("DATABASE_PUBLIC_URL", database_url)
     if not database_url:
         print("FOUT: DATABASE_URL niet gevonden in .env")
         sys.exit(1)
