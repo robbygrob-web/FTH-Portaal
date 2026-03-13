@@ -525,7 +525,7 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     cur.execute("""
                         SELECT id, naam, prijs_incl
                         FROM artikelen
-                        WHERE naam = %s AND actief = TRUE
+                        WHERE LOWER(naam) = LOWER(%s) AND actief = TRUE
                         LIMIT 1
                     """, (naam,))
                     return cur.fetchone()
