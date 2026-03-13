@@ -799,6 +799,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
         # Haal orders op met contact informatie en partner
+        # Totaal wordt berekend uit order_artikelen via subquery
         cur.execute("""
             SELECT 
                 o.id,
@@ -812,9 +813,11 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                      AND o.portaal_status IN ('claimed','transfer') 
                      THEN 'definitief'
                      ELSE o.status END as offerte_status_label,
-                o.totaal_bedrag,
-                o.bedrag_excl_btw,
-                o.bedrag_btw,
+                COALESCE((
+                    SELECT SUM(oa.prijs_incl * oa.aantal)
+                    FROM order_artikelen oa
+                    WHERE oa.order_id = o.id
+                ), 0) as totaal_bedrag,
                 o.plaats,
                 o.aantal_personen,
                 o.aantal_kinderen,
@@ -996,6 +999,8 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                             <th>Leverdatum + tijd</th>
                             <th>Aantal personen / kinderen</th>
                             <th>Totaalprijs incl. BTW</th>
+                            <th>BTW</th>
+                            <th>Prijs partner</th>
                             <th>Status portaal</th>
                             <th>Status offerte</th>
                             <th>Partner</th>
@@ -1003,7 +1008,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                         </tr>
                     </thead>
                     <tbody>
-                        {table_rows if table_rows else '<tr><td colspan="10" style="text-align:center;padding:40px;">Geen aanvragen gevonden</td></tr>'}
+                        {table_rows if table_rows else '<tr><td colspan="12" style="text-align:center;padding:40px;">Geen aanvragen gevonden</td></tr>'}
                     </tbody>
                 </table>
             </div>
