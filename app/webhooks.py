@@ -588,9 +588,10 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                         reiskosten_prijs_incl  # prijs_incl
                     )
                 
-                # 3. Broodjes toevoegen als veld "79" gevuld is
+                # 3. Broodjes toevoegen als veld "79" expliciet met "ja" begint
                 broodjes_veld = body.get("79")
-                if broodjes_veld and broodjes_veld.strip() and broodjes_veld != "0":
+                broodjes = str(broodjes_veld or "").lower().startswith("ja")
+                if broodjes:
                     # Als gevuld: aantal = aantal_personen
                     broodjes_artikel = get_artikel_by_naam("Broodjes")
                     if broodjes_artikel:
@@ -605,9 +606,10 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                     else:
                         _LOG.warning("Broodjes artikel niet gevonden in artikelen tabel")
                 
-                # 4. Drankjes toevoegen als veld "44" gevuld is
+                # 4. Drankjes toevoegen als veld "44" expliciet met "ja" begint
                 drankjes_veld = body.get("44")
-                if drankjes_veld and drankjes_veld.strip() and drankjes_veld != "0":
+                drankjes = str(drankjes_veld or "").lower().startswith("ja")
+                if drankjes:
                     # Als gevuld: aantal = aantal_personen
                     drankjes_artikel = get_artikel_by_naam("Drankjes")
                     if drankjes_artikel:
