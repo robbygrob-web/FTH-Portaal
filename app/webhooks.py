@@ -470,6 +470,10 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
             except:
                 pass
         
+        # Bepaal ordertype op basis van veld 81
+        ordertype_veld = str(body.get("81", "")).lower()
+        ordertype = "b2b" if "zakelijk" in ordertype_veld else "b2c"
+        
         # Maak order aan
         try:
             cur.execute("""
@@ -495,7 +499,7 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 plaats,
                 aantal_personen,
                 aantal_kinderen,
-                "b2b" if body.get("81", "").lower() == "zakelijk" else "b2c",  # ordertype
+                ordertype,  # ordertype
                 opmerkingen,
                 utm_source,  # utm_source (echte UTM tracking data)
                 utm_medium,  # utm_medium
