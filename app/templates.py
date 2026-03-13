@@ -242,36 +242,26 @@ async def get_template_original(naam: str):
     return Response(content=html_content, media_type="text/html")
 
 
-
-
-
-
-
 def load_email_template(naam: str) -> str:
     path = Path(__file__).parent / "email_templates" / naam
     return path.read_text(encoding="utf-8")
 
-def render_offerte_v10(
-    voornaam: str,
-    aantal_personen: int,
-    aantal_kinderen: int,
-    datum_str: str,
-    tijdstip: str,
-    locatie: str,
-    pakket_naam: str,
-    totaal_str: str,
-    bevestig_url: str,
-    notitie_klant: str = ""
-) -> str:
-    html = load_email_template("offerte_v10.html")
-    return html.format(
-        voornaam=voornaam,
-        aantal_personen=aantal_personen,
-        aantal_kinderen=aantal_kinderen,
-        datum_str=datum_str,
-        tijdstip=tijdstip,
-        locatie=locatie,
-        pakket_naam=pakket_naam,
-        totaal_str=totaal_str,
-        bevestig_url=bevestig_url,
-    )
+
+def format_dutch_date(dt) -> str:
+    if not dt:
+        return ""
+    maanden = ["januari","februari","maart","april","mei","juni",
+               "juli","augustus","september","oktober","november","december"]
+    return f"{dt.day} {maanden[dt.month - 1]} {dt.year}"
+
+
+def format_time(dt) -> str:
+    if not dt:
+        return ""
+    return dt.strftime("%H:%M")
+
+
+def format_currency(amount) -> str:
+    if not amount:
+        return "0,00"
+    return f"{float(amount):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
