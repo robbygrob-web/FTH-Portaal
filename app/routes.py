@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app.odoo_client import get_odoo_client
 from app.auth import get_partner_auth
 from app.config import get_config_value
+from app.templates import format_dutch_date, format_time, format_currency
 import logging
 import os
 import psycopg2
@@ -2302,8 +2303,8 @@ async def test_odoo_verbinding_endpoint():
         }
 
 @router.get("/bevestig/{token}", response_class=HTMLResponse)
-async def bevestig_order(token: str):
-    """Bevestig order via token link"""
+async def bevestig_order_get(token: str):
+    """Toon bevestigingspagina met order samenvatting"""
     conn = None
     try:
         database_url = os.getenv("DATABASE_URL")
@@ -2315,7 +2316,7 @@ async def bevestig_order(token: str):
         
         # Zoek order op token
         cur.execute("""
-            SELECT id, status, portaal_status
+            SELECT id, status, portaal_status, leverdatum, plaats, aantal_personen, aantal_kinderen
             FROM orders
             WHERE bevestig_token = %s
         """, (token,))
@@ -2330,10 +2331,11 @@ async def bevestig_order(token: str):
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Bevestiging - FTH</title>
+                <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        font-family: 'Montserrat', sans-serif;
                         background: #fffdf2;
                         display: flex;
                         justify-content: center;
@@ -2369,6 +2371,324 @@ async def bevestig_order(token: str):
             """
             return HTMLResponse(content=html_content)
         
+        # Check of al bevestigd
+        if order["status"] == "sale":
+            html_content = """
+            <!DOCTYPE html>
+            <html lang="nl">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Bevestiging - FTH</title>
+                <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body {
+                        font-family: 'Montserrat', sans-serif;
+                        background: #fffdf2;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        padding: 20px;
+                    }
+                    .container {
+                        background: white;
+                        padding: 40px;
+                        border-radius: 12px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        max-width: 500px;
+                        text-align: center;
+                    }
+                    h1 {
+                        color: #333333;
+                        margin-bottom: 20px;
+                    }
+                    p {
+                        color: #666;
+                        line-height: 1.6;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Al bevestigd</h1>
+                    <p>Deze offerte is al bevestigd. Bedankt!</p>
+                </div>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content)
+        
+        # Haal order_artikelen op
+        cur.execute("""
+            SELECT oa.naam, oa.aantal, oa.prijs_incl
+            FROM order_artikelen oa
+            WHERE oa.order_id = %s
+            ORDER BY oa.created_at
+        """, (order["id"],))
+        
+        order_artikelen = cur.fetchall()
+        
+        # Bepaal pakket_naam: eerste artikel dat niet 'Reiskosten' of 'Toeslag' is
+        pakket_naam = ""
+        for artikel in order_artikelen:
+            naam = artikel.get("naam", "")
+            if naam and naam.lower() not in ["reiskosten", "toeslag"]:
+                pakket_naam = naam
+                break
+        
+        # Fallback als geen pakket gevonden
+        if not pakket_naam and order_artikelen:
+            pakket_naam = order_artikelen[0].get("naam", "Pakket")
+        
+        # Bereken totaal: SUM(prijs_incl * aantal) uit order_artikelen
+        totaal = 0.0
+        for artikel in order_artikelen:
+            prijs_incl = float(artikel.get("prijs_incl", 0) or 0)
+            aantal = float(artikel.get("aantal", 0) or 0)
+            totaal += prijs_incl * aantal
+        
+        # Format data
+        datum_str = format_dutch_date(order.get("leverdatum")) if order.get("leverdatum") else ""
+        tijdstip = format_time(order.get("leverdatum")) if order.get("leverdatum") else ""
+        locatie = order.get("plaats") or ""
+        totaal_str = format_currency(totaal)
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Bevestiging - FTH</title>
+            <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: 'Montserrat', sans-serif;
+                    background: #fffdf2;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    padding: 20px;
+                }}
+                .container {{
+                    background: white;
+                    padding: 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    max-width: 600px;
+                    width: 100%;
+                }}
+                h1 {{
+                    color: #2d2d2d;
+                    margin-bottom: 30px;
+                    font-size: 28px;
+                    text-align: center;
+                }}
+                .order-summary {{
+                    background: #f9f9f9;
+                    padding: 24px;
+                    border-radius: 8px;
+                    margin-bottom: 30px;
+                }}
+                .summary-row {{
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 12px 0;
+                    border-bottom: 1px solid #e0e0e0;
+                }}
+                .summary-row:last-child {{
+                    border-bottom: none;
+                }}
+                .summary-row:last-of-type {{
+                    font-weight: 700;
+                    font-size: 18px;
+                    margin-top: 8px;
+                    padding-top: 16px;
+                    border-top: 2px solid #2d2d2d;
+                }}
+                .summary-label {{
+                    color: #666;
+                }}
+                .summary-value {{
+                    color: #2d2d2d;
+                    font-weight: 600;
+                }}
+                .voorwaarden-section {{
+                    margin-bottom: 30px;
+                }}
+                .checkbox-wrapper {{
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 12px;
+                    margin-bottom: 20px;
+                }}
+                .checkbox-wrapper input[type="checkbox"] {{
+                    margin-top: 3px;
+                    width: 18px;
+                    height: 18px;
+                    cursor: pointer;
+                }}
+                .checkbox-wrapper label {{
+                    color: #2d2d2d;
+                    font-size: 14px;
+                    line-height: 1.6;
+                    cursor: pointer;
+                }}
+                .checkbox-wrapper a {{
+                    color: #a07800;
+                    text-decoration: underline;
+                }}
+                .button-group {{
+                    display: flex;
+                    gap: 12px;
+                    flex-direction: column;
+                }}
+                .btn {{
+                    padding: 14px 24px;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    text-decoration: none;
+                    text-align: center;
+                    font-family: 'Montserrat', sans-serif;
+                    transition: opacity 0.2s;
+                }}
+                .btn-primary {{
+                    background: #FEC82A;
+                    color: #2d2d2d;
+                }}
+                .btn-primary:disabled {{
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }}
+                .btn-secondary {{
+                    background: #e0e0e0;
+                    color: #2d2d2d;
+                }}
+                .cancel-link {{
+                    text-align: center;
+                    margin-top: 20px;
+                }}
+                .cancel-link a {{
+                    color: #666;
+                    text-decoration: underline;
+                    font-size: 14px;
+                }}
+                @media (max-width: 600px) {{
+                    .container {{
+                        padding: 24px;
+                    }}
+                    h1 {{
+                        font-size: 24px;
+                    }}
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Bevestig uw catering</h1>
+                
+                <div class="order-summary">
+                    <div class="summary-row">
+                        <span class="summary-label">Datum</span>
+                        <span class="summary-value">{datum_str}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Tijdstip</span>
+                        <span class="summary-value">{tijdstip}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Locatie</span>
+                        <span class="summary-value">{locatie}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Pakket</span>
+                        <span class="summary-value">{pakket_naam}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Totaal incl. BTW (9%)</span>
+                        <span class="summary-value">€&nbsp;{totaal_str}</span>
+                    </div>
+                </div>
+                
+                <div class="voorwaarden-section">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="akkoord-check">
+                        <label for="akkoord-check">
+                            Ik ga akkoord met de <a href="https://friettruck-huren.nl/algemene-voorwaarden" target="_blank">algemene voorwaarden</a> van Friettruck-huren.nl
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <form method="post" action="/bevestig/{token}" id="bevestig-form">
+                        <button type="submit" class="btn btn-primary" id="bevestig-btn" disabled>
+                            Bevestig mijn aanvraag
+                        </button>
+                    </form>
+                    <div class="cancel-link">
+                        <a href="#" onclick="window.close(); return false;">Annuleren</a>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+                document.getElementById('akkoord-check').addEventListener('change', function() {{
+                    var btn = document.getElementById('bevestig-btn');
+                    btn.disabled = !this.checked;
+                }});
+            </script>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij ophalen bevestigingspagina: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij ophalen bevestigingspagina: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+@router.post("/bevestig/{token}", response_class=RedirectResponse)
+async def bevestig_order_post(token: str):
+    """Verwerk bevestiging en redirect naar bedankt pagina"""
+    conn = None
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise HTTPException(status_code=500, detail="Database configuratie ontbreekt")
+        
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Zoek order op token
+        cur.execute("""
+            SELECT id, status
+            FROM orders
+            WHERE bevestig_token = %s
+        """, (token,))
+        
+        order = cur.fetchone()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Ongeldige of verlopen bevestigingslink")
+        
+        if order["status"] == "sale":
+            # Al bevestigd, redirect naar bedankt pagina
+            return RedirectResponse(url=f"/bevestig/{token}/bedankt", status_code=303)
+        
         # Update order status
         cur.execute("""
             UPDATE orders
@@ -2378,51 +2698,8 @@ async def bevestig_order(token: str):
         
         conn.commit()
         
-        html_content = """
-        <!DOCTYPE html>
-        <html lang="nl">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Bevestiging - FTH</title>
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                body {
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    background: #fffdf2;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    min-height: 100vh;
-                    padding: 20px;
-                }
-                .container {
-                    background: white;
-                    padding: 40px;
-                    border-radius: 12px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    max-width: 500px;
-                    text-align: center;
-                }
-                h1 {
-                    color: #333333;
-                    margin-bottom: 20px;
-                }
-                p {
-                    color: #666;
-                    line-height: 1.6;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Bedankt!</h1>
-                <p>Uw aanvraag is bevestigd. We nemen contact met u op.</p>
-            </div>
-        </body>
-        </html>
-        """
-        return HTMLResponse(content=html_content)
+        # Redirect naar bedankt pagina
+        return RedirectResponse(url=f"/bevestig/{token}/bedankt", status_code=303)
         
     except HTTPException:
         raise
@@ -2435,3 +2712,55 @@ async def bevestig_order(token: str):
         if conn:
             cur.close()
             conn.close()
+
+@router.get("/bevestig/{token}/bedankt", response_class=HTMLResponse)
+async def bevestig_bedankt(token: str):
+    """Toon bedankt pagina na bevestiging"""
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="nl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Bedankt - FTH</title>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Montserrat', sans-serif;
+                background: #fffdf2;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                padding: 20px;
+            }
+            .container {
+                background: white;
+                padding: 40px;
+                border-radius: 12px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                max-width: 500px;
+                text-align: center;
+            }
+            h1 {
+                color: #2d2d2d;
+                margin-bottom: 20px;
+                font-size: 32px;
+            }
+            p {
+                color: #666;
+                line-height: 1.6;
+                font-size: 16px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Bedankt!</h1>
+            <p>Uw aanvraag is bevestigd. We nemen contact met u op.</p>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)

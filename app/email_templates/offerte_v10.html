@@ -52,13 +52,7 @@ body {{ background: #e0dfcf; font-family: Montserrat, Arial, sans-serif; }}
       <div class="row"><span>Locatie</span><span>{locatie}</span></div>
       <div class="row"><span>Pakket</span><span>{pakket_naam}</span></div>
       <div class="totaal-row"><span>Totaal incl. BTW (9%)</span><span>&euro;&nbsp;{totaal_str}</span></div>
-      <button class="btn" onclick="document.getElementById('popup').style.display='flex'">
-        Uw catering bevestigen &rsaquo;
-      </button>
-      <div class="voorwaarden-check">
-        <input type="checkbox" id="akkoord">
-        <label for="akkoord">Ik ga akkoord met de <a href="https://friettruck-huren.nl/algemene-voorwaarden">algemene voorwaarden</a> van Friettruck-huren.nl</label>
-      </div>
+      <a class="btn" href="{bevestig_url}">Uw catering bevestigen &rsaquo;</a>
     </div>
 
     <div class="quote-bar">
@@ -107,25 +101,4 @@ body {{ background: #e0dfcf; font-family: Montserrat, Arial, sans-serif; }}
 
   </div>
 
-<!-- POPUP -->
-<div id="popup" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
-<div style="background:#fff;padding:32px;max-width:420px;width:90%;border-radius:8px;font-family:Montserrat,Arial,sans-serif;">
-<h3 style="margin:0 0 16px;font-size:18px;">Bijna klaar!</h3>
-<label style="display:flex;gap:10px;margin-bottom:24px;cursor:pointer;">
-<input type="checkbox" id="akkoord-check" style="margin-top:3px;">
-<span style="font-size:13px;line-height:1.5;">Ik ga akkoord met de <a href="https://friettruck-huren.nl/algemene-voorwaarden" target="_blank" style="color:#a07800;">algemene voorwaarden</a></span>
-</label>
-<div style="display:flex;gap:12px;">
-<button onclick="document.getElementById('popup').style.display='none'" style="flex:1;padding:12px;background:#e0e0e0;border:none;border-radius:4px;cursor:pointer;">Annuleren</button>
-<a id="bevestig-btn" href="{bevestig_url}" style="flex:2;padding:12px;background:#FEC82A;border-radius:4px;text-align:center;text-decoration:none;color:#2d2d2d;font-weight:700;pointer-events:none;opacity:0.5;">Bevestig</a>
-</div>
-</div>
-</div>
-<script>
-document.getElementById('akkoord-check').addEventListener('change',function(){{
-var b=document.getElementById('bevestig-btn');
-b.style.pointerEvents=this.checked?'auto':'none';
-b.style.opacity=this.checked?'1':'0.5';
-}});
-</script>
 </body></html>
