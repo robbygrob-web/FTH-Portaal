@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app.odoo_client import get_odoo_client
 from app.auth import get_partner_auth
 from app.config import get_config_value
-from app.templates import format_dutch_date, format_time, format_currency, render_bevestiging_a
+from app.templates import format_dutch_date, format_time, format_currency, render_bevestiging_a, render_bevestiging_b
 from app.mail import stuur_mail
 import logging
 import os
@@ -2692,6 +2692,16 @@ async def bevestig_order_post(token: str, background_tasks: BackgroundTasks):
         
         order_id = order["id"]
         
+        # Haal portaal_status en klant gegevens op VOOR update
+        cur.execute("""
+            SELECT o.portaal_status, c.email, c.naam
+            FROM orders o
+            JOIN contacten c ON o.klant_id = c.id
+            WHERE o.id = %s
+        """, (order_id,))
+        
+        klant_data = cur.fetchone()
+        
         # Update order status
         cur.execute("""
             UPDATE orders
@@ -2701,26 +2711,22 @@ async def bevestig_order_post(token: str, background_tasks: BackgroundTasks):
         
         conn.commit()
         
-        # Haal klant gegevens op voor bevestigingsmail
-        cur.execute("""
-            SELECT c.email, c.naam
-            FROM contacten c
-            JOIN orders o ON o.klant_id = c.id
-            WHERE o.id = %s
-        """, (order_id,))
-        
-        klant_data = cur.fetchone()
-        
         if klant_data:
+            portaal_status = klant_data.get("portaal_status", "")
             klant_email = klant_data.get("email")
             klant_naam = klant_data.get("naam", "")
             
             if klant_email:
                 voornaam = klant_naam.split()[0] if klant_naam else "klant"
                 
-                # Stuur altijd bevestigingsmail variant A
-                onderwerp, html = render_bevestiging_a(voornaam)
-                template_naam = "bevestiging_a"
+                # Template keuze op basis van portaal_status
+                if portaal_status in ('claimed', 'transfer'):
+                    onderwerp, html = render_bevestiging_b(voornaam)
+                    template_naam = "bevestiging_b"
+                else:
+                    # nieuw of beschikbaar
+                    onderwerp, html = render_bevestiging_a(voornaam)
+                    template_naam = "bevestiging_a"
                 
                 # Stuur bevestigingsmail in background
                 background_tasks.add_task(
