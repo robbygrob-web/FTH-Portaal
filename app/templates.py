@@ -291,3 +291,15 @@ def render_offerte_v10(
         totaal_str=totaal_str,
         bevestig_url=bevestig_url,
     )
+
+
+def render_bevestiging_a(voornaam: str) -> tuple:
+    onderwerp = "Bedankt voor uw bevestiging — Friettruck-huren.nl"
+    html = load_email_template("bevestiging_a.html").format(voornaam=voornaam)
+    return onderwerp, html
+
+
+def render_bevestiging_b(voornaam: str) -> tuple:
+    onderwerp = "Wij komen voor u bakken! — Friettruck-huren.nl"
+    html = load_email_template("bevestiging_b.html").format(voornaam=voornaam)
+    return onderwerp, html

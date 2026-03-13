@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Request, HTTPException, Form
+from fastapi import APIRouter, Request, HTTPException, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from app.odoo_client import get_odoo_client
 from app.auth import get_partner_auth
 from app.config import get_config_value
-from app.templates import format_dutch_date, format_time, format_currency
+from app.templates import format_dutch_date, format_time, format_currency, render_bevestiging_a, render_bevestiging_b
+from app.mail import stuur_mail
 import logging
 import os
 import psycopg2
@@ -2662,7 +2663,7 @@ async def bevestig_order_get(token: str):
             conn.close()
 
 @router.post("/bevestig/{token}", response_class=RedirectResponse)
-async def bevestig_order_post(token: str):
+async def bevestig_order_post(token: str, background_tasks: BackgroundTasks):
     """Verwerk bevestiging en redirect naar bedankt pagina"""
     conn = None
     try:
@@ -2689,14 +2690,52 @@ async def bevestig_order_post(token: str):
             # Al bevestigd, redirect naar bedankt pagina
             return RedirectResponse(url=f"/bevestig/{token}/bedankt", status_code=303)
         
+        order_id = order["id"]
+        
         # Update order status
         cur.execute("""
             UPDATE orders
             SET status = 'sale', portaal_status = 'beschikbaar', updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-        """, (order["id"],))
+        """, (order_id,))
         
         conn.commit()
+        
+        # Haal klant gegevens op voor bevestigingsmail
+        cur.execute("""
+            SELECT c.email, c.naam, o.portaal_status 
+            FROM contacten c
+            JOIN orders o ON o.klant_id = c.id
+            WHERE o.id = %s
+        """, (order_id,))
+        
+        klant_data = cur.fetchone()
+        
+        if klant_data:
+            klant_email = klant_data.get("email")
+            klant_naam = klant_data.get("naam", "")
+            portaal_status = klant_data.get("portaal_status", "")
+            
+            if klant_email:
+                voornaam = klant_naam.split()[0] if klant_naam else "klant"
+                
+                # Status check voor juiste template
+                if portaal_status in ('claimed', 'transfer'):
+                    onderwerp, html = render_bevestiging_b(voornaam)
+                    template_naam = "bevestiging_b"
+                else:
+                    onderwerp, html = render_bevestiging_a(voornaam)
+                    template_naam = "bevestiging_a"
+                
+                # Stuur bevestigingsmail in background
+                background_tasks.add_task(
+                    stuur_mail,
+                    naar=klant_email,
+                    onderwerp=onderwerp,
+                    inhoud=html,
+                    order_id=order_id,
+                    template_naam=template_naam
+                )
         
         # Redirect naar bedankt pagina
         return RedirectResponse(url=f"/bevestig/{token}/bedankt", status_code=303)
