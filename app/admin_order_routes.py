@@ -16,7 +16,7 @@ from app.config import SESSION_SECRET
 from app.mail import stuur_mail
 from app.admin_routes import verify_admin_session, get_database_url
 from app.mollie_client import create_payment, cancel_payment
-from app.templates import render_offerte_v10, format_dutch_date, format_time, format_currency
+from app.templates import render_offerte_v10, format_dutch_date, format_time, format_currency, render_bevestiging_b
 import random
 
 _LOG = logging.getLogger(__name__)
@@ -1327,25 +1327,16 @@ async def claim_order(
             ordernummer = order.get("ordernummer", "")
             
             if klant_email:
-                mail_body = f"""
-                <html>
-                <body>
-                    <h2>Bevestigd! We komen bakken</h2>
-                    <p>Beste {klant_naam},</p>
-                    <p>Dank voor de opdracht!</p>
-                    <p>De beschikbaarheid is geverifieerd en we bevestigen bij deze: we komen bakken! :)</p>
-                    <p>Met vriendelijke groet,<br>FTH Portaal</p>
-                </body>
-                </html>
-                """
+                voornaam = klant_naam.split()[0] if klant_naam else "klant"
+                onderwerp, html = render_bevestiging_b(voornaam)
                 
                 background_tasks.add_task(
                     stuur_mail,
                     naar=klant_email,
-                    onderwerp=f"Bevestigd! We komen bakken — Friettruck-huren.nl",
-                    inhoud=mail_body,
+                    onderwerp=onderwerp,
+                    inhoud=html,
                     order_id=order_id,
-                    template_naam="Bevestiging"
+                    template_naam="bevestiging_b"
                 )
         
         return RedirectResponse(url=f"/admin/order/{order_id}?token={SESSION_SECRET}", status_code=303)
