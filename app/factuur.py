@@ -55,7 +55,7 @@ def generate_factuur_pdf(order_id: str) -> bytes:
             SELECT 
                 o.id, o.ordernummer, o.leverdatum, o.plaats, 
                 o.aantal_personen, o.aantal_kinderen, o.ordertype,
-                c.id as klant_id, c.voornaam, c.naam as klant_naam, 
+                c.id as klant_id, c.naam as klant_naam, 
                 c.email, c.adres, c.postcode, c.land, c.btw_nummer
             FROM orders o
             LEFT JOIN contacten c ON o.klant_id = c.id
@@ -110,7 +110,6 @@ def generate_factuur_pdf(order_id: str) -> bytes:
             'aantal_kinderen': order_row['aantal_kinderen'] or 0,
             'ordertype': order_row['ordertype'],
             'klant': {
-                'voornaam': order_row['voornaam'],
                 'klant_naam': order_row['klant_naam'],
                 'email': order_row['email'],
                 'adres': order_row['adres'],
@@ -234,7 +233,7 @@ def generate_factuur_pdf(order_id: str) -> bytes:
     
     # Klant informatie (links, onder header)
     klant = order_data['klant']
-    klant_naam = klant.get('klant_naam') or klant.get('voornaam') or ""
+    klant_naam = klant.get('klant_naam') or ""
     
     if klant_naam:
         elements.append(Paragraph(klant_naam, normal_style))
