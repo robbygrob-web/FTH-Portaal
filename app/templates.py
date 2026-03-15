@@ -319,19 +319,18 @@ def render_planning_9dagen(
     partner_telefoon: str
 ) -> str:
     html = load_email_template("planning_9dagen.html")
-    return html.format(
-        voornaam=voornaam,
-        aantal_personen=aantal_personen,
-        aantal_kinderen=aantal_kinderen,
-        pakket=pakket,
-        broodjes_ja_nee=broodjes_ja_nee,
-        drankjes_ja_nee=drankjes_ja_nee,
-        locatie=locatie,
-        datum=datum,
-        tijdstip=tijdstip,
-        totaal=totaal,
-        partner_telefoon=partner_telefoon
-    )
+    html = html.replace("{voornaam}", voornaam)
+    html = html.replace("{aantal_personen}", str(aantal_personen))
+    html = html.replace("{aantal_kinderen}", str(aantal_kinderen))
+    html = html.replace("{pakket}", pakket)
+    html = html.replace("{broodjes_ja_nee}", broodjes_ja_nee)
+    html = html.replace("{drankjes_ja_nee}", drankjes_ja_nee)
+    html = html.replace("{locatie}", locatie)
+    html = html.replace("{datum}", datum)
+    html = html.replace("{tijdstip}", tijdstip)
+    html = html.replace("{totaal}", totaal)
+    html = html.replace("{partner_telefoon}", partner_telefoon)
+    return html
 
 
 def render_planning_7dagen(
@@ -347,18 +346,17 @@ def render_planning_7dagen(
     betaallink: str
 ) -> str:
     html = load_email_template("planning_7dagen.html")
-    return html.format(
-        voornaam=voornaam,
-        aantal_personen=aantal_personen,
-        aantal_kinderen=aantal_kinderen,
-        pakket=pakket,
-        locatie=locatie,
-        datum=datum,
-        tijdstip=tijdstip,
-        totaal=totaal,
-        partner_telefoon=partner_telefoon,
-        betaallink=betaallink
-    )
+    html = html.replace("{voornaam}", voornaam)
+    html = html.replace("{aantal_personen}", str(aantal_personen))
+    html = html.replace("{aantal_kinderen}", str(aantal_kinderen))
+    html = html.replace("{pakket}", pakket)
+    html = html.replace("{locatie}", locatie)
+    html = html.replace("{datum}", datum)
+    html = html.replace("{tijdstip}", tijdstip)
+    html = html.replace("{totaal}", totaal)
+    html = html.replace("{partner_telefoon}", partner_telefoon)
+    html = html.replace("{betaallink}", betaallink)
+    return html
 
 
 def render_planning_5dagen_betaald(
@@ -374,18 +372,17 @@ def render_planning_5dagen_betaald(
     afmeldlink: str
 ) -> str:
     html = load_email_template("planning_5dagen_betaald.html")
-    return html.format(
-        voornaam=voornaam,
-        aantal_personen=aantal_personen,
-        aantal_kinderen=aantal_kinderen,
-        pakket=pakket,
-        locatie=locatie,
-        datum=datum,
-        tijdstip=tijdstip,
-        totaal=totaal,
-        partner_telefoon=partner_telefoon,
-        afmeldlink=afmeldlink
-    )
+    html = html.replace("{voornaam}", voornaam)
+    html = html.replace("{aantal_personen}", str(aantal_personen))
+    html = html.replace("{aantal_kinderen}", str(aantal_kinderen))
+    html = html.replace("{pakket}", pakket)
+    html = html.replace("{locatie}", locatie)
+    html = html.replace("{datum}", datum)
+    html = html.replace("{tijdstip}", tijdstip)
+    html = html.replace("{totaal}", totaal)
+    html = html.replace("{partner_telefoon}", partner_telefoon)
+    html = html.replace("{afmeldlink}", afmeldlink)
+    return html
 
 
 def render_planning_5dagen_onbetaald(
@@ -401,18 +398,17 @@ def render_planning_5dagen_onbetaald(
     betaallink: str
 ) -> str:
     html = load_email_template("planning_5dagen_onbetaald.html")
-    return html.format(
-        voornaam=voornaam,
-        aantal_personen=aantal_personen,
-        aantal_kinderen=aantal_kinderen,
-        pakket=pakket,
-        locatie=locatie,
-        datum=datum,
-        tijdstip=tijdstip,
-        totaal=totaal,
-        partner_telefoon=partner_telefoon,
-        betaallink=betaallink
-    )
+    html = html.replace("{voornaam}", voornaam)
+    html = html.replace("{aantal_personen}", str(aantal_personen))
+    html = html.replace("{aantal_kinderen}", str(aantal_kinderen))
+    html = html.replace("{pakket}", pakket)
+    html = html.replace("{locatie}", locatie)
+    html = html.replace("{datum}", datum)
+    html = html.replace("{tijdstip}", tijdstip)
+    html = html.replace("{totaal}", totaal)
+    html = html.replace("{partner_telefoon}", partner_telefoon)
+    html = html.replace("{betaallink}", betaallink)
+    return html
 
 
 def render_planning_3dagen_betaald(
@@ -428,18 +424,17 @@ def render_planning_3dagen_betaald(
     afmeldlink: str
 ) -> str:
     html = load_email_template("planning_3dagen_betaald.html")
-    return html.format(
-        voornaam=voornaam,
-        aantal_personen=aantal_personen,
-        aantal_kinderen=aantal_kinderen,
-        pakket=pakket,
-        locatie=locatie,
-        datum=datum,
-        tijdstip=tijdstip,
-        totaal=totaal,
-        partner_telefoon=partner_telefoon,
-        afmeldlink=afmeldlink
-    )
+    html = html.replace("{voornaam}", voornaam)
+    html = html.replace("{aantal_personen}", str(aantal_personen))
+    html = html.replace("{aantal_kinderen}", str(aantal_kinderen))
+    html = html.replace("{pakket}", pakket)
+    html = html.replace("{locatie}", locatie)
+    html = html.replace("{datum}", datum)
+    html = html.replace("{tijdstip}", tijdstip)
+    html = html.replace("{totaal}", totaal)
+    html = html.replace("{partner_telefoon}", partner_telefoon)
+    html = html.replace("{afmeldlink}", afmeldlink)
+    return html
 
 
 def render_planning_3dagen_onbetaald(
@@ -455,18 +450,17 @@ def render_planning_3dagen_onbetaald(
     betaallink: str
 ) -> str:
     html = load_email_template("planning_3dagen_onbetaald.html")
-    return html.format(
-        voornaam=voornaam,
-        aantal_personen=aantal_personen,
-        aantal_kinderen=aantal_kinderen,
-        pakket=pakket,
-        locatie=locatie,
-        datum=datum,
-        tijdstip=tijdstip,
-        totaal=totaal,
-        partner_telefoon=partner_telefoon,
-        betaallink=betaallink
-    )
+    html = html.replace("{voornaam}", voornaam)
+    html = html.replace("{aantal_personen}", str(aantal_personen))
+    html = html.replace("{aantal_kinderen}", str(aantal_kinderen))
+    html = html.replace("{pakket}", pakket)
+    html = html.replace("{locatie}", locatie)
+    html = html.replace("{datum}", datum)
+    html = html.replace("{tijdstip}", tijdstip)
+    html = html.replace("{totaal}", totaal)
+    html = html.replace("{partner_telefoon}", partner_telefoon)
+    html = html.replace("{betaallink}", betaallink)
+    return html
 
 
 def render_planning_1dag_betaald(
@@ -482,18 +476,17 @@ def render_planning_1dag_betaald(
     afmeldlink: str
 ) -> str:
     html = load_email_template("planning_1dag_betaald.html")
-    return html.format(
-        voornaam=voornaam,
-        aantal_personen=aantal_personen,
-        aantal_kinderen=aantal_kinderen,
-        pakket=pakket,
-        locatie=locatie,
-        datum=datum,
-        tijdstip=tijdstip,
-        totaal=totaal,
-        partner_telefoon=partner_telefoon,
-        afmeldlink=afmeldlink
-    )
+    html = html.replace("{voornaam}", voornaam)
+    html = html.replace("{aantal_personen}", str(aantal_personen))
+    html = html.replace("{aantal_kinderen}", str(aantal_kinderen))
+    html = html.replace("{pakket}", pakket)
+    html = html.replace("{locatie}", locatie)
+    html = html.replace("{datum}", datum)
+    html = html.replace("{tijdstip}", tijdstip)
+    html = html.replace("{totaal}", totaal)
+    html = html.replace("{partner_telefoon}", partner_telefoon)
+    html = html.replace("{afmeldlink}", afmeldlink)
+    return html
 
 
 def render_planning_1dag_onbetaald(
@@ -509,15 +502,14 @@ def render_planning_1dag_onbetaald(
     betaallink: str
 ) -> str:
     html = load_email_template("planning_1dag_onbetaald.html")
-    return html.format(
-        voornaam=voornaam,
-        aantal_personen=aantal_personen,
-        aantal_kinderen=aantal_kinderen,
-        pakket=pakket,
-        locatie=locatie,
-        datum=datum,
-        tijdstip=tijdstip,
-        totaal=totaal,
-        partner_telefoon=partner_telefoon,
-        betaallink=betaallink
-    )
+    html = html.replace("{voornaam}", voornaam)
+    html = html.replace("{aantal_personen}", str(aantal_personen))
+    html = html.replace("{aantal_kinderen}", str(aantal_kinderen))
+    html = html.replace("{pakket}", pakket)
+    html = html.replace("{locatie}", locatie)
+    html = html.replace("{datum}", datum)
+    html = html.replace("{tijdstip}", tijdstip)
+    html = html.replace("{totaal}", totaal)
+    html = html.replace("{partner_telefoon}", partner_telefoon)
+    html = html.replace("{betaallink}", betaallink)
+    return html
