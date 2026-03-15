@@ -280,28 +280,30 @@ def render_offerte_v10(
     notitie_klant: str = ""
 ) -> str:
     html = load_email_template("offerte_v10.html")
-    return html.format(
-        voornaam=voornaam,
-        aantal_personen=aantal_personen,
-        aantal_kinderen=aantal_kinderen,
-        datum_str=datum_str,
-        tijdstip=tijdstip,
-        locatie=locatie,
-        pakket_naam=pakket_naam,
-        totaal_str=totaal_str,
-        bevestig_url=bevestig_url,
-    )
+    html = html.replace("{voornaam}", voornaam)
+    html = html.replace("{aantal_personen}", str(aantal_personen))
+    html = html.replace("{aantal_kinderen}", str(aantal_kinderen))
+    html = html.replace("{datum_str}", datum_str)
+    html = html.replace("{tijdstip}", tijdstip)
+    html = html.replace("{locatie}", locatie)
+    html = html.replace("{pakket_naam}", pakket_naam)
+    html = html.replace("{totaal_str}", totaal_str)
+    html = html.replace("{bevestig_url}", bevestig_url)
+    html = html.replace("{notitie_klant}", notitie_klant or "")
+    return html
 
 
 def render_bevestiging_a(voornaam: str) -> tuple:
     onderwerp = "Bedankt voor uw bevestiging — Friettruck-huren.nl"
-    html = load_email_template("bevestiging_a.html").format(voornaam=voornaam)
+    html = load_email_template("bevestiging_a.html")
+    html = html.replace("{voornaam}", voornaam)
     return onderwerp, html
 
 
 def render_bevestiging_b(voornaam: str) -> tuple:
     onderwerp = "Wij komen voor u bakken! — Friettruck-huren.nl"
-    html = load_email_template("bevestiging_b.html").format(voornaam=voornaam)
+    html = load_email_template("bevestiging_b.html")
+    html = html.replace("{voornaam}", voornaam)
     return onderwerp, html
 
 
