@@ -34,7 +34,7 @@
 | type | character varying | nee |  |  |
 | betaald_op | timestamp without time zone | nee |  |  |
 | aangemaakt_op | timestamp without time zone | nee | now() |  |
-| order_id | uuid | nee |  |  |
+| order_id | uuid | nee |  | -> orders.id |
 | factuur_id | uuid | nee |  | -> facturen.id |
 
 ## btw_tarieven (3 records)
@@ -85,8 +85,10 @@
 | factuurdatum | date | nee |  |  |
 | pdf_url | text | nee |  |  |
 | created_at | timestamp with time zone | nee | CURRENT_TIMESTAMP |  |
+| mollie_payment_id | character varying | nee |  |  |
+| mollie_checkout_url | text | nee |  |  |
 
-## mail_logs (33452 records)
+## mail_logs (33454 records)
 | kolom | type | nullable | default | FK |
 |-------|------|----------|---------|----|
 | id | uuid | nee | uuid_generate_v4() |  |
@@ -160,7 +162,6 @@
 | halal | boolean | nee | false |  |
 | flexible_time | character varying | nee |  |  |
 | gclid | character varying | nee |  |  |
-| klant_notitie | text | nee |  |  |
 | bevestig_token | character varying | nee |  |  |
 | gf_referentie | character varying | nee |  |  |
 | betaal_status | character varying | nee | 'onbetaald'::character varying |  |

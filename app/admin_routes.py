@@ -1827,7 +1827,7 @@ async def communicatie_inbox(request: Request, verified: bool = Depends(verify_a
         cur.execute("""
             SELECT
                 ml.id,
-                ml.ontvanger_id as contact_id,
+                COALESCE(ml.ontvanger_id, o.klant_id) as contact_id,
                 COALESCE(c.naam, ml.email_van, ml.naar) as contact_naam,
                 COALESCE(c.email, ml.email_van, ml.naar) as email,
                 ml.preview as bericht_preview,
@@ -1836,6 +1836,7 @@ async def communicatie_inbox(request: Request, verified: bool = Depends(verify_a
                 ml.order_id
             FROM mail_logs ml
             LEFT JOIN contacten c ON ml.ontvanger_id = c.id
+            LEFT JOIN orders o ON ml.order_id = o.id
             WHERE ml.richting = 'inkomend'
               AND (ml.gearchiveerd = FALSE OR ml.gearchiveerd IS NULL)
             ORDER BY ml.verzonden_op DESC NULLS LAST, ml.created_at DESC
