@@ -270,6 +270,24 @@ async def klant_detail(request: Request, klant_id: str, verified: bool = Depends
                     color: #999;
                     margin-top: 4px;
                 }}
+                .chat-message-expand {{
+                    cursor: pointer;
+                    user-select: none;
+                    font-size: 12px;
+                    color: #999;
+                    margin-right: 8px;
+                    transition: transform 0.2s;
+                    display: inline-block;
+                }}
+                .chat-message.expanded .chat-message-expand {{
+                    transform: rotate(90deg);
+                }}
+                .chat-message-preview {{
+                    display: none;
+                }}
+                .chat-message.expanded .chat-message-preview {{
+                    display: block;
+                }}
                 .chat-order-badge {{
                     display: inline-block;
                     margin-top: 6px;
@@ -468,11 +486,14 @@ async def klant_detail(request: Request, klant_id: str, verified: bool = Depends
                                 
                                 // Build message HTML
                                 html += '<div class="chat-message ' + richting + '">';
+                                html += '<span class="chat-message-expand" onclick="event.stopPropagation(); window.toggleChatExpand(this)">▶</span>';
                                 if (labelHtml) {{
                                     html += labelHtml;
                                 }}
+                                html += '<div class="chat-message-preview">';
                                 html += '<div class="chat-bubble ' + richting + (isPlaceholder ? ' placeholder' : '') + '">';
                                 html += bodyContent;
+                                html += '</div>';
                                 html += '</div>';
                                 if (orderBadgeHtml) {{
                                     html += orderBadgeHtml;
@@ -492,6 +513,12 @@ async def klant_detail(request: Request, klant_id: str, verified: bool = Depends
                             console.error('Fout bij ophalen berichten:', error);
                             chatContainer.innerHTML = '<div class="chat-empty">Fout bij laden berichten</div>';
                         }});
+                    
+                    window.toggleChatExpand = function(arrow) {{
+                        const item = arrow.closest('.chat-message');
+                        item.classList.toggle('expanded');
+                        arrow.textContent = item.classList.contains('expanded') ? '▼' : '▶';
+                    }};
                 }})();
             </script>
         </body>

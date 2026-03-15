@@ -1175,10 +1175,16 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             <div class="inbox-widget">
                 <div class="inbox-header">
                     <h2>Inkomende berichten</h2>
-                    <label>
-                        <input type="checkbox" id="inbox-archief-checkbox">
-                        Archief weergeven
-                    </label>
+                    <div style="display: flex; gap: 15px;">
+                        <label>
+                            <input type="checkbox" id="inbox-post-checkbox" checked>
+                            Post
+                        </label>
+                        <label>
+                            <input type="checkbox" id="inbox-archief-checkbox">
+                            Archief
+                        </label>
+                    </div>
                 </div>
                 <div class="inbox-list" id="inbox-list">
                     <div class="inbox-loading">Laden...</div>
@@ -1187,6 +1193,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             <script>
                 (function() {{
                     const inboxList = document.getElementById('inbox-list');
+                    const postCheckbox = document.getElementById('inbox-post-checkbox');
                     const archiefCheckbox = document.getElementById('inbox-archief-checkbox');
                     const token = new URLSearchParams(window.location.search).get('token');
                     
@@ -1237,17 +1244,24 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                                     return;
                                 }}
                                 
+                                const toonPost = postCheckbox.checked;
                                 const toonArchief = archiefCheckbox.checked;
                                 let mails = data.mails.slice(0, 8);
                                 
-                                // Filter gearchiveerde items als checkbox unchecked
-                                if (!toonArchief) {{
-                                    mails = mails.filter(mail => !mail.gearchiveerd);
-                                }}
+                                // Filter op basis van beide checkboxes
+                                mails = mails.filter(mail => {{
+                                    const isGearchiveerd = mail.gearchiveerd || false;
+                                    if (toonPost && toonArchief) return true; // Beide AAN: toon alles
+                                    if (!toonPost && !toonArchief) return false; // Beide UIT: toon niets
+                                    if (toonPost && !toonArchief) return !isGearchiveerd; // Alleen Post: niet-gearchiveerd
+                                    if (!toonPost && toonArchief) return isGearchiveerd; // Alleen Archief: gearchiveerd
+                                    return false;
+                                }});
                                 
                                 let html = '';
                                 
                                 mails.forEach(mail => {{
+                                    console.log('mail:', mail.id, 'order_id:', mail.order_id, 'contact_id:', mail.contact_id);
                                     const contactId = mail.contact_id || '';
                                     const contactNaam = mail.contact_naam || mail.email || 'Onbekend';
                                     const preview = mail.bericht_preview || mail.onderwerp || '(Geen preview)';
@@ -1320,7 +1334,10 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                         }});
                     }};
                     
-                    // Checkbox event listener
+                    // Checkbox event listeners
+                    postCheckbox.addEventListener('change', function() {{
+                        laadInbox();
+                    }});
                     archiefCheckbox.addEventListener('change', function() {{
                         laadInbox();
                     }});
