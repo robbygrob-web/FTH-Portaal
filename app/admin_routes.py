@@ -1012,6 +1012,23 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                     color: #333333;
                     font-size: 20px;
                     margin: 0;
+                    display: inline-block;
+                }}
+                .inbox-toggle-btn {{
+                    font-size: 14px;
+                    padding: 6px 12px;
+                    border: 1px solid #ddd;
+                    border-radius: 6px;
+                    background: white;
+                    cursor: pointer;
+                    margin-left: 10px;
+                }}
+                .inbox-toggle-btn:hover {{
+                    background: #f5f5f5;
+                }}
+                .inbox-item.gearchiveerd {{
+                    background: #f9f9f9;
+                    opacity: 0.6;
                 }}
                 .inbox-list {{
                     max-height: 400px;
@@ -1134,6 +1151,7 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             <div class="inbox-widget">
                 <div class="inbox-header">
                     <h2>Inkomende berichten</h2>
+                    <button class="inbox-toggle-btn" id="inbox-toggle-btn">📁 Archief</button>
                 </div>
                 <div class="inbox-list" id="inbox-list">
                     <div class="inbox-loading">Laden...</div>
@@ -1142,7 +1160,9 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             <script>
                 (function() {{
                     const inboxList = document.getElementById('inbox-list');
+                    const toggleBtn = document.getElementById('inbox-toggle-btn');
                     const token = new URLSearchParams(window.location.search).get('token');
+                    let toonArchief = false;
                     
                     if (!token) {{
                         inboxList.innerHTML = '<div class="inbox-empty">Geen toegang</div>';
@@ -1181,54 +1201,60 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                         }}
                     }}
                     
-                    fetch('/admin/communicatie/inbox?token=' + encodeURIComponent(token))
-                        .then(response => response.json())
-                        .then(data => {{
-                            if (!data.mails || data.mails.length === 0) {{
-                                inboxList.innerHTML = '<div class="inbox-empty">Geen inkomende berichten</div>';
-                                return;
-                            }}
-                            
-                            const mails = data.mails.slice(0, 8);
-                            let html = '';
-                            
-                            mails.forEach(mail => {{
-                                const contactId = mail.contact_id || '';
-                                const contactNaam = mail.contact_naam || mail.email || 'Onbekend';
-                                const preview = mail.bericht_preview || mail.onderwerp || '(Geen preview)';
-                                const tijd = formatTime(mail.verzonden_op);
-                                const link = contactId ? '/admin/klant/' + contactId + '?token=' + encodeURIComponent(token) + '#chatvenster' : '#';
+                    function laadInbox(archief) {{
+                        inboxList.innerHTML = '<div class="inbox-loading">Laden...</div>';
+                        const archiefParam = archief ? '&archief=true' : '';
+                        fetch('/admin/communicatie/inbox?token=' + encodeURIComponent(token) + archiefParam)
+                            .then(response => response.json())
+                            .then(data => {{
+                                if (!data.mails || data.mails.length === 0) {{
+                                    inboxList.innerHTML = '<div class="inbox-empty">Geen inkomende berichten</div>';
+                                    return;
+                                }}
                                 
-                                html += '<div class="inbox-item" onclick="window.location.href=\\'' + link + '\\'">';
-                                html += '<div class="inbox-item-content">';
-                                html += '<div class="inbox-item-contact">' + escapeHtml(contactNaam) + '</div>';
-                                html += '<div class="inbox-item-preview">' + escapeHtml(preview) + '</div>';
-                                html += '</div>';
-                                html += '<div style="display: flex; align-items: center; gap: 10px;">';
-                                html += '<div class="inbox-item-time">' + escapeHtml(tijd) + '</div>';
-                                html += '<div class="inbox-item-actions" onclick="event.stopPropagation()">';
-                                if (contactId) {{
-                                    const klantLink = '/admin/klant/' + contactId + '?token=' + encodeURIComponent(token);
-                                    html += '<a href="' + klantLink + '" class="inbox-btn">Klant</a>';
-                                }}
-                                if (mail.order_id) {{
-                                    const orderLink = '/admin/order/' + mail.order_id + '?token=' + encodeURIComponent(token);
-                                    html += '<a href="' + orderLink + '" class="inbox-btn">Order</a>';
-                                }}
-                                html += '<button class="inbox-archive-btn" onclick="event.stopPropagation(); archiveerMail(\\'' + mail.id + '\\', this)">×</button>';
-                                html += '</div>';
-                                html += '</div>';
-                                html += '</div>';
+                                const mails = data.mails.slice(0, 8);
+                                let html = '';
+                                
+                                mails.forEach(mail => {{
+                                    const contactId = mail.contact_id || '';
+                                    const contactNaam = mail.contact_naam || mail.email || 'Onbekend';
+                                    const preview = mail.bericht_preview || mail.onderwerp || '(Geen preview)';
+                                    const tijd = formatTime(mail.verzonden_op);
+                                    const link = contactId ? '/admin/klant/' + contactId + '?token=' + encodeURIComponent(token) + '#chatvenster' : '#';
+                                    const isGearchiveerd = mail.gearchiveerd || false;
+                                    const itemClass = isGearchiveerd ? 'inbox-item gearchieveerd' : 'inbox-item';
+                                    
+                                    html += '<div class="' + itemClass + '" onclick="window.location.href=\\'' + link + '\\'">';
+                                    html += '<div class="inbox-item-content">';
+                                    html += '<div class="inbox-item-contact">' + escapeHtml(contactNaam) + '</div>';
+                                    html += '<div class="inbox-item-preview">' + escapeHtml(preview) + '</div>';
+                                    html += '<div class="inbox-item-time">' + escapeHtml(tijd) + '</div>';
+                                    html += '</div>';
+                                    html += '<div style="display: flex; align-items: center; gap: 10px;">';
+                                    html += '<div class="inbox-item-actions" onclick="event.stopPropagation()">';
+                                    if (contactId) {{
+                                        const klantLink = '/admin/klant/' + contactId + '?token=' + encodeURIComponent(token);
+                                        html += '<a href="' + klantLink + '" class="inbox-btn">Klant</a>';
+                                    }}
+                                    if (mail.order_id) {{
+                                        const orderLink = '/admin/order/' + mail.order_id + '?token=' + encodeURIComponent(token);
+                                        html += '<a href="' + orderLink + '" class="inbox-btn">Order</a>';
+                                    }}
+                                    html += '<button class="inbox-archive-btn" onclick="event.stopPropagation(); window.archiveerMail(\\'' + mail.id + '\\', this)">×</button>';
+                                    html += '</div>';
+                                    html += '</div>';
+                                    html += '</div>';
+                                }});
+                                
+                                inboxList.innerHTML = html;
+                            }})
+                            .catch(error => {{
+                                console.error('Fout bij ophalen inbox:', error);
+                                inboxList.innerHTML = '<div class="inbox-empty">Fout bij laden berichten</div>';
                             }});
-                            
-                            inboxList.innerHTML = html;
-                        }})
-                        .catch(error => {{
-                            console.error('Fout bij ophalen inbox:', error);
-                            inboxList.innerHTML = '<div class="inbox-empty">Fout bij laden berichten</div>';
-                        }});
+                    }}
                     
-                    function archiveerMail(mailId, button) {{
+                    window.archiveerMail = function(mailId, button) {{
                         const token = new URLSearchParams(window.location.search).get('token');
                         if (!token) return;
                         
@@ -1237,14 +1263,24 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                         }})
                         .then(response => response.json())
                         .then(data => {{
-                            // Verwijder rij uit DOM
-                            button.closest('.inbox-item').remove();
+                            // Herlaad inbox met huidige archief status
+                            laadInbox(toonArchief);
                         }})
                         .catch(error => {{
                             console.error('Fout bij archiveren:', error);
                             alert('Fout bij archiveren');
                         }});
-                    }}
+                    }};
+                    
+                    // Toggle knop event listener
+                    toggleBtn.addEventListener('click', function() {{
+                        toonArchief = !toonArchief;
+                        toggleBtn.textContent = toonArchief ? '📥 Inbox' : '📁 Archief';
+                        laadInbox(toonArchief);
+                    }});
+                    
+                    // Laad initieel inbox
+                    laadInbox(false);
                 }})();
             </script>
         </body>
@@ -1474,7 +1510,11 @@ async def verwerk_nieuwe_aanvraag(
 
 
 @router.get("/communicatie/inbox")
-async def communicatie_inbox(request: Request, verified: bool = Depends(verify_admin_session)):
+async def communicatie_inbox(
+    request: Request,
+    archief: bool = False,
+    verified: bool = Depends(verify_admin_session)
+):
     """Haal inbox overzicht op: alle inkomende mails"""
     conn = None
     try:
@@ -1482,7 +1522,13 @@ async def communicatie_inbox(request: Request, verified: bool = Depends(verify_a
         conn = psycopg2.connect(database_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        cur.execute("""
+        # Bepaal WHERE clause op basis van archief parameter
+        if archief:
+            archiveer_filter = "ml.gearchiveerd = TRUE"
+        else:
+            archiveer_filter = "(ml.gearchiveerd = FALSE OR ml.gearchiveerd IS NULL)"
+        
+        cur.execute(f"""
             SELECT
                 ml.id,
                 COALESCE(ml.ontvanger_id, o.klant_id) as contact_id,
@@ -1491,12 +1537,13 @@ async def communicatie_inbox(request: Request, verified: bool = Depends(verify_a
                 ml.preview as bericht_preview,
                 ml.onderwerp,
                 ml.verzonden_op,
-                ml.order_id
+                ml.order_id,
+                ml.gearchiveerd
             FROM mail_logs ml
             LEFT JOIN contacten c ON ml.ontvanger_id = c.id
             LEFT JOIN orders o ON ml.order_id = o.id
             WHERE ml.richting = 'inkomend'
-              AND (ml.gearchiveerd = FALSE OR ml.gearchiveerd IS NULL)
+              AND {archiveer_filter}
               AND ml.verzonden_op IS NOT NULL
             ORDER BY ml.verzonden_op DESC NULLS LAST, ml.created_at DESC
             LIMIT 100
@@ -1515,7 +1562,8 @@ async def communicatie_inbox(request: Request, verified: bool = Depends(verify_a
                 "bericht_preview": mail.get("bericht_preview"),
                 "onderwerp": mail.get("onderwerp"),
                 "verzonden_op": mail.get("verzonden_op").isoformat() if mail.get("verzonden_op") else None,
-                "order_id": str(mail.get("order_id")) if mail.get("order_id") else None
+                "order_id": str(mail.get("order_id")) if mail.get("order_id") else None,
+                "gearchiveerd": mail.get("gearchiveerd") or False
             })
         
         return JSONResponse({"mails": result, "aantal": len(result)})
