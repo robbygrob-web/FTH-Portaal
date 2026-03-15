@@ -568,15 +568,23 @@ def haal_inkomende_mails() -> dict:
                     reply_message_ids.extend([ref.strip() for ref in references.split() if ref.strip()])
                 
                 for reply_msg_id in reply_message_ids:
+                    # Normaliseer: zorg dat beide met brackets zijn
+                    normalized = reply_msg_id.strip()
+                    if not normalized.startswith('<'):
+                        normalized = '<' + normalized
+                    if not normalized.endswith('>'):
+                        normalized = normalized + '>'
+                    
                     cur.execute("""
                         SELECT order_id FROM mail_logs 
-                        WHERE message_id = %s AND order_id IS NOT NULL 
+                        WHERE (message_id = %s OR message_id = %s)
+                        AND order_id IS NOT NULL 
                         LIMIT 1
-                    """, (reply_msg_id,))
+                    """, (normalized, reply_msg_id.strip()))
                     result = cur.fetchone()
                     if result and result[0]:
                         order_id = result[0]
-                        _LOG.info(f"Order ID gevonden via reply header: {order_id} (reply naar: {reply_msg_id})")
+                        _LOG.info(f"Order ID gevonden via reply header: {order_id}")
                         break
                 
                 cur.close()
