@@ -284,6 +284,7 @@ def update_factuur_bij_orderwijziging(order_id: str, nieuwe_totaal: float, conn,
 async def test_planning_flow(
     request: Request,
     order_id: str,
+    force: bool = False,
     verified: bool = Depends(verify_admin_session)
 ):
     """Test endpoint om alle planning emails te versturen voor een order"""
@@ -354,6 +355,18 @@ async def test_planning_flow(
             heeft_token = dag_config["heeft_token"]
             
             try:
+                # Check duplicate sending (overslaan als force=True)
+                if not force:
+                    from app.planning_scheduler import check_duplicate_sending
+                    template_naam_check = f"{template_base}_betaald" if dagen in [5, 3, 1] and betaal_status == 'betaald' else (f"{template_base}_onbetaald" if dagen in [5, 3, 1] and betaal_status != 'betaald' else template_base)
+                    if check_duplicate_sending(cur, order_id, template_naam_check):
+                        results.append({
+                            "template": template_naam_check,
+                            "status": "overgeslagen",
+                            "error": "Mail al vandaag verstuurd (gebruik ?force=true om te forceren)"
+                        })
+                        continue
+                
                 # Bepaal betaald/onbetaald voor dag 5, 3, 1
                 is_betaald = (betaal_status == 'betaald') if dagen in [5, 3, 1] else None
                 
@@ -546,7 +559,12 @@ async def test_planning_flow(
         # Genereer HTML response
         results_html = ""
         for result in results:
-            status_badge = '<span style="background:#27ae60;color:white;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:700;">VERSTUURD</span>' if result["status"] == "verstuurd" else '<span style="background:#e74c3c;color:white;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:700;">MISLUKT</span>'
+            if result["status"] == "verstuurd":
+                status_badge = '<span style="background:#27ae60;color:white;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:700;">VERSTUURD</span>'
+            elif result["status"] == "overgeslagen":
+                status_badge = '<span style="background:#f39c12;color:white;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:700;">OVERGESLAGEN</span>'
+            else:
+                status_badge = '<span style="background:#e74c3c;color:white;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:700;">MISLUKT</span>'
             error_text = f'<div style="color:#e74c3c;font-size:12px;margin-top:4px;">{result["error"]}</div>' if result["error"] else ""
             results_html += f"""
                 <tr>

@@ -78,11 +78,12 @@ def get_pakket_naam(cur, order_id: str) -> str:
     if result and result['naam']:
         return result['naam']
     
-    # Fallback: eerste artikel
+    # Fallback: eerste artikel (ook exclusief reiskosten etc.)
     cur.execute("""
         SELECT naam
         FROM order_artikelen
         WHERE order_id = %s
+        AND LOWER(naam) NOT IN ('reiskosten', 'toeslag', 'broodjes', 'drankjes', 'kids pakket')
         ORDER BY id
         LIMIT 1
     """, (order_id,))
