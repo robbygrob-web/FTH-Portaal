@@ -542,20 +542,31 @@ async def test_planning_flow(
                         continue
                 
                 # Verstuur mail
-                stuur_mail(
-                    naar=email,
-                    onderwerp=f"Nog {dagen} {'dag' if dagen == 1 else 'dagen'} tot uw friettruck-feest!",
-                    inhoud=html,
-                    order_id=order_id,
-                    template_naam=template_naam,
-                    attachments=attachments if attachments else None
-                )
-                
-                results.append({
-                    "template": template_naam,
-                    "status": "verstuurd",
-                    "error": None
-                })
+                try:
+                    stuur_mail(
+                        naar=email,
+                        onderwerp=f"Nog {dagen} {'dag' if dagen == 1 else 'dagen'} tot uw friettruck-feest!",
+                        inhoud=html,
+                        order_id=order_id,
+                        template_naam=template_naam,
+                        attachments=attachments if attachments else None
+                    )
+                    
+                    results.append({
+                        "template": template_naam,
+                        "status": "verstuurd",
+                        "error": None
+                    })
+                except Exception as e:
+                    _LOG.error(f"Fout bij versturen {template_naam} voor order {order_id}: {e}", exc_info=True)
+                    if conn:
+                        conn.rollback()
+                    results.append({
+                        "template": template_naam,
+                        "status": "mislukt",
+                        "error": str(e)
+                    })
+                    continue
                 
             except Exception as e:
                 _LOG.error(f"Fout bij versturen {template_base} voor order {order_id}: {e}", exc_info=True)
