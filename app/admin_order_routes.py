@@ -16,7 +16,18 @@ from app.config import SESSION_SECRET
 from app.mail import stuur_mail
 from app.admin_routes import verify_admin_session, get_database_url
 from app.mollie_client import create_payment, cancel_payment
-from app.templates import render_offerte_v10, format_dutch_date, format_time, format_currency, render_bevestiging_b
+from app.templates import (
+    render_offerte_v10, format_dutch_date, format_time, format_currency, render_bevestiging_b,
+    render_planning_9dagen, render_planning_7dagen,
+    render_planning_5dagen_betaald, render_planning_5dagen_onbetaald,
+    render_planning_3dagen_betaald, render_planning_3dagen_onbetaald,
+    render_planning_1dag_betaald, render_planning_1dag_onbetaald
+)
+from app.planning_scheduler import (
+    get_base_url, get_pakket_naam, get_broodjes_ja_nee, get_drankjes_ja_nee,
+    get_partner_telefoon, get_totaal_bedrag, generate_afmeld_token
+)
+from app.factuur import generate_factuur_pdf
 import random
 
 _LOG = logging.getLogger(__name__)
@@ -267,6 +278,417 @@ def update_factuur_bij_orderwijziging(order_id: str, nieuwe_totaal: float, conn,
     except Exception as e:
         _LOG.error(f"Fout bij updaten factuur voor order {order_id}: {e}", exc_info=True)
         conn.rollback()
+
+
+@router.get("/test-planning-flow/{order_id}", response_class=HTMLResponse)
+async def test_planning_flow(
+    request: Request,
+    order_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Test endpoint om alle planning emails te versturen voor een order"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Haal order op
+        cur.execute("""
+            SELECT 
+                o.id, o.ordernummer, o.leverdatum, o.plaats, 
+                o.aantal_personen, o.aantal_kinderen, o.contractor_id,
+                o.planning_afmeld_token, o.betaal_status, o.status,
+                c.voornaam, c.email
+            FROM orders o
+            LEFT JOIN contacten c ON o.klant_id = c.id
+            WHERE o.id = %s
+        """, (order_id,))
+        
+        order = cur.fetchone()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order niet gevonden")
+        
+        email = order.get("email")
+        if not email:
+            raise HTTPException(status_code=400, detail="Order heeft geen email adres")
+        
+        ordernummer = order.get("ordernummer", "")
+        leverdatum = order.get("leverdatum")
+        plaats = order.get("plaats", "")
+        aantal_personen = order.get("aantal_personen", 0)
+        aantal_kinderen = order.get("aantal_kinderen", 0)
+        contractor_id = order.get("contractor_id")
+        planning_afmeld_token = order.get("planning_afmeld_token")
+        betaal_status = order.get("betaal_status")
+        voornaam = order.get("voornaam", "klant") or "klant"
+        
+        base_url = get_base_url()
+        
+        # Haal basis data op
+        pakket = get_pakket_naam(cur, order_id)
+        partner_telefoon = get_partner_telefoon(cur, contractor_id)
+        totaal_bedrag = get_totaal_bedrag(cur, order_id)
+        totaal_str = f"€ {format_currency(totaal_bedrag)}"
+        datum = format_dutch_date(leverdatum) if leverdatum else ""
+        tijdstip = format_time(leverdatum) if leverdatum else ""
+        
+        # Resultaten lijst
+        results = []
+        
+        # Dag configuratie
+        dagen_config = [
+            {"dagen": 9, "template_naam": "planning_9dagen", "heeft_broodjes_drankjes": True, "heeft_pdf": False, "heeft_token": False},
+            {"dagen": 7, "template_naam": "planning_7dagen", "heeft_broodjes_drankjes": False, "heeft_pdf": True, "heeft_token": False},
+            {"dagen": 5, "template_naam": "planning_5dagen", "heeft_broodjes_drankjes": False, "heeft_pdf": True, "heeft_token": True},
+            {"dagen": 3, "template_naam": "planning_3dagen", "heeft_broodjes_drankjes": False, "heeft_pdf": True, "heeft_token": False},
+            {"dagen": 1, "template_naam": "planning_1dag", "heeft_broodjes_drankjes": False, "heeft_pdf": True, "heeft_token": False},
+        ]
+        
+        for dag_config in dagen_config:
+            dagen = dag_config["dagen"]
+            template_base = dag_config["template_naam"]
+            heeft_broodjes_drankjes = dag_config["heeft_broodjes_drankjes"]
+            heeft_pdf = dag_config["heeft_pdf"]
+            heeft_token = dag_config["heeft_token"]
+            
+            try:
+                # Bepaal betaald/onbetaald voor dag 5, 3, 1
+                is_betaald = (betaal_status == 'betaald') if dagen in [5, 3, 1] else None
+                
+                # Token generatie (alleen dag 5 betaald)
+                if heeft_token and is_betaald and not planning_afmeld_token:
+                    planning_afmeld_token = generate_afmeld_token(cur, order_id, conn)
+                
+                afmeldlink = f"{base_url}/planning/afmelden/{planning_afmeld_token}" if planning_afmeld_token else ""
+                
+                # Betaallink ophalen (voor dag 7, 5 onbetaald, 3 onbetaald, 1 onbetaald)
+                betaallink = ""
+                if dagen == 7 or (dagen in [5, 3, 1] and not is_betaald):
+                    cur.execute("""
+                        SELECT mollie_checkout_url
+                        FROM facturen
+                        WHERE order_id = %s
+                        LIMIT 1
+                    """, (order_id,))
+                    factuur_result = cur.fetchone()
+                    betaallink = factuur_result['mollie_checkout_url'] if factuur_result else ""
+                
+                # Broodjes/drankjes (alleen dag 9)
+                broodjes_ja_nee = ""
+                drankjes_ja_nee = ""
+                if heeft_broodjes_drankjes:
+                    broodjes_ja_nee = get_broodjes_ja_nee(cur, order_id)
+                    drankjes_ja_nee = get_drankjes_ja_nee(cur, order_id)
+                
+                # Render HTML
+                if dagen == 9:
+                    html = render_planning_9dagen(
+                        voornaam=voornaam,
+                        aantal_personen=aantal_personen,
+                        aantal_kinderen=aantal_kinderen,
+                        pakket=pakket,
+                        broodjes_ja_nee=broodjes_ja_nee,
+                        drankjes_ja_nee=drankjes_ja_nee,
+                        locatie=plaats,
+                        datum=datum,
+                        tijdstip=tijdstip,
+                        totaal=totaal_str,
+                        partner_telefoon=partner_telefoon
+                    )
+                    template_naam = "planning_9dagen"
+                elif dagen == 7:
+                    html = render_planning_7dagen(
+                        voornaam=voornaam,
+                        aantal_personen=aantal_personen,
+                        aantal_kinderen=aantal_kinderen,
+                        pakket=pakket,
+                        locatie=plaats,
+                        datum=datum,
+                        tijdstip=tijdstip,
+                        totaal=totaal_str,
+                        partner_telefoon=partner_telefoon,
+                        betaallink=betaallink
+                    )
+                    template_naam = "planning_7dagen"
+                elif dagen == 5:
+                    if is_betaald:
+                        html = render_planning_5dagen_betaald(
+                            voornaam=voornaam,
+                            aantal_personen=aantal_personen,
+                            aantal_kinderen=aantal_kinderen,
+                            pakket=pakket,
+                            locatie=plaats,
+                            datum=datum,
+                            tijdstip=tijdstip,
+                            totaal=totaal_str,
+                            partner_telefoon=partner_telefoon,
+                            afmeldlink=afmeldlink
+                        )
+                        template_naam = "planning_5dagen_betaald"
+                    else:
+                        html = render_planning_5dagen_onbetaald(
+                            voornaam=voornaam,
+                            aantal_personen=aantal_personen,
+                            aantal_kinderen=aantal_kinderen,
+                            pakket=pakket,
+                            locatie=plaats,
+                            datum=datum,
+                            tijdstip=tijdstip,
+                            totaal=totaal_str,
+                            partner_telefoon=partner_telefoon,
+                            betaallink=betaallink
+                        )
+                        template_naam = "planning_5dagen_onbetaald"
+                elif dagen == 3:
+                    if is_betaald:
+                        html = render_planning_3dagen_betaald(
+                            voornaam=voornaam,
+                            aantal_personen=aantal_personen,
+                            aantal_kinderen=aantal_kinderen,
+                            pakket=pakket,
+                            locatie=plaats,
+                            datum=datum,
+                            tijdstip=tijdstip,
+                            totaal=totaal_str,
+                            partner_telefoon=partner_telefoon,
+                            afmeldlink=afmeldlink
+                        )
+                        template_naam = "planning_3dagen_betaald"
+                    else:
+                        html = render_planning_3dagen_onbetaald(
+                            voornaam=voornaam,
+                            aantal_personen=aantal_personen,
+                            aantal_kinderen=aantal_kinderen,
+                            pakket=pakket,
+                            locatie=plaats,
+                            datum=datum,
+                            tijdstip=tijdstip,
+                            totaal=totaal_str,
+                            partner_telefoon=partner_telefoon,
+                            betaallink=betaallink
+                        )
+                        template_naam = "planning_3dagen_onbetaald"
+                else:  # dag 1
+                    if is_betaald:
+                        html = render_planning_1dag_betaald(
+                            voornaam=voornaam,
+                            aantal_personen=aantal_personen,
+                            aantal_kinderen=aantal_kinderen,
+                            pakket=pakket,
+                            locatie=plaats,
+                            datum=datum,
+                            tijdstip=tijdstip,
+                            totaal=totaal_str,
+                            partner_telefoon=partner_telefoon,
+                            afmeldlink=afmeldlink
+                        )
+                        template_naam = "planning_1dag_betaald"
+                    else:
+                        html = render_planning_1dag_onbetaald(
+                            voornaam=voornaam,
+                            aantal_personen=aantal_personen,
+                            aantal_kinderen=aantal_kinderen,
+                            pakket=pakket,
+                            locatie=plaats,
+                            datum=datum,
+                            tijdstip=tijdstip,
+                            totaal=totaal_str,
+                            partner_telefoon=partner_telefoon,
+                            betaallink=betaallink
+                        )
+                        template_naam = "planning_1dag_onbetaald"
+                
+                # Genereer PDF bijlage indien nodig
+                attachments = []
+                if heeft_pdf:
+                    try:
+                        pdf_bytes = generate_factuur_pdf(order_id)
+                        attachments.append({
+                            "filename": f"factuur_{ordernummer}.pdf",
+                            "content": pdf_bytes,
+                            "content_type": "application/pdf"
+                        })
+                    except Exception as e:
+                        _LOG.error(f"Fout bij PDF generatie voor order {order_id}: {e}", exc_info=True)
+                        results.append({
+                            "template": template_naam,
+                            "status": "mislukt",
+                            "error": f"PDF generatie gefaald: {str(e)}"
+                        })
+                        continue
+                
+                # Verstuur mail
+                stuur_mail(
+                    naar=email,
+                    onderwerp=f"Nog {dagen} {'dag' if dagen == 1 else 'dagen'} tot uw friettruck-feest!",
+                    inhoud=html,
+                    order_id=order_id,
+                    template_naam=template_naam,
+                    attachments=attachments if attachments else None
+                )
+                
+                results.append({
+                    "template": template_naam,
+                    "status": "verstuurd",
+                    "error": None
+                })
+                
+            except Exception as e:
+                _LOG.error(f"Fout bij versturen {template_base} voor order {order_id}: {e}", exc_info=True)
+                results.append({
+                    "template": template_base,
+                    "status": "mislukt",
+                    "error": str(e)
+                })
+        
+        # Genereer HTML response
+        results_html = ""
+        for result in results:
+            status_badge = '<span style="background:#27ae60;color:white;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:700;">VERSTUURD</span>' if result["status"] == "verstuurd" else '<span style="background:#e74c3c;color:white;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:700;">MISLUKT</span>'
+            error_text = f'<div style="color:#e74c3c;font-size:12px;margin-top:4px;">{result["error"]}</div>' if result["error"] else ""
+            results_html += f"""
+                <tr>
+                    <td>{result["template"]}</td>
+                    <td>{status_badge}</td>
+                    <td>{error_text}</td>
+                </tr>
+            """
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Planning Flow Test - FTH</title>
+            <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: 'Montserrat', sans-serif;
+                    background: #f5f5f5;
+                    padding: 20px;
+                }}
+                .container {{
+                    max-width: 1000px;
+                    margin: 0 auto;
+                    background: white;
+                    padding: 30px;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }}
+                h1 {{
+                    color: #2d2d2d;
+                    margin-bottom: 30px;
+                    font-size: 28px;
+                }}
+                .order-info {{
+                    background: #f9f9f9;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin-bottom: 30px;
+                }}
+                .info-row {{
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 8px 0;
+                    border-bottom: 1px solid #e0e0e0;
+                }}
+                .info-row:last-child {{
+                    border-bottom: none;
+                }}
+                .info-label {{
+                    color: #666;
+                    font-weight: 600;
+                }}
+                .info-value {{
+                    color: #2d2d2d;
+                }}
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 20px;
+                }}
+                th, td {{
+                    padding: 12px;
+                    text-align: left;
+                    border-bottom: 1px solid #e0e0e0;
+                }}
+                th {{
+                    background: #f9f9f9;
+                    font-weight: 700;
+                    color: #2d2d2d;
+                }}
+                .back-link {{
+                    display: inline-block;
+                    margin-top: 30px;
+                    color: #666;
+                    text-decoration: none;
+                    font-size: 14px;
+                }}
+                .back-link:hover {{
+                    text-decoration: underline;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Planning Flow Test - Order {ordernummer}</h1>
+                
+                <div class="order-info">
+                    <div class="info-row">
+                        <span class="info-label">Ordernummer</span>
+                        <span class="info-value">{ordernummer}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Email</span>
+                        <span class="info-value">{email}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Leverdatum</span>
+                        <span class="info-value">{datum} {tijdstip}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Betaal Status</span>
+                        <span class="info-value">{betaal_status or 'N/A'}</span>
+                    </div>
+                </div>
+                
+                <h2 style="font-size:20px;margin-bottom:20px;color:#2d2d2d;">Test Resultaten</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Template</th>
+                            <th>Status</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {results_html}
+                    </tbody>
+                </table>
+                
+                <a href="/admin/order/{order_id}?token={SESSION_SECRET}" class="back-link">← Terug naar order detail</a>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return HTMLResponse(content=html_content)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij planning flow test: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij planning flow test: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
 
 
 @router.get("/{order_id}", response_class=HTMLResponse)
