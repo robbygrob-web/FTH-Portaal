@@ -379,7 +379,7 @@ async def check_en_verstuur_planning_emails():
                         aantal_personen = order.get("aantal_personen", 0)
                         aantal_kinderen = order.get("aantal_kinderen", 0)
                         contractor_id = order.get("contractor_id")
-                        betaallink = order.get("betaallink", "")
+                        betaallink = order.get("betaallink") or ""
                         voornaam = order.get("voornaam", "")
                         email = order.get("email")
                         

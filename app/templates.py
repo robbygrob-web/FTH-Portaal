@@ -361,7 +361,7 @@ def render_planning_7dagen(
     html = html.replace("{tijdstip}", tijdstip)
     html = html.replace("{totaal}", totaal)
     html = html.replace("{partner_telefoon}", partner_telefoon)
-    html = html.replace("{betaallink}", betaallink)
+    html = html.replace("{betaallink}", betaallink or "")
     return html
 
 
@@ -417,7 +417,7 @@ def render_planning_5dagen_onbetaald(
     html = html.replace("{tijdstip}", tijdstip)
     html = html.replace("{totaal}", totaal)
     html = html.replace("{partner_telefoon}", partner_telefoon)
-    html = html.replace("{betaallink}", betaallink)
+    html = html.replace("{betaallink}", betaallink or "")
     return html
 
 
@@ -473,7 +473,7 @@ def render_planning_3dagen_onbetaald(
     html = html.replace("{tijdstip}", tijdstip)
     html = html.replace("{totaal}", totaal)
     html = html.replace("{partner_telefoon}", partner_telefoon)
-    html = html.replace("{betaallink}", betaallink)
+    html = html.replace("{betaallink}", betaallink or "")
     return html
 
 
@@ -529,7 +529,7 @@ def render_planning_1dag_onbetaald(
     html = html.replace("{tijdstip}", tijdstip)
     html = html.replace("{totaal}", totaal)
     html = html.replace("{partner_telefoon}", partner_telefoon)
-    html = html.replace("{betaallink}", betaallink)
+    html = html.replace("{betaallink}", betaallink or "")
     return html
 
 
