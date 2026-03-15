@@ -12,3 +12,4 @@ google-auth-oauthlib>=1.1.0
 google-api-python-client>=2.100.0
 litellm
 mollie-api-python
+reportlab==4.1.0
