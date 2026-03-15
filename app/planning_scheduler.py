@@ -53,7 +53,7 @@ def check_duplicate_sending(cur, order_id: str, template_naam: str) -> bool:
         FROM mail_logs
         WHERE order_id = %s
         AND template_naam = %s
-        AND DATE(verzonden_op AT TIME ZONE 'Europe/Amsterdam') = CURRENT_DATE AT TIME ZONE 'Europe/Amsterdam'
+        AND DATE(verzonden_op AT TIME ZONE 'Europe/Amsterdam') = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Amsterdam')::date
     """, (order_id, template_naam))
     
     result = cur.fetchone()
@@ -227,7 +227,7 @@ async def check_en_verstuur_planning_emails():
                         SELECT 1 FROM mail_logs ml 
                         WHERE ml.order_id = o.id 
                         AND ml.template_naam = %s
-                        AND DATE(ml.verzonden_op AT TIME ZONE 'Europe/Amsterdam') = CURRENT_DATE AT TIME ZONE 'Europe/Amsterdam'
+                        AND DATE(ml.verzonden_op AT TIME ZONE 'Europe/Amsterdam') = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Amsterdam')::date
                     )
                 """, (target_date, f"{template_base}_betaald"))
                 
@@ -358,7 +358,7 @@ async def check_en_verstuur_planning_emails():
                         SELECT 1 FROM mail_logs ml 
                         WHERE ml.order_id = o.id 
                         AND ml.template_naam = %s
-                        AND DATE(ml.verzonden_op AT TIME ZONE 'Europe/Amsterdam') = CURRENT_DATE AT TIME ZONE 'Europe/Amsterdam'
+                        AND DATE(ml.verzonden_op AT TIME ZONE 'Europe/Amsterdam') = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Amsterdam')::date
                     )
                 """, (target_date, f"{template_base}_onbetaald"))
                 
@@ -480,7 +480,7 @@ async def check_en_verstuur_planning_emails():
                         SELECT 1 FROM mail_logs ml 
                         WHERE ml.order_id = o.id 
                         AND ml.template_naam = %s
-                        AND DATE(ml.verzonden_op AT TIME ZONE 'Europe/Amsterdam') = CURRENT_DATE AT TIME ZONE 'Europe/Amsterdam'
+                        AND DATE(ml.verzonden_op AT TIME ZONE 'Europe/Amsterdam') = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Amsterdam')::date
                     )
                 """
                 
