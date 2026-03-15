@@ -339,6 +339,67 @@ async def test_planning_flow(
         # Resultaten lijst
         results = []
         
+        # OFFERTE MAIL (als eerste stap)
+        try:
+            # Reset transaction aan het begin
+            try:
+                conn.rollback()
+            except:
+                pass
+            
+            # Genereer bevestig token
+            bevestig_token = str(uuid.uuid4())
+            
+            # Sla token op in database
+            cur.execute("""
+                UPDATE orders
+                SET bevestig_token = %s
+                WHERE id = %s
+            """, (bevestig_token, order_id))
+            conn.commit()
+            
+            # Maak bevestig link
+            bevestig_link = f"{base_url}/bevestig/{bevestig_token}"
+            
+            # Bepaal voornaam voor offerte (eerste deel van volledige naam)
+            klant_naam = voornaam or "klant"
+            voornaam_offerte = klant_naam.split()[0] if klant_naam else "klant"
+            
+            # Render offerte template
+            template_html = render_offerte_v10(
+                voornaam=voornaam_offerte,
+                aantal_personen=aantal_personen,
+                aantal_kinderen=aantal_kinderen,
+                datum_str=datum,
+                tijdstip=tijdstip,
+                locatie=plaats,
+                pakket_naam=pakket,
+                totaal_str=totaal_str,
+                bevestig_url=bevestig_link,
+            )
+            
+            # Verstuur mail
+            stuur_mail(
+                naar=email,
+                onderwerp=f"Offerte {ordernummer}",
+                inhoud=template_html,
+                order_id=order_id,
+                template_naam="offerte_v10"
+            )
+            
+            results.append({
+                "template": "offerte_v10",
+                "status": "verstuurd",
+                "error": None
+            })
+        except Exception as e:
+            conn.rollback()
+            results.append({
+                "template": "offerte_v10",
+                "status": "mislukt",
+                "error": str(e)
+            })
+        
         # Dag configuratie
         dagen_config = [
             {"dagen": 9, "template_naam": "planning_9dagen", "heeft_broodjes_drankjes": True, "heeft_pdf": False, "heeft_token": False},
