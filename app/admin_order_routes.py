@@ -355,6 +355,12 @@ async def test_planning_flow(
             heeft_pdf = dag_config["heeft_pdf"]
             heeft_token = dag_config["heeft_token"]
             
+            # Reset transaction aan het begin van elke dag iteratie
+            try:
+                conn.rollback()
+            except:
+                pass
+            
             try:
                 # Check duplicate sending (overslaan als force=True)
                 if not force:
