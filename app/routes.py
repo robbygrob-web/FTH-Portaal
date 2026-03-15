@@ -2804,3 +2804,411 @@ async def bevestig_bedankt(token: str):
     </html>
     """
     return HTMLResponse(content=html_content)
+
+
+@router.get("/planning/afmelden/{token}", response_class=HTMLResponse)
+async def planning_afmelden_get(token: str):
+    """Toon afmeld bevestigingspagina"""
+    conn = None
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise HTTPException(status_code=500, detail="Database configuratie ontbreekt")
+        
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Zoek order op token
+        cur.execute("""
+            SELECT o.id, o.ordernummer, o.planning_afgemeld, o.leverdatum,
+                   c.voornaam
+            FROM orders o
+            LEFT JOIN contacten c ON o.klant_id = c.id
+            WHERE o.planning_afmeld_token = %s
+        """, (token,))
+        
+        order = cur.fetchone()
+        
+        if not order:
+            html_content = """
+            <!DOCTYPE html>
+            <html lang="nl">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Afmelden - FTH</title>
+                <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body {
+                        font-family: 'Montserrat', sans-serif;
+                        background: #fffdf2;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        padding: 20px;
+                    }
+                    .container {
+                        background: white;
+                        padding: 40px;
+                        border-radius: 12px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        max-width: 500px;
+                        text-align: center;
+                    }
+                    h1 {
+                        color: #333333;
+                        margin-bottom: 20px;
+                    }
+                    p {
+                        color: #666;
+                        line-height: 1.6;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Link is ongeldig</h1>
+                    <p>Deze afmeldlink is ongeldig of verlopen.</p>
+                </div>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content)
+        
+        # Check of al afgemeld
+        if order["planning_afgemeld"]:
+            html_content = """
+            <!DOCTYPE html>
+            <html lang="nl">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Afmelden - FTH</title>
+                <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body {
+                        font-family: 'Montserrat', sans-serif;
+                        background: #fffdf2;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        padding: 20px;
+                    }
+                    .container {
+                        background: white;
+                        padding: 40px;
+                        border-radius: 12px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        max-width: 500px;
+                        text-align: center;
+                    }
+                    h1 {
+                        color: #333333;
+                        margin-bottom: 20px;
+                    }
+                    p {
+                        color: #666;
+                        line-height: 1.6;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Al afgemeld</h1>
+                    <p>U heeft zich al afgemeld voor planning emails voor deze order.</p>
+                </div>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content)
+        
+        # Format data
+        voornaam = order.get("voornaam", "klant") or "klant"
+        ordernummer = order.get("ordernummer", "")
+        leverdatum = order.get("leverdatum")
+        datum_str = format_dutch_date(leverdatum) if leverdatum else ""
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Afmelden - FTH</title>
+            <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: 'Montserrat', sans-serif;
+                    background: #fffdf2;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    padding: 20px;
+                }}
+                .container {{
+                    background: white;
+                    padding: 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    max-width: 600px;
+                    width: 100%;
+                }}
+                h1 {{
+                    color: #2d2d2d;
+                    margin-bottom: 20px;
+                    font-size: 28px;
+                }}
+                .info-section {{
+                    background: #f9f9f9;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin-bottom: 30px;
+                }}
+                .info-row {{
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 8px 0;
+                    border-bottom: 1px solid #e0e0e0;
+                }}
+                .info-row:last-child {{
+                    border-bottom: none;
+                }}
+                .info-label {{
+                    color: #666;
+                }}
+                .info-value {{
+                    color: #2d2d2d;
+                    font-weight: 600;
+                }}
+                p {{
+                    color: #2d2d2d;
+                    line-height: 1.6;
+                    margin-bottom: 20px;
+                }}
+                .button-group {{
+                    display: flex;
+                    gap: 12px;
+                    flex-direction: column;
+                }}
+                .btn {{
+                    padding: 14px 24px;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    text-decoration: none;
+                    text-align: center;
+                    font-family: 'Montserrat', sans-serif;
+                    transition: opacity 0.2s;
+                }}
+                .btn-primary {{
+                    background: #FEC82A;
+                    color: #2d2d2d;
+                }}
+                .btn-secondary {{
+                    background: #e0e0e0;
+                    color: #2d2d2d;
+                }}
+                .cancel-link {{
+                    text-align: center;
+                    margin-top: 20px;
+                }}
+                .cancel-link a {{
+                    color: #666;
+                    text-decoration: underline;
+                    font-size: 14px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Afmelden voor planning emails</h1>
+                
+                <p>Beste {voornaam}, u kunt zich afmelden voor planning emails voor order <strong>{ordernummer}</strong>.</p>
+                
+                <div class="info-section">
+                    <div class="info-row">
+                        <span class="info-label">Ordernummer</span>
+                        <span class="info-value">{ordernummer}</span>
+                    </div>
+                    {f'<div class="info-row"><span class="info-label">Leverdatum</span><span class="info-value">{datum_str}</span></div>' if datum_str else ''}
+                </div>
+                
+                <p>Weet u zeker dat u zich wilt afmelden? U ontvangt dan geen planning emails meer voor deze order.</p>
+                
+                <div class="button-group">
+                    <form method="post" action="/planning/afmelden/{token}">
+                        <button type="submit" class="btn btn-primary">
+                            Ja, ik wil me afmelden
+                        </button>
+                    </form>
+                    <div class="cancel-link">
+                        <a href="#" onclick="window.close(); return false;">Nee, ik wil de emails blijven ontvangen</a>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij ophalen afmeldpagina: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij ophalen afmeldpagina: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/planning/afmelden/{token}", response_class=RedirectResponse)
+async def planning_afmelden_post(token: str):
+    """Verwerk afmelding en redirect naar bedankt pagina"""
+    conn = None
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise HTTPException(status_code=500, detail="Database configuratie ontbreekt")
+        
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Zoek order op token
+        cur.execute("""
+            SELECT o.id, o.planning_afgemeld
+            FROM orders o
+            WHERE o.planning_afmeld_token = %s
+        """, (token,))
+        
+        order = cur.fetchone()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Ongeldige of verlopen afmeldlink")
+        
+        if order["planning_afgemeld"]:
+            # Al afgemeld, redirect naar bedankt pagina (idempotent)
+            return RedirectResponse(url=f"/planning/afmelden/{token}/bedankt", status_code=303)
+        
+        order_id = order["id"]
+        
+        # Update order planning_afgemeld
+        cur.execute("""
+            UPDATE orders
+            SET planning_afgemeld = TRUE, updated_at = CURRENT_TIMESTAMP
+            WHERE planning_afmeld_token = %s AND planning_afgemeld = FALSE
+        """, (token,))
+        
+        conn.commit()
+        
+        _LOG.info(f"Planning afmelding verwerkt voor order {order_id} met token {token}")
+        
+        # Redirect naar bedankt pagina
+        return RedirectResponse(url=f"/planning/afmelden/{token}/bedankt", status_code=303)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij afmelden planning emails: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij afmelden planning emails: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.get("/planning/afmelden/{token}/bedankt", response_class=HTMLResponse)
+async def planning_afmelden_bedankt(token: str):
+    """Toon bedankt pagina na afmelding"""
+    conn = None
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise HTTPException(status_code=500, detail="Database configuratie ontbreekt")
+        
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Haal ordernummer op voor weergave
+        cur.execute("""
+            SELECT ordernummer
+            FROM orders
+            WHERE planning_afmeld_token = %s
+        """, (token,))
+        
+        order = cur.fetchone()
+        ordernummer = order.get("ordernummer", "") if order else ""
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Afmelding bevestigd - FTH</title>
+            <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: 'Montserrat', sans-serif;
+                    background: #fffdf2;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    padding: 20px;
+                }}
+                .container {{
+                    background: white;
+                    padding: 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    max-width: 500px;
+                    text-align: center;
+                }}
+                h1 {{
+                    color: #2d2d2d;
+                    margin-bottom: 20px;
+                    font-size: 32px;
+                }}
+                p {{
+                    color: #666;
+                    line-height: 1.6;
+                    font-size: 16px;
+                    margin-bottom: 12px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Afmelding bevestigd</h1>
+                <p>U heeft zich succesvol afgemeld voor planning emails voor deze order.</p>
+                {f'<p>U ontvangt vanaf nu geen planning emails meer voor order <strong>{ordernummer}</strong>.</p>' if ordernummer else '<p>U ontvangt vanaf nu geen planning emails meer voor deze order.</p>'}
+                <p>Als u zich later weer wilt aanmelden, neem dan contact met ons op.</p>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij ophalen bedankt pagina: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij ophalen bedankt pagina: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()

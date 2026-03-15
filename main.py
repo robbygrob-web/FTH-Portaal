@@ -184,6 +184,14 @@ async def startup_event():
     except Exception as e:
         print(f"[WARNING] Factuur scheduler niet beschikbaar: {e}")
     
+    # Start dagelijkse planning scheduler
+    try:
+        from app.planning_scheduler import run_daily_planning_check
+        print("[STARTUP] Start achtergrondtaak voor automatische planning emails")
+        asyncio.create_task(run_daily_planning_check())
+    except Exception as e:
+        print(f"[WARNING] Planning scheduler niet beschikbaar: {e}")
+    
     # Voer database migratie 004 uit
     try:
         from scripts.run_migration_004 import run_migration_004

@@ -137,13 +137,32 @@ def log_mail_to_db(
         # Bepaal bericht_type op basis van richting
         bericht_type = "email_incoming" if richting == "inkomend" else "email_outgoing"
         
+        # Bepaal ontvanger_id via email match
+        # Bij uitgaand: match naar (ontvanger) met contacten.email
+        # Bij inkomend: match email_van (afzender) met contacten.email
+        ontvanger_id = None
+        try:
+            email_to_match = email_van if richting == "inkomend" else naar
+            if email_to_match:
+                cur.execute("""
+                    SELECT id FROM contacten 
+                    WHERE email = %s 
+                    LIMIT 1
+                """, (email_to_match,))
+                result = cur.fetchone()
+                if result:
+                    ontvanger_id = result[0]
+        except Exception as e:
+            # Fail silently - ontvanger_id mag NULL blijven
+            _LOG.debug(f"Kon ontvanger_id niet bepalen voor email {email_to_match}: {e}")
+        
         cur.execute("""
             INSERT INTO mail_logs (
                 richting, kanaal, naar, onderwerp, inhoud, email_van,
                 message_id, order_id, template_naam, status,
-                bericht_type, heeft_fout, preview, verzonden_op
+                bericht_type, heeft_fout, preview, verzonden_op, ontvanger_id
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             ) RETURNING id
         """, (
             richting,  # richting
@@ -159,7 +178,8 @@ def log_mail_to_db(
             bericht_type,  # bericht_type
             heeft_fout,
             preview,
-            verzonden_op
+            verzonden_op,
+            ontvanger_id  # ontvanger_id
         ))
         
         log_id = cur.fetchone()[0]

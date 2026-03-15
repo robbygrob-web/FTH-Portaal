@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body{font-family:Arial,sans-serif;background:#e0dfcf;margin:0;}
+.wrap{max-width:600px;margin:0 auto;background:#f8f7e8;padding:32px 28px;}
+.titel{font-size:20px;font-weight:800;color:#2d2d2d;margin-bottom:16px;}
+.order-box{border:2px dashed #FEC82A;border-radius:12px;padding:18px;background:#fff;margin-bottom:16px;}
+.row{display:flex;justify-content:space-between;padding:5px 0;font-size:14px;color:#2d2d2d;border-bottom:1px solid #f0efe0;}
+.info{font-size:13px;color:#2d2d2d;line-height:1.7;margin-bottom:14px;}
+.footer{font-size:12px;color:#888;margin-top:24px;text-align:center;}
+.btn{display:inline-block;background:#FEC82A;color:#1a1a1a;font-weight:800;font-size:15px;text-align:center;padding:14px 20px;border-radius:8px;text-decoration:none;margin-top:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="titel">Nog 3 dagen tot uw friettruck-feest!</p>
+<p class="info">Beste {voornaam},<br><br>
+Over 3 dagen staat onze friettruck bij u voor de deur!</p>
+<div class="order-box">
+<div class="row"><span>Aantal personen</span><span>{aantal_personen}</span></div>
+<div class="row"><span>Aantal kinderen</span><span>{aantal_kinderen}</span></div>
+<div class="row"><span>Gekozen pakket</span><span>{pakket}</span></div>
+<div class="row"><span>Locatie</span><span>{locatie}</span></div>
+<div class="row"><span>Datum</span><span>{datum}</span></div>
+<div class="row"><span>Tijdstip</span><span>{tijdstip}</span></div>
+<div class="row"><span>Kosten</span><span>{totaal}</span></div>
+</div>
+<p class="info">We zien u graag over 3 dagen!<br><br>
+Bij vragen: {partner_telefoon}. Bij geen gehoor: 085-212 7601.</p>
+<a href="{afmeldlink}" class="btn">Afmelden voor planning emails</a>
+<div class="footer">Met vriendelijke groet,<br>Team Friettruck-huren.nl</div>
+</div>
+</body>
+</html>

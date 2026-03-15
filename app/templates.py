@@ -303,3 +303,221 @@ def render_bevestiging_b(voornaam: str) -> tuple:
     onderwerp = "Wij komen voor u bakken! — Friettruck-huren.nl"
     html = load_email_template("bevestiging_b.html").format(voornaam=voornaam)
     return onderwerp, html
+
+
+def render_planning_9dagen(
+    voornaam: str,
+    aantal_personen: int,
+    aantal_kinderen: int,
+    pakket: str,
+    broodjes_ja_nee: str,
+    drankjes_ja_nee: str,
+    locatie: str,
+    datum: str,
+    tijdstip: str,
+    totaal: str,
+    partner_telefoon: str
+) -> str:
+    html = load_email_template("planning_9dagen.html")
+    return html.format(
+        voornaam=voornaam,
+        aantal_personen=aantal_personen,
+        aantal_kinderen=aantal_kinderen,
+        pakket=pakket,
+        broodjes_ja_nee=broodjes_ja_nee,
+        drankjes_ja_nee=drankjes_ja_nee,
+        locatie=locatie,
+        datum=datum,
+        tijdstip=tijdstip,
+        totaal=totaal,
+        partner_telefoon=partner_telefoon
+    )
+
+
+def render_planning_7dagen(
+    voornaam: str,
+    aantal_personen: int,
+    aantal_kinderen: int,
+    pakket: str,
+    locatie: str,
+    datum: str,
+    tijdstip: str,
+    totaal: str,
+    partner_telefoon: str,
+    betaallink: str
+) -> str:
+    html = load_email_template("planning_7dagen.html")
+    return html.format(
+        voornaam=voornaam,
+        aantal_personen=aantal_personen,
+        aantal_kinderen=aantal_kinderen,
+        pakket=pakket,
+        locatie=locatie,
+        datum=datum,
+        tijdstip=tijdstip,
+        totaal=totaal,
+        partner_telefoon=partner_telefoon,
+        betaallink=betaallink
+    )
+
+
+def render_planning_5dagen_betaald(
+    voornaam: str,
+    aantal_personen: int,
+    aantal_kinderen: int,
+    pakket: str,
+    locatie: str,
+    datum: str,
+    tijdstip: str,
+    totaal: str,
+    partner_telefoon: str,
+    afmeldlink: str
+) -> str:
+    html = load_email_template("planning_5dagen_betaald.html")
+    return html.format(
+        voornaam=voornaam,
+        aantal_personen=aantal_personen,
+        aantal_kinderen=aantal_kinderen,
+        pakket=pakket,
+        locatie=locatie,
+        datum=datum,
+        tijdstip=tijdstip,
+        totaal=totaal,
+        partner_telefoon=partner_telefoon,
+        afmeldlink=afmeldlink
+    )
+
+
+def render_planning_5dagen_onbetaald(
+    voornaam: str,
+    aantal_personen: int,
+    aantal_kinderen: int,
+    pakket: str,
+    locatie: str,
+    datum: str,
+    tijdstip: str,
+    totaal: str,
+    partner_telefoon: str,
+    betaallink: str
+) -> str:
+    html = load_email_template("planning_5dagen_onbetaald.html")
+    return html.format(
+        voornaam=voornaam,
+        aantal_personen=aantal_personen,
+        aantal_kinderen=aantal_kinderen,
+        pakket=pakket,
+        locatie=locatie,
+        datum=datum,
+        tijdstip=tijdstip,
+        totaal=totaal,
+        partner_telefoon=partner_telefoon,
+        betaallink=betaallink
+    )
+
+
+def render_planning_3dagen_betaald(
+    voornaam: str,
+    aantal_personen: int,
+    aantal_kinderen: int,
+    pakket: str,
+    locatie: str,
+    datum: str,
+    tijdstip: str,
+    totaal: str,
+    partner_telefoon: str,
+    afmeldlink: str
+) -> str:
+    html = load_email_template("planning_3dagen_betaald.html")
+    return html.format(
+        voornaam=voornaam,
+        aantal_personen=aantal_personen,
+        aantal_kinderen=aantal_kinderen,
+        pakket=pakket,
+        locatie=locatie,
+        datum=datum,
+        tijdstip=tijdstip,
+        totaal=totaal,
+        partner_telefoon=partner_telefoon,
+        afmeldlink=afmeldlink
+    )
+
+
+def render_planning_3dagen_onbetaald(
+    voornaam: str,
+    aantal_personen: int,
+    aantal_kinderen: int,
+    pakket: str,
+    locatie: str,
+    datum: str,
+    tijdstip: str,
+    totaal: str,
+    partner_telefoon: str,
+    betaallink: str
+) -> str:
+    html = load_email_template("planning_3dagen_onbetaald.html")
+    return html.format(
+        voornaam=voornaam,
+        aantal_personen=aantal_personen,
+        aantal_kinderen=aantal_kinderen,
+        pakket=pakket,
+        locatie=locatie,
+        datum=datum,
+        tijdstip=tijdstip,
+        totaal=totaal,
+        partner_telefoon=partner_telefoon,
+        betaallink=betaallink
+    )
+
+
+def render_planning_1dag_betaald(
+    voornaam: str,
+    aantal_personen: int,
+    aantal_kinderen: int,
+    pakket: str,
+    locatie: str,
+    datum: str,
+    tijdstip: str,
+    totaal: str,
+    partner_telefoon: str,
+    afmeldlink: str
+) -> str:
+    html = load_email_template("planning_1dag_betaald.html")
+    return html.format(
+        voornaam=voornaam,
+        aantal_personen=aantal_personen,
+        aantal_kinderen=aantal_kinderen,
+        pakket=pakket,
+        locatie=locatie,
+        datum=datum,
+        tijdstip=tijdstip,
+        totaal=totaal,
+        partner_telefoon=partner_telefoon,
+        afmeldlink=afmeldlink
+    )
+
+
+def render_planning_1dag_onbetaald(
+    voornaam: str,
+    aantal_personen: int,
+    aantal_kinderen: int,
+    pakket: str,
+    locatie: str,
+    datum: str,
+    tijdstip: str,
+    totaal: str,
+    partner_telefoon: str,
+    betaallink: str
+) -> str:
+    html = load_email_template("planning_1dag_onbetaald.html")
+    return html.format(
+        voornaam=voornaam,
+        aantal_personen=aantal_personen,
+        aantal_kinderen=aantal_kinderen,
+        pakket=pakket,
+        locatie=locatie,
+        datum=datum,
+        tijdstip=tijdstip,
+        totaal=totaal,
+        partner_telefoon=partner_telefoon,
+        betaallink=betaallink
+    )
