@@ -708,6 +708,35 @@ async def test_planning_flow(
             cur.close()
             conn.close()
 
+@router.get("/debug-artikelen/{order_id}", response_class=JSONResponse)
+async def debug_artikelen(order_id: str, verified: bool = Depends(verify_admin_session)):
+    """Tijdelijk debug endpoint om artikelen op te halen"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cur.execute("""
+            SELECT naam, aantal, prijs_incl 
+            FROM order_artikelen 
+            WHERE order_id = %s
+            ORDER BY id
+        """, (order_id,))
+        
+        artikelen = cur.fetchall()
+        return JSONResponse(content={
+            "order_id": order_id,
+            "artikelen": [dict(row) for row in artikelen]
+        })
+    except Exception as e:
+        _LOG.error(f"Fout bij ophalen artikelen: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
 
 @router.get("/{order_id}", response_class=HTMLResponse)
 async def order_detail(request: Request, order_id: str, verified: bool = Depends(verify_admin_session)):
