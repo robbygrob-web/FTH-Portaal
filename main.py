@@ -224,3 +224,11 @@ async def startup_event():
     except Exception as e:
         print(f"[WARNING] Migratie 005 niet beschikbaar: {e}")
     
+    # Voer database migratie 006 uit
+    try:
+        from scripts.run_migration_006 import run_migration_006
+        print("[STARTUP] Voer database migratie 006 uit...")
+        run_migration_006()
+    except Exception as e:
+        print(f"[WARNING] Migratie 006 niet beschikbaar: {e}")
+    

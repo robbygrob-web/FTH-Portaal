@@ -3212,3 +3212,414 @@ async def planning_afmelden_bedankt(token: str):
         if conn:
             cur.close()
             conn.close()
+
+
+@router.get("/aanvraag/annuleren/{token}", response_class=HTMLResponse)
+async def aanvraag_annuleren_get(token: str):
+    """Toon annuleer bevestigingspagina"""
+    conn = None
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise HTTPException(status_code=500, detail="Database configuratie ontbreekt")
+        
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Zoek order op token
+        cur.execute("""
+            SELECT o.id, o.ordernummer, o.status, o.leverdatum,
+                   c.naam as voornaam
+            FROM orders o
+            LEFT JOIN contacten c ON o.klant_id = c.id
+            WHERE o.annuleer_token = %s
+        """, (token,))
+        
+        order = cur.fetchone()
+        
+        if not order:
+            html_content = """
+            <!DOCTYPE html>
+            <html lang="nl">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Annuleren - FTH</title>
+                <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body {
+                        font-family: 'Montserrat', sans-serif;
+                        background: #fffdf2;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        padding: 20px;
+                    }
+                    .container {
+                        background: white;
+                        padding: 40px;
+                        border-radius: 12px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        max-width: 500px;
+                        text-align: center;
+                    }
+                    h1 {
+                        color: #333333;
+                        margin-bottom: 20px;
+                    }
+                    p {
+                        color: #666;
+                        line-height: 1.6;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Link is ongeldig</h1>
+                    <p>Deze annuleerlink is ongeldig of verlopen.</p>
+                </div>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content)
+        
+        # Check of al geannuleerd
+        if order["status"] == "cancel":
+            html_content = """
+            <!DOCTYPE html>
+            <html lang="nl">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Annuleren - FTH</title>
+                <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body {
+                        font-family: 'Montserrat', sans-serif;
+                        background: #fffdf2;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        padding: 20px;
+                    }
+                    .container {
+                        background: white;
+                        padding: 40px;
+                        border-radius: 12px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        max-width: 500px;
+                        text-align: center;
+                    }
+                    h1 {
+                        color: #333333;
+                        margin-bottom: 20px;
+                    }
+                    p {
+                        color: #666;
+                        line-height: 1.6;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Al geannuleerd</h1>
+                    <p>Deze aanvraag is al geannuleerd.</p>
+                </div>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content)
+        
+        order_id = order["id"]
+        ordernummer = order.get("ordernummer", "")
+        voornaam = order.get("voornaam", "")
+        leverdatum = order.get("leverdatum")
+        
+        # Format leverdatum
+        datum_str = ""
+        if leverdatum:
+            datum_str = format_dutch_date(leverdatum)
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Annuleren - FTH</title>
+            <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: 'Montserrat', sans-serif;
+                    background: #fffdf2;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    padding: 20px;
+                }}
+                .container {{
+                    background: white;
+                    padding: 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    max-width: 600px;
+                    width: 100%;
+                }}
+                h1 {{
+                    color: #2d2d2d;
+                    margin-bottom: 20px;
+                    font-size: 28px;
+                }}
+                .info-section {{
+                    background: #f9f9f9;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin-bottom: 30px;
+                }}
+                .info-row {{
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 8px 0;
+                    border-bottom: 1px solid #e0e0e0;
+                }}
+                .info-row:last-child {{
+                    border-bottom: none;
+                }}
+                .info-label {{
+                    color: #666;
+                }}
+                .info-value {{
+                    color: #2d2d2d;
+                    font-weight: 600;
+                }}
+                p {{
+                    color: #2d2d2d;
+                    line-height: 1.6;
+                    margin-bottom: 20px;
+                }}
+                .button-group {{
+                    display: flex;
+                    gap: 12px;
+                    flex-direction: column;
+                }}
+                .btn {{
+                    padding: 14px 24px;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    text-decoration: none;
+                    text-align: center;
+                    font-family: 'Montserrat', sans-serif;
+                    transition: opacity 0.2s;
+                }}
+                .btn-primary {{
+                    background: #FEC82A;
+                    color: #2d2d2d;
+                }}
+                .btn-secondary {{
+                    background: #e0e0e0;
+                    color: #2d2d2d;
+                }}
+                .cancel-link {{
+                    text-align: center;
+                    margin-top: 20px;
+                }}
+                .cancel-link a {{
+                    color: #666;
+                    text-decoration: underline;
+                    font-size: 14px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Annuleer aanvraag</h1>
+                
+                <p>Beste {voornaam}, u kunt de aanvraag voor order <strong>{ordernummer}</strong> annuleren.</p>
+                
+                <div class="info-section">
+                    <div class="info-row">
+                        <span class="info-label">Ordernummer</span>
+                        <span class="info-value">{ordernummer}</span>
+                    </div>
+                    {f'<div class="info-row"><span class="info-label">Leverdatum</span><span class="info-value">{datum_str}</span></div>' if datum_str else ''}
+                </div>
+                
+                <p>Weet u zeker dat u de aanvraag wilt annuleren?</p>
+                
+                <div class="button-group">
+                    <form method="post" action="/aanvraag/annuleren/{token}">
+                        <button type="submit" class="btn btn-primary">
+                            Ja, annuleer aanvraag
+                        </button>
+                    </form>
+                    <div class="cancel-link">
+                        <a href="#" onclick="window.close(); return false;">Nee, behoud aanvraag</a>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij ophalen annuleerpagina: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij ophalen annuleerpagina: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/aanvraag/annuleren/{token}", response_class=RedirectResponse)
+async def aanvraag_annuleren_post(token: str):
+    """Verwerk annulering en redirect naar bedankt pagina"""
+    conn = None
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise HTTPException(status_code=500, detail="Database configuratie ontbreekt")
+        
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Zoek order op token
+        cur.execute("""
+            SELECT o.id, o.status
+            FROM orders o
+            WHERE o.annuleer_token = %s
+        """, (token,))
+        
+        order = cur.fetchone()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Ongeldige of verlopen annuleerlink")
+        
+        if order["status"] == "cancel":
+            # Al geannuleerd, redirect naar bedankt pagina (idempotent)
+            return RedirectResponse(url=f"/aanvraag/annuleren/{token}/bedankt", status_code=303)
+        
+        order_id = order["id"]
+        
+        # Update order status naar cancel
+        cur.execute("""
+            UPDATE orders
+            SET status = 'cancel', updated_at = CURRENT_TIMESTAMP
+            WHERE annuleer_token = %s AND status != 'cancel'
+        """, (token,))
+        
+        conn.commit()
+        
+        _LOG.info(f"Aanvraag annulering verwerkt voor order {order_id} met token {token}")
+        
+        # Redirect naar bedankt pagina
+        return RedirectResponse(url=f"/aanvraag/annuleren/{token}/bedankt", status_code=303)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij annuleren aanvraag: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij annuleren aanvraag: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.get("/aanvraag/annuleren/{token}/bedankt", response_class=HTMLResponse)
+async def aanvraag_annuleren_bedankt(token: str):
+    """Toon bedankt pagina na annulering"""
+    conn = None
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise HTTPException(status_code=500, detail="Database configuratie ontbreekt")
+        
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Haal ordernummer op voor weergave
+        cur.execute("""
+            SELECT ordernummer
+            FROM orders
+            WHERE annuleer_token = %s
+        """, (token,))
+        
+        order = cur.fetchone()
+        ordernummer = order.get("ordernummer", "") if order else ""
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="nl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Aanvraag geannuleerd - FTH</title>
+            <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: 'Montserrat', sans-serif;
+                    background: #fffdf2;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    padding: 20px;
+                }}
+                .container {{
+                    background: white;
+                    padding: 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    max-width: 500px;
+                    text-align: center;
+                }}
+                h1 {{
+                    color: #2d2d2d;
+                    margin-bottom: 20px;
+                    font-size: 32px;
+                }}
+                p {{
+                    color: #666;
+                    line-height: 1.6;
+                    font-size: 16px;
+                    margin-bottom: 12px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Aanvraag geannuleerd</h1>
+                <p>Uw aanvraag is geannuleerd.</p>
+                <p>Heeft u vragen? Neem contact op via reply.</p>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij ophalen bedankt pagina: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fout bij ophalen bedankt pagina: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()

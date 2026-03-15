@@ -554,7 +554,8 @@ def render_herinnering_7dagen(voornaam: str, bevestiglink: str) -> str:
     return html
 
 
-def render_beschikbaarheid_negatief(voornaam: str) -> str:
+def render_beschikbaarheid_negatief(voornaam: str, annuleerlink: str = "") -> str:
     html = load_email_template("beschikbaarheid_negatief.html")
     html = html.replace("{voornaam}", voornaam)
+    html = html.replace("{annuleerlink}", annuleerlink or "")
     return html
