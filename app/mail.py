@@ -8,8 +8,11 @@ import uuid
 import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.application import MIMEApplication
+from email import encoders
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import psycopg2
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -174,7 +177,13 @@ def log_mail_to_db(
         return None
 
 
-def create_message(to: str, subject: str, body: str, html: bool = True) -> dict:
+def create_message(
+    to: str, 
+    subject: str, 
+    body: str, 
+    html: bool = True,
+    attachments: Optional[List[Dict[str, Any]]] = None
+) -> dict:
     """
     Maak een Gmail API message object.
     
@@ -183,24 +192,78 @@ def create_message(to: str, subject: str, body: str, html: bool = True) -> dict:
         subject: Email onderwerp
         body: Email inhoud (HTML of tekst)
         html: Of de inhoud HTML is (default: True)
+        attachments: Optionele lijst van bijlagen. Elke bijlage is een dict met:
+            - 'filename': str (bijv. 'factuur.pdf')
+            - 'content': bytes (bijlage content)
+            - 'content_type': str (bijv. 'application/pdf')
     
     Returns:
-        dict met 'raw' key die base64 encoded message bevat
+        dict met 'raw' key die base64 encoded message bevat en 'message_id'
     """
     message_id = f"<{uuid.uuid4()}@friettruck-huren.nl>"
     
+    # Bepaal of we bijlagen hebben
+    has_attachments = attachments and len(attachments) > 0
+    
     # Maak email bericht
-    msg = MIMEMultipart('alternative')
+    if has_attachments:
+        # Gebruik 'mixed' voor berichten met bijlagen
+        msg = MIMEMultipart('mixed')
+    else:
+        # Gebruik 'alternative' voor alleen HTML/text
+        msg = MIMEMultipart('alternative')
+    
     msg['From'] = f"{GMAIL_FROM_NAME} <{GMAIL_FROM_EMAIL}>"
     msg['To'] = to
     msg['Subject'] = subject
     msg['Message-ID'] = message_id
     
-    # Voeg inhoud toe
-    if html:
-        msg.attach(MIMEText(body, 'html', 'utf-8'))
+    # Voeg body toe
+    if has_attachments:
+        # Bij bijlagen: body in aparte alternative part
+        body_part = MIMEMultipart('alternative')
+        if html:
+            body_part.attach(MIMEText(body, 'html', 'utf-8'))
+        else:
+            body_part.attach(MIMEText(body, 'plain', 'utf-8'))
+        msg.attach(body_part)
     else:
-        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        # Zonder bijlagen: direct body toevoegen
+        if html:
+            msg.attach(MIMEText(body, 'html', 'utf-8'))
+        else:
+            msg.attach(MIMEText(body, 'plain', 'utf-8'))
+    
+    # Voeg bijlagen toe
+    if has_attachments:
+        for att in attachments:
+            filename = att.get('filename', 'attachment')
+            content = att.get('content')
+            content_type = att.get('content_type', 'application/octet-stream')
+            
+            if content is None:
+                continue
+            
+            # Bepaal MIME type
+            if content_type.startswith('application/'):
+                # PDF, etc.
+                main_type, sub_type = content_type.split('/', 1)
+                part = MIMEApplication(content, _subtype=sub_type)
+            else:
+                # Andere types
+                main_type, sub_type = content_type.split('/', 1)
+                part = MIMEBase(main_type, sub_type)
+                part.set_payload(content)
+                encoders.encode_base64(part)
+            
+            # Voeg Content-Disposition header toe
+            part.add_header(
+                'Content-Disposition',
+                'attachment',
+                filename=filename
+            )
+            
+            msg.attach(part)
     
     # Encode naar base64url format (Gmail API vereist)
     raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')
@@ -217,7 +280,8 @@ def stuur_mail(
     inhoud: str,
     order_id: Optional[str] = None,
     template_naam: Optional[str] = None,
-    html: bool = True
+    html: bool = True,
+    attachments: Optional[List[Dict[str, Any]]] = None
 ) -> dict:
     """
     Stuur een email via Gmail API (OAuth2) en log in mail_logs tabel.
@@ -229,6 +293,10 @@ def stuur_mail(
         order_id: Optionele UUID van gerelateerde order
         template_naam: Optionele naam van gebruikte template
         html: Of de inhoud HTML is (default: True)
+        attachments: Optionele lijst van bijlagen. Elke bijlage is een dict met:
+            - 'filename': str (bijv. 'factuur.pdf')
+            - 'content': bytes (bijlage content)
+            - 'content_type': str (bijv. 'application/pdf')
     
     Returns:
         dict met status en details:
@@ -246,7 +314,7 @@ def stuur_mail(
         service = get_gmail_service()
         
         # Maak email message
-        message_data = create_message(naar, onderwerp, inhoud, html)
+        message_data = create_message(naar, onderwerp, inhoud, html, attachments)
         message_id = message_data['message_id']
         
         # Verzend via Gmail API

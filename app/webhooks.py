@@ -542,11 +542,14 @@ async def gravity_aanvraag_webhook(request: Request, token: str = Query(..., des
                 
                 # 1. Hoofdartikel (pakket) uit veld "69" (prioriteit) of "57.1"
                 # Aantal = aantal_personen, prijs_incl = prijs per persoon
+                _LOG.info(f"[WEBHOOK] Pakket veld 69: '{body.get('69', '')}' | veld 57.1: '{body.get('57.1', '')}'")
                 artikel_naam = body.get("69", "").split("|")[0].strip()
                 if not artikel_naam:
                     artikel_naam = body.get("57.1") or ""
+                _LOG.info(f"[WEBHOOK] Artikel naam na split: '{artikel_naam}'")
                 if artikel_naam:
                     artikel = get_artikel_by_naam(artikel_naam)
+                    _LOG.info(f"[WEBHOOK] Artikel gevonden: {artikel}")
                     if artikel:
                         # Gebruik aantal_personen als aantal, prijs_incl uit artikel
                         pakket_aantal = Decimal(str(aantal_personen)) if aantal_personen > 0 else Decimal("1")

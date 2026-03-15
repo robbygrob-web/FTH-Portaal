@@ -92,6 +92,11 @@ else:
 
 app.include_router(templates_router)
 
+# Include designer routes
+from app.designer_routes import router as designer_router
+app.include_router(designer_router)
+print(f"[DEBUG] Designer router geregistreerd in app")
+
 # Include admin routes
 try:
     from app.admin_routes import router as admin_router, setup_router as admin_setup_router
@@ -186,3 +191,11 @@ async def startup_event():
         run_migration_004()
     except Exception as e:
         print(f"[WARNING] Migratie 004 niet beschikbaar: {e}")
+    
+    # Voer database migratie 005 uit
+    try:
+        from scripts.run_migration_005 import run_migration_005
+        print("[STARTUP] Voer database migratie 005 uit...")
+        run_migration_005()
+    except Exception as e:
+        print(f"[WARNING] Migratie 005 niet beschikbaar: {e}")

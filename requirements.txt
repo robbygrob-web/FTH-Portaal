@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+jinja2
 requests
 python-dotenv
 starlette

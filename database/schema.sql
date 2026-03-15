@@ -97,6 +97,11 @@ CREATE TABLE orders (
     -- Betaling
     betaaltermijn_id INTEGER, -- Referentie naar Odoo payment term
     betaaltermijn_naam VARCHAR(100),
+    betaal_status VARCHAR(50) DEFAULT 'onbetaald', -- toegevoegd via admin endpoint: onbetaald, factuur_verstuurd, betaald
+    
+    -- Planning email systeem
+    planning_afgemeld BOOLEAN DEFAULT FALSE, -- Of klant heeft afgemeld voor planning
+    planning_afmeld_token UUID, -- Unieke token voor afmeldlink (alleen bij betaalde orders)
     
     -- Extra
     opmerkingen TEXT,

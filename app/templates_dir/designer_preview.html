@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mail Templates — Designer Preview | FTH Portaal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: #fffdf2;
+            color: #333333;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: 900;
+            color: #333333;
+            margin-bottom: 10px;
+        }
+        
+        h1 {
+            font-size: 32px;
+            color: #333333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .overview-table {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #333333;
+            cursor: pointer;
+        }
+        
+        th:hover {
+            background-color: #f0f0f0;
+        }
+        
+        tr {
+            cursor: pointer;
+        }
+        
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-gebouwd {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-niet-gebouwd {
+            background: #e9ecef;
+            color: #6c757d;
+        }
+        
+        .categorie-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #fec82a;
+            color: #333333;
+        }
+        
+        .accordion {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .accordion-header {
+            padding: 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+            transition: background-color 0.2s;
+        }
+        
+        .accordion-header:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .accordion-header.active {
+            background-color: #f8f9fa;
+        }
+        
+        .accordion-title {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex: 1;
+        }
+        
+        .accordion-name {
+            font-weight: 600;
+            font-size: 18px;
+            color: #333333;
+        }
+        
+        .chevron {
+            transition: transform 0.3s;
+            font-size: 20px;
+            color: #666;
+        }
+        
+        .accordion-header.active .chevron {
+            transform: rotate(180deg);
+        }
+        
+        .accordion-body {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        
+        .accordion-body.active {
+            max-height: 5000px;
+            padding: 20px;
+        }
+        
+        .preview-container {
+            margin-bottom: 20px;
+        }
+        
+        .preview-iframe {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            background: white;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Montserrat', sans-serif;
+        }
+        
+        .btn-primary {
+            background: #fec82a;
+            color: #333333;
+        }
+        
+        .btn-primary:hover {
+            background: #e2af13;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .placeholder-card {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+        
+        .upload-success {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .upload-success.show {
+            display: block;
+        }
+        
+        .legend {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .legend h3 {
+            color: #333333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .legend-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 10px;
+        }
+        
+        .legend-item {
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        
+        .legend-item code {
+            background: #fec82a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            color: #333333;
+        }
+        
+        .hidden-file-input {
+            display: none;
+        }
+        
+        .copy-feedback {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 1000;
+        }
+        
+        .copy-feedback.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">FRIETTRUCKHUREN.NL</div>
+            <h1>Mail Templates — Designer Preview</h1>
+            <p class="subtitle">1) Bekijk preview  2) Kopieer HTML  3) Pas aan in Beefree  4) Upload  5) Refresh</p>
+        </div>
+        
+        <div class="overview-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)">Template ↕</th>
+                        <th onclick="sortTable(1)">Categorie ↕</th>
+                        <th onclick="sortTable(2)">Status ↕</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for template in templates %}
+                    <tr onclick="scrollToAccordion('{{ template.key }}')">
+                        <td>{{ template.display_naam }}</td>
+                        <td><span class="categorie-badge">{{ template.categorie }}</span></td>
+                        <td>
+                            {% if template.status == "gebouwd" %}
+                                <span class="status-badge status-gebouwd">✓ Gebouwd</span>
+                            {% else %}
+                                <span class="status-badge status-niet-gebouwd">○ Nog niet gebouwd</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% for template in templates %}
+        <div class="accordion" id="accordion-{{ template.key }}">
+            <div class="accordion-header" onclick="toggleAccordion('{{ template.key }}')">
+                <div class="accordion-title">
+                    <span class="accordion-name">{{ template.display_naam }}</span>
+                    <span class="categorie-badge">{{ template.categorie }}</span>
+                    {% if template.status == "gebouwd" %}
+                        <span class="status-badge status-gebouwd">✓ Gebouwd</span>
+                    {% else %}
+                        <span class="status-badge status-niet-gebouwd">○ Nog niet gebouwd</span>
+                    {% endif %}
+                </div>
+                <span class="chevron">▼</span>
+            </div>
+            <div class="accordion-body" id="body-{{ template.key }}">
+                {% if template.status == "gebouwd" %}
+                    <div class="upload-success" id="success-{{ template.key }}">
+                        Geüpload! ✓ Template is bijgewerkt.
+                    </div>
+                    <div class="preview-container">
+                        <iframe 
+                            id="iframe-{{ template.key }}" 
+                            class="preview-iframe"
+                            sandbox="allow-same-origin"
+                        ></iframe>
+                    </div>
+                    <script type="application/json" id="data-{{ template.key }}">
+                        {{ template.rendered_html | tojson }}
+                    </script>
+                {% else %}
+                    <div class="placeholder-card">
+                        <p>Template nog niet gebouwd</p>
+                    </div>
+                {% endif %}
+                
+                <div class="actions">
+                    <button class="btn btn-primary" onclick="copyHTML('{{ template.key }}')">
+                        Kopieer HTML
+                    </button>
+                    <button class="btn btn-secondary" onclick="uploadHTML('{{ template.key }}')">
+                        Upload HTML
+                    </button>
+                </div>
+                
+                <input 
+                    type="file" 
+                    id="file-{{ template.key }}" 
+                    class="hidden-file-input" 
+                    accept=".html"
+                    onchange="handleFileSelect('{{ template.key }}', '{{ token }}')"
+                >
+                
+                <script type="application/json" id="raw-{{ template.key }}">
+                    {{ template.raw_html | tojson }}
+                </script>
+            </div>
+        </div>
+        {% endfor %}
+        
+        <div class="legend">
+            <h3>Placeholder Legenda</h3>
+            <div class="legend-list">
+                <div class="legend-item"><code>{voornaam}</code> → Voornaam van klant</div>
+                <div class="legend-item"><code>{datum}</code> / <code>{datum_str}</code> → Datum van event</div>
+                <div class="legend-item"><code>{tijdstip}</code> → Tijdstip van event</div>
+                <div class="legend-item"><code>{locatie}</code> → Locatie van event</div>
+                <div class="legend-item"><code>{pakket_naam}</code> → Pakket naam</div>
+                <div class="legend-item"><code>{aantal_personen}</code> → Aantal personen</div>
+                <div class="legend-item"><code>{aantal_kinderen}</code> → Aantal kinderen</div>
+                <div class="legend-item"><code>{totaal_str}</code> → Totaalprijs</div>
+                <div class="legend-item"><code>{factuurnummer}</code> → Factuurnummer</div>
+                <div class="legend-item"><code>{betaallink}</code> → Betaallink URL</div>
+                <div class="legend-item"><code>{bevestig_url}</code> → Bevestigingslink URL</div>
+                <div class="legend-item"><code>{afmeldlink}</code> → Afmeldlink URL</div>
+                <div class="legend-item"><code>{partner_telefoon}</code> → Telefoonnummer partner</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="copy-feedback" id="copy-feedback">Gekopieerd! ✓</div>
+    
+    <script>
+        // Accordion toggle
+        function toggleAccordion(key) {
+            const header = document.querySelector(`#accordion-${key} .accordion-header`);
+            const body = document.getElementById(`body-${key}`);
+            
+            const isActive = header.classList.contains('active');
+            
+            // Close all accordions
+            document.querySelectorAll('.accordion-header').forEach(h => {
+                h.classList.remove('active');
+            });
+            document.querySelectorAll('.accordion-body').forEach(b => {
+                b.classList.remove('active');
+            });
+            
+            // Toggle current accordion
+            if (!isActive) {
+                header.classList.add('active');
+                body.classList.add('active');
+                
+                // Load iframe content if not loaded yet
+                const iframe = document.getElementById(`iframe-${key}`);
+                if (iframe && !iframe.dataset.loaded) {
+                    const dataScript = document.getElementById(`data-${key}`);
+                    if (dataScript) {
+                        try {
+                            const html = JSON.parse(dataScript.textContent);
+                            iframe.srcdoc = html;
+                            iframe.dataset.loaded = 'true';
+                        } catch (e) {
+                            console.error('Error loading iframe content:', e);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Scroll to accordion
+        function scrollToAccordion(key) {
+            const accordion = document.getElementById(`accordion-${key}`);
+            if (accordion) {
+                accordion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Open accordion if closed
+                setTimeout(() => toggleAccordion(key), 300);
+            }
+        }
+        
+        // Copy HTML to clipboard
+        function copyHTML(key) {
+            const rawScript = document.getElementById(`raw-${key}`);
+            if (!rawScript) {
+                alert('Kon HTML niet vinden');
+                return;
+            }
+            
+            try {
+                const html = JSON.parse(rawScript.textContent);
+                navigator.clipboard.writeText(html).then(() => {
+                    showCopyFeedback();
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                    alert('Kon niet kopiëren naar clipboard');
+                });
+            } catch (e) {
+                console.error('Error parsing HTML:', e);
+                alert('Fout bij lezen van HTML');
+            }
+        }
+        
+        // Show copy feedback
+        function showCopyFeedback() {
+            const feedback = document.getElementById('copy-feedback');
+            feedback.classList.add('show');
+            setTimeout(() => {
+                feedback.classList.remove('show');
+            }, 2000);
+        }
+        
+        // Upload HTML
+        function uploadHTML(key) {
+            const fileInput = document.getElementById(`file-${key}`);
+            if (fileInput) {
+                fileInput.click();
+            }
+        }
+        
+        // Handle file select
+        function handleFileSelect(key, token) {
+            const fileInput = document.getElementById(`file-${key}`);
+            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            
+            // Validate file
+            if (!file.name.endsWith('.html')) {
+                alert('Alleen .html bestanden toegestaan');
+                return;
+            }
+            
+            if (file.size > 500 * 1024) {
+                alert('Bestand te groot. Maximum 500KB toegestaan.');
+                return;
+            }
+            
+            // Create form and submit
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const uploadUrl = `/designer/${token}/upload/${key}.html`;
+            
+            fetch(uploadUrl, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.detail || 'Upload gefaald');
+                    });
+                }
+            })
+            .catch(error => {
+                alert('Fout bij uploaden: ' + error.message);
+            });
+        }
+        
+        // Table sorting
+        let sortDirection = {};
+        
+        function sortTable(columnIndex) {
+            const table = document.querySelector('.overview-table table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            const direction = sortDirection[columnIndex] || 'asc';
+            sortDirection[columnIndex] = direction === 'asc' ? 'desc' : 'asc';
+            
+            rows.sort((a, b) => {
+                const aText = a.cells[columnIndex].textContent.trim();
+                const bText = b.cells[columnIndex].textContent.trim();
+                
+                if (direction === 'asc') {
+                    return aText.localeCompare(bText);
+                } else {
+                    return bText.localeCompare(aText);
+                }
+            });
+            
+            rows.forEach(row => tbody.appendChild(row));
+        }
+        
+        // Show upload success message if query parameter present
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const uploadedKey = urlParams.get('uploaded');
+            
+            if (uploadedKey) {
+                const successDiv = document.getElementById(`success-${uploadedKey}`);
+                if (successDiv) {
+                    successDiv.classList.add('show');
+                    // Open accordion
+                    toggleAccordion(uploadedKey);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
