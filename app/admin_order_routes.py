@@ -299,7 +299,7 @@ async def test_planning_flow(
                 o.id, o.ordernummer, o.leverdatum, o.plaats, 
                 o.aantal_personen, o.aantal_kinderen, o.contractor_id,
                 o.planning_afmeld_token, o.betaal_status, o.status,
-                c.voornaam, c.email
+                c.naam as voornaam, c.email
             FROM orders o
             LEFT JOIN contacten c ON o.klant_id = c.id
             WHERE o.id = %s
