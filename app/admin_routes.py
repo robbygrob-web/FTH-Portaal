@@ -1007,28 +1007,52 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                     margin-bottom: 15px;
                     padding-bottom: 10px;
                     border-bottom: 2px solid #e0e0e0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
                 }}
                 .inbox-header h2 {{
                     color: #333333;
                     font-size: 20px;
                     margin: 0;
-                    display: inline-block;
                 }}
-                .inbox-toggle-btn {{
+                .inbox-header label {{
                     font-size: 14px;
-                    padding: 6px 12px;
-                    border: 1px solid #ddd;
-                    border-radius: 6px;
-                    background: white;
                     cursor: pointer;
-                    margin-left: 10px;
-                }}
-                .inbox-toggle-btn:hover {{
-                    background: #f5f5f5;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
                 }}
                 .inbox-item.gearchiveerd {{
-                    background: #f9f9f9;
+                    background: #f5f5f5;
                     opacity: 0.6;
+                }}
+                .inbox-item-expand {{
+                    cursor: pointer;
+                    user-select: none;
+                    font-size: 12px;
+                    color: #999;
+                    margin-right: 8px;
+                    transition: transform 0.2s;
+                    display: inline-block;
+                }}
+                .inbox-item.expanded .inbox-item-expand {{
+                    transform: rotate(90deg);
+                }}
+                .inbox-item-preview {{
+                    display: none;
+                    margin-top: 8px;
+                    padding-top: 8px;
+                    border-top: 1px solid #e0e0e0;
+                }}
+                .inbox-item.expanded .inbox-item-preview {{
+                    display: block;
+                }}
+                .inbox-item-archived-label {{
+                    font-size: 11px;
+                    font-style: italic;
+                    color: #999;
+                    margin-left: 8px;
                 }}
                 .inbox-list {{
                     max-height: 400px;
@@ -1151,7 +1175,10 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             <div class="inbox-widget">
                 <div class="inbox-header">
                     <h2>Inkomende berichten</h2>
-                    <button class="inbox-toggle-btn" id="inbox-toggle-btn">📁 Archief</button>
+                    <label>
+                        <input type="checkbox" id="inbox-archief-checkbox">
+                        Archief weergeven
+                    </label>
                 </div>
                 <div class="inbox-list" id="inbox-list">
                     <div class="inbox-loading">Laden...</div>
@@ -1160,9 +1187,8 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             <script>
                 (function() {{
                     const inboxList = document.getElementById('inbox-list');
-                    const toggleBtn = document.getElementById('inbox-toggle-btn');
+                    const archiefCheckbox = document.getElementById('inbox-archief-checkbox');
                     const token = new URLSearchParams(window.location.search).get('token');
-                    let toonArchief = false;
                     
                     if (!token) {{
                         inboxList.innerHTML = '<div class="inbox-empty">Geen toegang</div>';
@@ -1201,10 +1227,9 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                         }}
                     }}
                     
-                    function laadInbox(archief) {{
+                    function laadInbox() {{
                         inboxList.innerHTML = '<div class="inbox-loading">Laden...</div>';
-                        const archiefParam = archief ? '&archief=true' : '';
-                        fetch('/admin/communicatie/inbox?token=' + encodeURIComponent(token) + archiefParam)
+                        fetch('/admin/communicatie/inbox?token=' + encodeURIComponent(token))
                             .then(response => response.json())
                             .then(data => {{
                                 if (!data.mails || data.mails.length === 0) {{
@@ -1212,13 +1237,21 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                                     return;
                                 }}
                                 
-                                const mails = data.mails.slice(0, 8);
+                                const toonArchief = archiefCheckbox.checked;
+                                let mails = data.mails.slice(0, 8);
+                                
+                                // Filter gearchiveerde items als checkbox unchecked
+                                if (!toonArchief) {{
+                                    mails = mails.filter(mail => !mail.gearchiveerd);
+                                }}
+                                
                                 let html = '';
                                 
                                 mails.forEach(mail => {{
                                     const contactId = mail.contact_id || '';
                                     const contactNaam = mail.contact_naam || mail.email || 'Onbekend';
                                     const preview = mail.bericht_preview || mail.onderwerp || '(Geen preview)';
+                                    const onderwerp = mail.onderwerp || '(Geen onderwerp)';
                                     const tijd = formatTime(mail.verzonden_op);
                                     const link = contactId ? '/admin/klant/' + contactId + '?token=' + encodeURIComponent(token) + '#chatvenster' : '#';
                                     const isGearchiveerd = mail.gearchiveerd || false;
@@ -1226,7 +1259,16 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                                     
                                     html += '<div class="' + itemClass + '" onclick="window.location.href=\\'' + link + '\\'">';
                                     html += '<div class="inbox-item-content">';
+                                    html += '<div style="display: flex; align-items: center;">';
+                                    html += '<span class="inbox-item-expand" onclick="event.stopPropagation(); window.toggleExpand(this)">▶</span>';
                                     html += '<div class="inbox-item-contact">' + escapeHtml(contactNaam) + '</div>';
+                                    html += '</div>';
+                                    html += '<div style="display: flex; align-items: center; margin-top: 4px;">';
+                                    html += '<div class="inbox-item-contact" style="font-weight: normal; color: #666;">' + escapeHtml(onderwerp) + '</div>';
+                                    if (isGearchiveerd) {{
+                                        html += '<span class="inbox-item-archived-label">Gearchiveerd</span>';
+                                    }}
+                                    html += '</div>';
                                     html += '<div class="inbox-item-preview">' + escapeHtml(preview) + '</div>';
                                     html += '<div class="inbox-item-time">' + escapeHtml(tijd) + '</div>';
                                     html += '</div>';
@@ -1254,6 +1296,12 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                             }});
                     }}
                     
+                    window.toggleExpand = function(arrow) {{
+                        const item = arrow.closest('.inbox-item');
+                        item.classList.toggle('expanded');
+                        arrow.textContent = item.classList.contains('expanded') ? '▼' : '▶';
+                    }};
+                    
                     window.archiveerMail = function(mailId, button) {{
                         const token = new URLSearchParams(window.location.search).get('token');
                         if (!token) return;
@@ -1263,8 +1311,8 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                         }})
                         .then(response => response.json())
                         .then(data => {{
-                            // Herlaad inbox met huidige archief status
-                            laadInbox(toonArchief);
+                            // Herlaad inbox
+                            laadInbox();
                         }})
                         .catch(error => {{
                             console.error('Fout bij archiveren:', error);
@@ -1272,15 +1320,13 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                         }});
                     }};
                     
-                    // Toggle knop event listener
-                    toggleBtn.addEventListener('click', function() {{
-                        toonArchief = !toonArchief;
-                        toggleBtn.textContent = toonArchief ? '📥 Inbox' : '📁 Archief';
-                        laadInbox(toonArchief);
+                    // Checkbox event listener
+                    archiefCheckbox.addEventListener('change', function() {{
+                        laadInbox();
                     }});
                     
                     // Laad initieel inbox
-                    laadInbox(false);
+                    laadInbox();
                 }})();
             </script>
         </body>
@@ -1512,7 +1558,6 @@ async def verwerk_nieuwe_aanvraag(
 @router.get("/communicatie/inbox")
 async def communicatie_inbox(
     request: Request,
-    archief: bool = False,
     verified: bool = Depends(verify_admin_session)
 ):
     """Haal inbox overzicht op: alle inkomende mails"""
@@ -1522,13 +1567,7 @@ async def communicatie_inbox(
         conn = psycopg2.connect(database_url)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Bepaal WHERE clause op basis van archief parameter
-        if archief:
-            archiveer_filter = "ml.gearchiveerd = TRUE"
-        else:
-            archiveer_filter = "(ml.gearchiveerd = FALSE OR ml.gearchiveerd IS NULL)"
-        
-        cur.execute(f"""
+        cur.execute("""
             SELECT
                 ml.id,
                 COALESCE(ml.ontvanger_id, o.klant_id) as contact_id,
@@ -1543,7 +1582,6 @@ async def communicatie_inbox(
             LEFT JOIN contacten c ON ml.ontvanger_id = c.id
             LEFT JOIN orders o ON ml.order_id = o.id
             WHERE ml.richting = 'inkomend'
-              AND {archiveer_filter}
               AND ml.verzonden_op IS NOT NULL
             ORDER BY ml.verzonden_op DESC NULLS LAST, ml.created_at DESC
             LIMIT 100
