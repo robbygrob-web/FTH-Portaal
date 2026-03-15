@@ -438,11 +438,11 @@ async def klant_detail(request: Request, klant_id: str, verified: bool = Depends
                                 let isPlaceholder = false;
                                 
                                 if (bericht.body) {{
-                                    bodyContent = escapeHtml(bericht.body);
+                                    bodyContent = bericht.body; // Raw HTML, geen escapeHtml
                                 }} else if (bericht.preview) {{
-                                    bodyContent = escapeHtml(bericht.preview);
+                                    bodyContent = bericht.preview; // Raw HTML, geen escapeHtml
                                 }} else if (bericht.onderwerp) {{
-                                    bodyContent = escapeHtml(bericht.onderwerp);
+                                    bodyContent = escapeHtml(bericht.onderwerp); // Plain text, wel escapeHtml
                                     isPlaceholder = true;
                                 }} else {{
                                     bodyContent = '(Geen inhoud)';

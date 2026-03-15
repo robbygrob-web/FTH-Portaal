@@ -150,6 +150,44 @@ async def add_betaal_status_column(verified: bool = Depends(verify_admin_token))
             conn.close()
 
 
+@router.post("/communicatie/inbox/{mail_id}/archiveer")
+async def archiveer_mail(
+    request: Request,
+    mail_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Archiveer een mail log"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE mail_logs
+            SET gearchiveerd = TRUE
+            WHERE id = %s
+        """, (mail_id,))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Mail niet gevonden")
+        
+        conn.commit()
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
 @setup_router.post("/add-facturen-mollie-columns")
 async def add_facturen_mollie_columns(verified: bool = Depends(verify_admin_token)):
     """
@@ -210,6 +248,44 @@ async def add_facturen_mollie_columns(verified: bool = Depends(verify_admin_toke
             conn.close()
 
 
+@router.post("/communicatie/inbox/{mail_id}/archiveer")
+async def archiveer_mail(
+    request: Request,
+    mail_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Archiveer een mail log"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE mail_logs
+            SET gearchiveerd = TRUE
+            WHERE id = %s
+        """, (mail_id,))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Mail niet gevonden")
+        
+        conn.commit()
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
 @setup_router.post("/add-gf-referentie-column")
 async def add_gf_referentie_column(verified: bool = Depends(verify_admin_token)):
     """
@@ -263,6 +339,44 @@ async def add_gf_referentie_column(verified: bool = Depends(verify_admin_token))
             conn.close()
 
 
+@router.post("/communicatie/inbox/{mail_id}/archiveer")
+async def archiveer_mail(
+    request: Request,
+    mail_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Archiveer een mail log"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE mail_logs
+            SET gearchiveerd = TRUE
+            WHERE id = %s
+        """, (mail_id,))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Mail niet gevonden")
+        
+        conn.commit()
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
 @setup_router.post("/add-bevestig-token-column")
 async def add_bevestig_token_column(verified: bool = Depends(verify_admin_token)):
     """
@@ -310,6 +424,44 @@ async def add_bevestig_token_column(verified: bool = Depends(verify_admin_token)
         full_error = f"{error_message}\n\nTraceback:\n{error_traceback}"
         _LOG.error(f"Fout bij toevoegen bevestig_token kolom: {full_error}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout bij toevoegen kolom: {full_error}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/communicatie/inbox/{mail_id}/archiveer")
+async def archiveer_mail(
+    request: Request,
+    mail_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Archiveer een mail log"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE mail_logs
+            SET gearchiveerd = TRUE
+            WHERE id = %s
+        """, (mail_id,))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Mail niet gevonden")
+        
+        conn.commit()
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn:
             cur.close()
@@ -373,6 +525,44 @@ async def toon_orders(request: Request):
             conn.close()
 
 
+@router.post("/communicatie/inbox/{mail_id}/archiveer")
+async def archiveer_mail(
+    request: Request,
+    mail_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Archiveer een mail log"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE mail_logs
+            SET gearchiveerd = TRUE
+            WHERE id = %s
+        """, (mail_id,))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Mail niet gevonden")
+        
+        conn.commit()
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
 @setup_router.get("/toon-order-detail")
 async def toon_order_detail(request: Request):
     """Tijdelijk endpoint om alle kolommen van één order te tonen"""
@@ -414,6 +604,44 @@ async def toon_order_detail(request: Request):
         
     except Exception as e:
         _LOG.error(f"Fout bij ophalen order detail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/communicatie/inbox/{mail_id}/archiveer")
+async def archiveer_mail(
+    request: Request,
+    mail_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Archiveer een mail log"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE mail_logs
+            SET gearchiveerd = TRUE
+            WHERE id = %s
+        """, (mail_id,))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Mail niet gevonden")
+        
+        conn.commit()
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn:
@@ -793,6 +1021,44 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
             conn.close()
 
 
+@router.post("/communicatie/inbox/{mail_id}/archiveer")
+async def archiveer_mail(
+    request: Request,
+    mail_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Archiveer een mail log"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE mail_logs
+            SET gearchiveerd = TRUE
+            WHERE id = %s
+        """, (mail_id,))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Mail niet gevonden")
+        
+        conn.commit()
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
 @router.get("", response_class=HTMLResponse)
 async def admin_dashboard(request: Request, verified: bool = Depends(verify_admin_session)):
     """Admin dashboard met aanvragen lijst"""
@@ -1055,6 +1321,39 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                     margin-left: 15px;
                     white-space: nowrap;
                 }}
+                .inbox-item-actions {{
+                    display: flex;
+                    gap: 6px;
+                    margin-left: 15px;
+                    align-items: center;
+                }}
+                .inbox-btn {{
+                    font-size: 11px;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    border: 1px solid #ddd;
+                    background: white;
+                    cursor: pointer;
+                    text-decoration: none;
+                    color: #333;
+                    white-space: nowrap;
+                }}
+                .inbox-btn:hover {{
+                    background: #f5f5f5;
+                    border-color: #999;
+                }}
+                .inbox-archive-btn {{
+                    font-size: 13px;
+                    color: #999;
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    padding: 0 4px;
+                    line-height: 1;
+                }}
+                .inbox-archive-btn:hover {{
+                    color: #e74c3c;
+                }}
                 .inbox-loading {{
                     text-align: center;
                     padding: 20px;
@@ -1171,7 +1470,20 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                                 html += '<div class="inbox-item-contact">' + escapeHtml(contactNaam) + '</div>';
                                 html += '<div class="inbox-item-preview">' + escapeHtml(preview) + '</div>';
                                 html += '</div>';
+                                html += '<div style="display: flex; align-items: center; gap: 10px;">';
                                 html += '<div class="inbox-item-time">' + escapeHtml(tijd) + '</div>';
+                                html += '<div class="inbox-item-actions" onclick="event.stopPropagation()">';
+                                if (contactId) {{
+                                    const klantLink = '/admin/klant/' + contactId + '?token=' + encodeURIComponent(token);
+                                    html += '<a href="' + klantLink + '" class="inbox-btn">Klant</a>';
+                                }}
+                                if (mail.order_id) {{
+                                    const orderLink = '/admin/order/' + mail.order_id + '?token=' + encodeURIComponent(token);
+                                    html += '<a href="' + orderLink + '" class="inbox-btn">Order</a>';
+                                }}
+                                html += '<button class="inbox-archive-btn" onclick="event.stopPropagation(); archiveerMail(\\'' + mail.id + '\\', this)">×</button>';
+                                html += '</div>';
+                                html += '</div>';
                                 html += '</div>';
                             }});
                             
@@ -1181,6 +1493,24 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                             console.error('Fout bij ophalen inbox:', error);
                             inboxList.innerHTML = '<div class="inbox-empty">Fout bij laden berichten</div>';
                         }});
+                    
+                    function archiveerMail(mailId, button) {{
+                        const token = new URLSearchParams(window.location.search).get('token');
+                        if (!token) return;
+                        
+                        fetch('/admin/communicatie/inbox/' + mailId + '/archiveer?token=' + encodeURIComponent(token), {{
+                            method: 'POST'
+                        }})
+                        .then(response => response.json())
+                        .then(data => {{
+                            // Verwijder rij uit DOM
+                            button.closest('.inbox-item').remove();
+                        }})
+                        .catch(error => {{
+                            console.error('Fout bij archiveren:', error);
+                            alert('Fout bij archiveren');
+                        }});
+                    }}
                 }})();
             </script>
         </body>
@@ -1192,6 +1522,44 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
     except Exception as e:
         _LOG.error(f"Fout bij ophalen admin dashboard: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout bij ophalen dashboard: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/communicatie/inbox/{mail_id}/archiveer")
+async def archiveer_mail(
+    request: Request,
+    mail_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Archiveer een mail log"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE mail_logs
+            SET gearchiveerd = TRUE
+            WHERE id = %s
+        """, (mail_id,))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Mail niet gevonden")
+        
+        conn.commit()
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn:
             cur.close()
@@ -1409,6 +1777,44 @@ async def verwerk_nieuwe_aanvraag(
             conn.close()
 
 
+@router.post("/communicatie/inbox/{mail_id}/archiveer")
+async def archiveer_mail(
+    request: Request,
+    mail_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Archiveer een mail log"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE mail_logs
+            SET gearchiveerd = TRUE
+            WHERE id = %s
+        """, (mail_id,))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Mail niet gevonden")
+        
+        conn.commit()
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
 @router.get("/communicatie/inbox")
 async def communicatie_inbox(request: Request, verified: bool = Depends(verify_admin_session)):
     """Haal inbox overzicht op: alle inkomende mails"""
@@ -1431,6 +1837,7 @@ async def communicatie_inbox(request: Request, verified: bool = Depends(verify_a
             FROM mail_logs ml
             LEFT JOIN contacten c ON ml.ontvanger_id = c.id
             WHERE ml.richting = 'inkomend'
+              AND (ml.gearchiveerd = FALSE OR ml.gearchiveerd IS NULL)
             ORDER BY ml.verzonden_op DESC NULLS LAST, ml.created_at DESC
             LIMIT 100
         """)
@@ -1455,6 +1862,44 @@ async def communicatie_inbox(request: Request, verified: bool = Depends(verify_a
         
     except Exception as e:
         _LOG.error(f"Fout bij ophalen inbox: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.post("/communicatie/inbox/{mail_id}/archiveer")
+async def archiveer_mail(
+    request: Request,
+    mail_id: str,
+    verified: bool = Depends(verify_admin_session)
+):
+    """Archiveer een mail log"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE mail_logs
+            SET gearchiveerd = TRUE
+            WHERE id = %s
+        """, (mail_id,))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Mail niet gevonden")
+        
+        conn.commit()
+        return JSONResponse({"status": "ok"})
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn:
