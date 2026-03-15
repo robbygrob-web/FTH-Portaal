@@ -22,6 +22,10 @@ _LOG = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+@router.get("/ping")
+async def ping():
+    return {"status": "ok"}
+
 # Setup router voor init-db endpoint
 setup_router = APIRouter(prefix="/admin/setup", tags=["admin"])
 
@@ -992,6 +996,75 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                 tr:hover {{
                     background: #f9f9f9;
                 }}
+                .inbox-widget {{
+                    background: white;
+                    border-radius: 12px;
+                    padding: 20px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    margin-bottom: 20px;
+                }}
+                .inbox-header {{
+                    margin-bottom: 15px;
+                    padding-bottom: 10px;
+                    border-bottom: 2px solid #e0e0e0;
+                }}
+                .inbox-header h2 {{
+                    color: #333333;
+                    font-size: 20px;
+                    margin: 0;
+                }}
+                .inbox-list {{
+                    max-height: 400px;
+                    overflow-y: auto;
+                    list-style: none;
+                }}
+                .inbox-item {{
+                    padding: 12px;
+                    border-bottom: 1px solid #e0e0e0;
+                    cursor: pointer;
+                    transition: background-color 0.2s;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                }}
+                .inbox-item:hover {{
+                    background: #f9f9f9;
+                }}
+                .inbox-item:last-child {{
+                    border-bottom: none;
+                }}
+                .inbox-item-content {{
+                    flex: 1;
+                    min-width: 0;
+                }}
+                .inbox-item-contact {{
+                    font-weight: 600;
+                    color: #333333;
+                    margin-bottom: 4px;
+                }}
+                .inbox-item-preview {{
+                    color: #666;
+                    font-size: 14px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }}
+                .inbox-item-time {{
+                    color: #999;
+                    font-size: 12px;
+                    margin-left: 15px;
+                    white-space: nowrap;
+                }}
+                .inbox-loading {{
+                    text-align: center;
+                    padding: 20px;
+                    color: #666;
+                }}
+                .inbox-empty {{
+                    text-align: center;
+                    padding: 40px;
+                    color: #999;
+                }}
             </style>
         </head>
         <body>
@@ -1025,6 +1098,91 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
                     </tbody>
                 </table>
             </div>
+            <div class="inbox-widget">
+                <div class="inbox-header">
+                    <h2>Inkomende berichten</h2>
+                </div>
+                <div class="inbox-list" id="inbox-list">
+                    <div class="inbox-loading">Laden...</div>
+                </div>
+            </div>
+            <script>
+                (function() {{
+                    const inboxList = document.getElementById('inbox-list');
+                    const token = new URLSearchParams(window.location.search).get('token');
+                    
+                    if (!token) {{
+                        inboxList.innerHTML = '<div class="inbox-empty">Geen toegang</div>';
+                        return;
+                    }}
+                    
+                    function escapeHtml(text) {{
+                        if (!text) return '';
+                        const div = document.createElement('div');
+                        div.textContent = text;
+                        return div.innerHTML;
+                    }}
+                    
+                    function formatTime(dateString) {{
+                        if (!dateString) return '';
+                        const date = new Date(dateString);
+                        const now = new Date();
+                        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        const yesterday = new Date(today);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                        
+                        const hours = String(date.getHours()).padStart(2, '0');
+                        const minutes = String(date.getMinutes()).padStart(2, '0');
+                        const timeStr = hours + ':' + minutes;
+                        
+                        if (messageDate.getTime() === today.getTime()) {{
+                            return 'vandaag ' + timeStr;
+                        }} else if (messageDate.getTime() === yesterday.getTime()) {{
+                            return 'gisteren ' + timeStr;
+                        }} else {{
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const year = date.getFullYear();
+                            return day + '-' + month + '-' + year + ' ' + timeStr;
+                        }}
+                    }}
+                    
+                    fetch('/admin/communicatie/inbox?token=' + encodeURIComponent(token))
+                        .then(response => response.json())
+                        .then(data => {{
+                            if (!data.mails || data.mails.length === 0) {{
+                                inboxList.innerHTML = '<div class="inbox-empty">Geen inkomende berichten</div>';
+                                return;
+                            }}
+                            
+                            const mails = data.mails.slice(0, 8);
+                            let html = '';
+                            
+                            mails.forEach(mail => {{
+                                const contactId = mail.contact_id || '';
+                                const contactNaam = mail.contact_naam || mail.email || 'Onbekend';
+                                const preview = mail.bericht_preview || mail.onderwerp || '(Geen preview)';
+                                const tijd = formatTime(mail.verzonden_op);
+                                const link = contactId ? '/admin/klant/' + contactId + '?token=' + encodeURIComponent(token) + '#chatvenster' : '#';
+                                
+                                html += '<div class="inbox-item" onclick="window.location.href=\\'' + link + '\\'">';
+                                html += '<div class="inbox-item-content">';
+                                html += '<div class="inbox-item-contact">' + escapeHtml(contactNaam) + '</div>';
+                                html += '<div class="inbox-item-preview">' + escapeHtml(preview) + '</div>';
+                                html += '</div>';
+                                html += '<div class="inbox-item-time">' + escapeHtml(tijd) + '</div>';
+                                html += '</div>';
+                            }});
+                            
+                            inboxList.innerHTML = html;
+                        }})
+                        .catch(error => {{
+                            console.error('Fout bij ophalen inbox:', error);
+                            inboxList.innerHTML = '<div class="inbox-empty">Fout bij laden berichten</div>';
+                        }});
+                }})();
+            </script>
         </body>
         </html>
         """
@@ -1245,6 +1403,59 @@ async def verwerk_nieuwe_aanvraag(
             conn.rollback()
         _LOG.error(f"Fout bij aanmaken nieuwe aanvraag: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout bij aanmaken aanvraag: {str(e)}")
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+
+@router.get("/communicatie/inbox")
+async def communicatie_inbox(request: Request, verified: bool = Depends(verify_admin_session)):
+    """Haal inbox overzicht op: alle inkomende mails"""
+    conn = None
+    try:
+        database_url = get_database_url()
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cur.execute("""
+            SELECT
+                ml.id,
+                ml.ontvanger_id as contact_id,
+                COALESCE(c.naam, ml.email_van, ml.naar) as contact_naam,
+                COALESCE(c.email, ml.email_van, ml.naar) as email,
+                ml.preview as bericht_preview,
+                ml.onderwerp,
+                ml.verzonden_op,
+                ml.order_id
+            FROM mail_logs ml
+            LEFT JOIN contacten c ON ml.ontvanger_id = c.id
+            WHERE ml.richting = 'inkomend'
+            ORDER BY ml.verzonden_op DESC NULLS LAST, ml.created_at DESC
+            LIMIT 100
+        """)
+        
+        mails = cur.fetchall()
+        
+        # Converteer naar dict lijst
+        result = []
+        for mail in mails:
+            result.append({
+                "id": str(mail.get("id")),
+                "contact_id": str(mail.get("contact_id")) if mail.get("contact_id") else None,
+                "contact_naam": mail.get("contact_naam"),
+                "email": mail.get("email"),
+                "bericht_preview": mail.get("bericht_preview"),
+                "onderwerp": mail.get("onderwerp"),
+                "verzonden_op": mail.get("verzonden_op").isoformat() if mail.get("verzonden_op") else None,
+                "order_id": str(mail.get("order_id")) if mail.get("order_id") else None
+            })
+        
+        return JSONResponse({"mails": result, "aantal": len(result)})
+        
+    except Exception as e:
+        _LOG.error(f"Fout bij ophalen inbox: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn:
             cur.close()
