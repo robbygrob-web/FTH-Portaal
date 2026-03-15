@@ -495,6 +495,8 @@ def haal_inkomende_mails() -> dict:
                 message_id_header = header_dict.get('Message-ID', '')
                 date_header = header_dict.get('Date', '')
                 naar_header = header_dict.get('To', GMAIL_FROM_EMAIL)
+                in_reply_to = header_dict.get('In-Reply-To', '')
+                references = header_dict.get('References', '')
                 
                 # Parse datum
                 try:
@@ -556,6 +558,27 @@ def haal_inkomende_mails() -> dict:
                         pass
                     continue
                 
+                # Zoek order_id via In-Reply-To of References header (voor reply op offerte)
+                order_id = None
+                reply_message_ids = []
+                if in_reply_to:
+                    reply_message_ids.append(in_reply_to.strip())
+                if references:
+                    # References kan meerdere message IDs bevatten, gescheiden door whitespace
+                    reply_message_ids.extend([ref.strip() for ref in references.split() if ref.strip()])
+                
+                for reply_msg_id in reply_message_ids:
+                    cur.execute("""
+                        SELECT order_id FROM mail_logs 
+                        WHERE message_id = %s AND order_id IS NOT NULL 
+                        LIMIT 1
+                    """, (reply_msg_id,))
+                    result = cur.fetchone()
+                    if result and result[0]:
+                        order_id = result[0]
+                        _LOG.info(f"Order ID gevonden via reply header: {order_id} (reply naar: {reply_msg_id})")
+                        break
+                
                 cur.close()
                 conn.close()
                 
@@ -568,7 +591,8 @@ def haal_inkomende_mails() -> dict:
                     email_van=email_van,
                     message_id=message_id_header,
                     richting="inkomend",
-                    verzonden_op=ontvangen_datum
+                    verzonden_op=ontvangen_datum,
+                    order_id=order_id
                 )
                 
                 if log_id:

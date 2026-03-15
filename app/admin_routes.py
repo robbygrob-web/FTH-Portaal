@@ -150,44 +150,6 @@ async def add_betaal_status_column(verified: bool = Depends(verify_admin_token))
             conn.close()
 
 
-@router.post("/communicatie/inbox/{mail_id}/archiveer")
-async def archiveer_mail(
-    request: Request,
-    mail_id: str,
-    verified: bool = Depends(verify_admin_session)
-):
-    """Archiveer een mail log"""
-    conn = None
-    try:
-        database_url = get_database_url()
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE mail_logs
-            SET gearchiveerd = TRUE
-            WHERE id = %s
-        """, (mail_id,))
-        
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Mail niet gevonden")
-        
-        conn.commit()
-        return JSONResponse({"status": "ok"})
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-
-
 @setup_router.post("/add-facturen-mollie-columns")
 async def add_facturen_mollie_columns(verified: bool = Depends(verify_admin_token)):
     """
@@ -248,44 +210,6 @@ async def add_facturen_mollie_columns(verified: bool = Depends(verify_admin_toke
             conn.close()
 
 
-@router.post("/communicatie/inbox/{mail_id}/archiveer")
-async def archiveer_mail(
-    request: Request,
-    mail_id: str,
-    verified: bool = Depends(verify_admin_session)
-):
-    """Archiveer een mail log"""
-    conn = None
-    try:
-        database_url = get_database_url()
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE mail_logs
-            SET gearchiveerd = TRUE
-            WHERE id = %s
-        """, (mail_id,))
-        
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Mail niet gevonden")
-        
-        conn.commit()
-        return JSONResponse({"status": "ok"})
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-
-
 @setup_router.post("/add-gf-referentie-column")
 async def add_gf_referentie_column(verified: bool = Depends(verify_admin_token)):
     """
@@ -339,44 +263,6 @@ async def add_gf_referentie_column(verified: bool = Depends(verify_admin_token))
             conn.close()
 
 
-@router.post("/communicatie/inbox/{mail_id}/archiveer")
-async def archiveer_mail(
-    request: Request,
-    mail_id: str,
-    verified: bool = Depends(verify_admin_session)
-):
-    """Archiveer een mail log"""
-    conn = None
-    try:
-        database_url = get_database_url()
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE mail_logs
-            SET gearchiveerd = TRUE
-            WHERE id = %s
-        """, (mail_id,))
-        
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Mail niet gevonden")
-        
-        conn.commit()
-        return JSONResponse({"status": "ok"})
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-
-
 @setup_router.post("/add-bevestig-token-column")
 async def add_bevestig_token_column(verified: bool = Depends(verify_admin_token)):
     """
@@ -424,44 +310,6 @@ async def add_bevestig_token_column(verified: bool = Depends(verify_admin_token)
         full_error = f"{error_message}\n\nTraceback:\n{error_traceback}"
         _LOG.error(f"Fout bij toevoegen bevestig_token kolom: {full_error}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout bij toevoegen kolom: {full_error}")
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-
-
-@router.post("/communicatie/inbox/{mail_id}/archiveer")
-async def archiveer_mail(
-    request: Request,
-    mail_id: str,
-    verified: bool = Depends(verify_admin_session)
-):
-    """Archiveer een mail log"""
-    conn = None
-    try:
-        database_url = get_database_url()
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE mail_logs
-            SET gearchiveerd = TRUE
-            WHERE id = %s
-        """, (mail_id,))
-        
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Mail niet gevonden")
-        
-        conn.commit()
-        return JSONResponse({"status": "ok"})
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn:
             cur.close()
@@ -525,44 +373,6 @@ async def toon_orders(request: Request):
             conn.close()
 
 
-@router.post("/communicatie/inbox/{mail_id}/archiveer")
-async def archiveer_mail(
-    request: Request,
-    mail_id: str,
-    verified: bool = Depends(verify_admin_session)
-):
-    """Archiveer een mail log"""
-    conn = None
-    try:
-        database_url = get_database_url()
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE mail_logs
-            SET gearchiveerd = TRUE
-            WHERE id = %s
-        """, (mail_id,))
-        
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Mail niet gevonden")
-        
-        conn.commit()
-        return JSONResponse({"status": "ok"})
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-
-
 @setup_router.get("/toon-order-detail")
 async def toon_order_detail(request: Request):
     """Tijdelijk endpoint om alle kolommen van één order te tonen"""
@@ -604,44 +414,6 @@ async def toon_order_detail(request: Request):
         
     except Exception as e:
         _LOG.error(f"Fout bij ophalen order detail: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-
-
-@router.post("/communicatie/inbox/{mail_id}/archiveer")
-async def archiveer_mail(
-    request: Request,
-    mail_id: str,
-    verified: bool = Depends(verify_admin_session)
-):
-    """Archiveer een mail log"""
-    conn = None
-    try:
-        database_url = get_database_url()
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE mail_logs
-            SET gearchiveerd = TRUE
-            WHERE id = %s
-        """, (mail_id,))
-        
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Mail niet gevonden")
-        
-        conn.commit()
-        return JSONResponse({"status": "ok"})
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn:
@@ -1015,44 +787,6 @@ async def init_database(verified: bool = Depends(verify_admin_token)):
         full_error = f"{error_message}\n\nTraceback:\n{error_traceback}"
         _LOG.error(f"Fout tijdens database setup: {full_error}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout tijdens database setup: {full_error}")
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-
-
-@router.post("/communicatie/inbox/{mail_id}/archiveer")
-async def archiveer_mail(
-    request: Request,
-    mail_id: str,
-    verified: bool = Depends(verify_admin_session)
-):
-    """Archiveer een mail log"""
-    conn = None
-    try:
-        database_url = get_database_url()
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE mail_logs
-            SET gearchiveerd = TRUE
-            WHERE id = %s
-        """, (mail_id,))
-        
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Mail niet gevonden")
-        
-        conn.commit()
-        return JSONResponse({"status": "ok"})
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn:
             cur.close()
@@ -1528,44 +1262,6 @@ async def admin_dashboard(request: Request, verified: bool = Depends(verify_admi
             conn.close()
 
 
-@router.post("/communicatie/inbox/{mail_id}/archiveer")
-async def archiveer_mail(
-    request: Request,
-    mail_id: str,
-    verified: bool = Depends(verify_admin_session)
-):
-    """Archiveer een mail log"""
-    conn = None
-    try:
-        database_url = get_database_url()
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE mail_logs
-            SET gearchiveerd = TRUE
-            WHERE id = %s
-        """, (mail_id,))
-        
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Mail niet gevonden")
-        
-        conn.commit()
-        return JSONResponse({"status": "ok"})
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-
-
 @router.get("/nieuw", response_class=HTMLResponse)
 async def nieuwe_aanvraag_form(request: Request, verified: bool = Depends(verify_admin_session)):
     """Formulier voor nieuwe aanvraag"""
@@ -1771,44 +1467,6 @@ async def verwerk_nieuwe_aanvraag(
             conn.rollback()
         _LOG.error(f"Fout bij aanmaken nieuwe aanvraag: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fout bij aanmaken aanvraag: {str(e)}")
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-
-
-@router.post("/communicatie/inbox/{mail_id}/archiveer")
-async def archiveer_mail(
-    request: Request,
-    mail_id: str,
-    verified: bool = Depends(verify_admin_session)
-):
-    """Archiveer een mail log"""
-    conn = None
-    try:
-        database_url = get_database_url()
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE mail_logs
-            SET gearchiveerd = TRUE
-            WHERE id = %s
-        """, (mail_id,))
-        
-        if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Mail niet gevonden")
-        
-        conn.commit()
-        return JSONResponse({"status": "ok"})
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        _LOG.error(f"Fout bij archiveren mail: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn:
             cur.close()
