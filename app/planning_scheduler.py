@@ -216,7 +216,7 @@ async def check_en_verstuur_planning_emails():
                         o.id, o.ordernummer, o.leverdatum, o.plaats, 
                         o.aantal_personen, o.aantal_kinderen, o.contractor_id,
                         o.planning_afmeld_token, o.betaal_status,
-                        c.voornaam, c.email
+                        c.naam as voornaam, c.email, c.adres as klant_adres
                     FROM orders o
                     LEFT JOIN contacten c ON o.klant_id = c.id
                     WHERE o.status = 'sale'
@@ -240,6 +240,7 @@ async def check_en_verstuur_planning_emails():
                         ordernummer = order.get("ordernummer", "")
                         leverdatum = order.get("leverdatum")
                         plaats = order.get("plaats", "")
+                        klant_adres = order.get("klant_adres", "") or ""
                         aantal_personen = order.get("aantal_personen", 0)
                         aantal_kinderen = order.get("aantal_kinderen", 0)
                         contractor_id = order.get("contractor_id")
@@ -281,7 +282,8 @@ async def check_en_verstuur_planning_emails():
                             tijdstip=tijdstip,
                             totaal=totaal_str,
                             partner_telefoon=partner_telefoon,
-                            afmeldlink=afmeldlink
+                            afmeldlink=afmeldlink,
+                            klant_adres=klant_adres
                         ) if dagen == 5 else (
                             render_planning_3dagen_betaald(
                                 voornaam=voornaam,
@@ -293,7 +295,8 @@ async def check_en_verstuur_planning_emails():
                                 tijdstip=tijdstip,
                                 totaal=totaal_str,
                                 partner_telefoon=partner_telefoon,
-                                afmeldlink=afmeldlink
+                                afmeldlink=afmeldlink,
+                                klant_adres=klant_adres
                             ) if dagen == 3 else render_planning_1dag_betaald(
                                 voornaam=voornaam,
                                 aantal_personen=aantal_personen,
@@ -304,7 +307,8 @@ async def check_en_verstuur_planning_emails():
                                 tijdstip=tijdstip,
                                 totaal=totaal_str,
                                 partner_telefoon=partner_telefoon,
-                                afmeldlink=afmeldlink
+                                afmeldlink=afmeldlink,
+                                klant_adres=klant_adres
                             )
                         )
                         
@@ -346,7 +350,7 @@ async def check_en_verstuur_planning_emails():
                         o.id, o.ordernummer, o.leverdatum, o.plaats, 
                         o.aantal_personen, o.aantal_kinderen, o.contractor_id,
                         f.mollie_checkout_url as betaallink,
-                        c.voornaam, c.email
+                        c.naam as voornaam, c.email, c.adres as klant_adres
                     FROM orders o
                     LEFT JOIN contacten c ON o.klant_id = c.id
                     LEFT JOIN facturen f ON f.order_id = o.id
@@ -371,6 +375,7 @@ async def check_en_verstuur_planning_emails():
                         ordernummer = order.get("ordernummer", "")
                         leverdatum = order.get("leverdatum")
                         plaats = order.get("plaats", "")
+                        klant_adres = order.get("klant_adres", "") or ""
                         aantal_personen = order.get("aantal_personen", 0)
                         aantal_kinderen = order.get("aantal_kinderen", 0)
                         contractor_id = order.get("contractor_id")
@@ -406,7 +411,8 @@ async def check_en_verstuur_planning_emails():
                             tijdstip=tijdstip,
                             totaal=totaal_str,
                             partner_telefoon=partner_telefoon,
-                            betaallink=betaallink
+                            betaallink=betaallink,
+                            klant_adres=klant_adres
                         ) if dagen == 5 else (
                             render_planning_3dagen_onbetaald(
                                 voornaam=voornaam,
@@ -418,7 +424,8 @@ async def check_en_verstuur_planning_emails():
                                 tijdstip=tijdstip,
                                 totaal=totaal_str,
                                 partner_telefoon=partner_telefoon,
-                                betaallink=betaallink
+                                betaallink=betaallink,
+                                klant_adres=klant_adres
                             ) if dagen == 3 else render_planning_1dag_onbetaald(
                                 voornaam=voornaam,
                                 aantal_personen=aantal_personen,
@@ -429,7 +436,8 @@ async def check_en_verstuur_planning_emails():
                                 tijdstip=tijdstip,
                                 totaal=totaal_str,
                                 partner_telefoon=partner_telefoon,
-                                betaallink=betaallink
+                                betaallink=betaallink,
+                                klant_adres=klant_adres
                             )
                         )
                         
@@ -470,7 +478,7 @@ async def check_en_verstuur_planning_emails():
                     SELECT 
                         o.id, o.ordernummer, o.leverdatum, o.plaats, 
                         o.aantal_personen, o.aantal_kinderen, o.contractor_id,
-                        c.voornaam, c.email
+                        c.naam as voornaam, c.email, c.adres as klant_adres
                     FROM orders o
                     LEFT JOIN contacten c ON o.klant_id = c.id
                     WHERE o.status = 'sale'
@@ -502,6 +510,7 @@ async def check_en_verstuur_planning_emails():
                         ordernummer = order.get("ordernummer", "")
                         leverdatum = order.get("leverdatum")
                         plaats = order.get("plaats", "")
+                        klant_adres = order.get("klant_adres", "") or ""
                         aantal_personen = order.get("aantal_personen", 0)
                         aantal_kinderen = order.get("aantal_kinderen", 0)
                         contractor_id = order.get("contractor_id")
@@ -557,7 +566,8 @@ async def check_en_verstuur_planning_emails():
                                 datum=datum,
                                 tijdstip=tijdstip,
                                 totaal=totaal_str,
-                                partner_telefoon=partner_telefoon
+                                partner_telefoon=partner_telefoon,
+                                klant_adres=klant_adres
                             )
                         else:  # dag 7
                             html = render_planning_7dagen(
@@ -570,7 +580,8 @@ async def check_en_verstuur_planning_emails():
                                 tijdstip=tijdstip,
                                 totaal=totaal_str,
                                 partner_telefoon=partner_telefoon,
-                                betaallink=betaallink
+                                betaallink=betaallink,
+                                klant_adres=klant_adres
                             )
                         
                         # Genereer PDF bijlage indien nodig

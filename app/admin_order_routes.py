@@ -300,7 +300,7 @@ async def test_planning_flow(
                 o.id, o.ordernummer, o.leverdatum, o.plaats, 
                 o.aantal_personen, o.aantal_kinderen, o.contractor_id,
                 o.planning_afmeld_token, o.betaal_status, o.status,
-                c.naam as voornaam, c.email
+                c.naam as voornaam, c.email, c.adres as klant_adres
             FROM orders o
             LEFT JOIN contacten c ON o.klant_id = c.id
             WHERE o.id = %s
@@ -318,6 +318,7 @@ async def test_planning_flow(
         ordernummer = order.get("ordernummer", "")
         leverdatum = order.get("leverdatum")
         plaats = order.get("plaats", "")
+        klant_adres = order.get("klant_adres", "") or ""
         aantal_personen = order.get("aantal_personen", 0)
         aantal_kinderen = order.get("aantal_kinderen", 0)
         contractor_id = order.get("contractor_id")
@@ -408,7 +409,8 @@ async def test_planning_flow(
                         datum=datum,
                         tijdstip=tijdstip,
                         totaal=totaal_str,
-                        partner_telefoon=partner_telefoon
+                        partner_telefoon=partner_telefoon,
+                        klant_adres=klant_adres
                     )
                     template_naam = "planning_9dagen"
                 elif dagen == 7:
@@ -422,7 +424,8 @@ async def test_planning_flow(
                         tijdstip=tijdstip,
                         totaal=totaal_str,
                         partner_telefoon=partner_telefoon,
-                        betaallink=betaallink
+                        betaallink=betaallink,
+                        klant_adres=klant_adres
                     )
                     template_naam = "planning_7dagen"
                 elif dagen == 5:
@@ -437,7 +440,8 @@ async def test_planning_flow(
                             tijdstip=tijdstip,
                             totaal=totaal_str,
                             partner_telefoon=partner_telefoon,
-                            afmeldlink=afmeldlink
+                            afmeldlink=afmeldlink,
+                            klant_adres=klant_adres
                         )
                         template_naam = "planning_5dagen_betaald"
                     else:
@@ -451,7 +455,8 @@ async def test_planning_flow(
                             tijdstip=tijdstip,
                             totaal=totaal_str,
                             partner_telefoon=partner_telefoon,
-                            betaallink=betaallink
+                            betaallink=betaallink,
+                            klant_adres=klant_adres
                         )
                         template_naam = "planning_5dagen_onbetaald"
                 elif dagen == 3:
@@ -466,7 +471,8 @@ async def test_planning_flow(
                             tijdstip=tijdstip,
                             totaal=totaal_str,
                             partner_telefoon=partner_telefoon,
-                            afmeldlink=afmeldlink
+                            afmeldlink=afmeldlink,
+                            klant_adres=klant_adres
                         )
                         template_naam = "planning_3dagen_betaald"
                     else:
@@ -480,7 +486,8 @@ async def test_planning_flow(
                             tijdstip=tijdstip,
                             totaal=totaal_str,
                             partner_telefoon=partner_telefoon,
-                            betaallink=betaallink
+                            betaallink=betaallink,
+                            klant_adres=klant_adres
                         )
                         template_naam = "planning_3dagen_onbetaald"
                 else:  # dag 1
@@ -495,7 +502,8 @@ async def test_planning_flow(
                             tijdstip=tijdstip,
                             totaal=totaal_str,
                             partner_telefoon=partner_telefoon,
-                            afmeldlink=afmeldlink
+                            afmeldlink=afmeldlink,
+                            klant_adres=klant_adres
                         )
                         template_naam = "planning_1dag_betaald"
                     else:
@@ -509,7 +517,8 @@ async def test_planning_flow(
                             tijdstip=tijdstip,
                             totaal=totaal_str,
                             partner_telefoon=partner_telefoon,
-                            betaallink=betaallink
+                            betaallink=betaallink,
+                            klant_adres=klant_adres
                         )
                         template_naam = "planning_1dag_onbetaald"
                 
