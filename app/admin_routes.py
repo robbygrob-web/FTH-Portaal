@@ -1839,6 +1839,7 @@ async def communicatie_inbox(request: Request, verified: bool = Depends(verify_a
             LEFT JOIN orders o ON ml.order_id = o.id
             WHERE ml.richting = 'inkomend'
               AND (ml.gearchiveerd = FALSE OR ml.gearchiveerd IS NULL)
+              AND ml.verzonden_op IS NOT NULL
             ORDER BY ml.verzonden_op DESC NULLS LAST, ml.created_at DESC
             LIMIT 100
         """)

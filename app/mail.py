@@ -142,16 +142,28 @@ def log_mail_to_db(
         # Bij inkomend: match email_van (afzender) met contacten.email
         ontvanger_id = None
         try:
+            import re
+            
+            def extract_email(raw):
+                """Extraheer pure email uit formaat 'Naam' <email@domain.nl> of gewoon email@domain.nl"""
+                if not raw:
+                    return None
+                match = re.search(r'<([^>]+)>', raw)
+                return match.group(1) if match else raw.strip()
+            
             email_to_match = email_van if richting == "inkomend" else naar
             if email_to_match:
-                cur.execute("""
-                    SELECT id FROM contacten 
-                    WHERE email = %s 
-                    LIMIT 1
-                """, (email_to_match,))
-                result = cur.fetchone()
-                if result:
-                    ontvanger_id = result[0]
+                # Extraheer pure email adres
+                pure_email = extract_email(email_to_match)
+                if pure_email:
+                    cur.execute("""
+                        SELECT id FROM contacten 
+                        WHERE email = %s 
+                        LIMIT 1
+                    """, (pure_email,))
+                    result = cur.fetchone()
+                    if result:
+                        ontvanger_id = result[0]
         except Exception as e:
             # Fail silently - ontvanger_id mag NULL blijven
             _LOG.debug(f"Kon ontvanger_id niet bepalen voor email {email_to_match}: {e}")
