@@ -93,7 +93,8 @@ def log_mail_to_db(
     message_id: Optional[str] = None,
     heeft_fout: bool = False,
     preview: Optional[str] = None,
-    richting: str = "uitgaand"
+    richting: str = "uitgaand",
+    verzonden_op: Optional[datetime] = None
 ):
     """
     Log mail verzending of ontvangst in mail_logs tabel.
@@ -131,8 +132,9 @@ def log_mail_to_db(
         if not email_van:
             email_van = GMAIL_FROM_EMAIL
         
-        # Bepaal verzonden_op op basis van status en richting
-        verzonden_op = datetime.now() if (status == "verzonden" and richting == "uitgaand") else None
+        # Bepaal verzonden_op op basis van status en richting (als niet al opgegeven)
+        if verzonden_op is None:
+            verzonden_op = datetime.now() if (status == "verzonden" and richting == "uitgaand") else None
         
         # Bepaal bericht_type op basis van richting
         bericht_type = "email_incoming" if richting == "inkomend" else "email_outgoing"
@@ -565,7 +567,8 @@ def haal_inkomende_mails() -> dict:
                     status="ontvangen",
                     email_van=email_van,
                     message_id=message_id_header,
-                    richting="inkomend"
+                    richting="inkomend",
+                    verzonden_op=ontvangen_datum
                 )
                 
                 if log_id:
