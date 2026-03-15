@@ -383,6 +383,9 @@
                     <button class="btn btn-primary" onclick="copyHTML('{{ template.key }}')">
                         Kopieer HTML
                     </button>
+                    <button class="btn btn-secondary" onclick="downloadHTML('{{ template.key }}')">
+                        Download HTML
+                    </button>
                     <button class="btn btn-secondary" onclick="uploadHTML('{{ template.key }}')">
                         Upload HTML
                     </button>
@@ -489,6 +492,31 @@
                     console.error('Failed to copy:', err);
                     alert('Kon niet kopiëren naar clipboard');
                 });
+            } catch (e) {
+                console.error('Error parsing HTML:', e);
+                alert('Fout bij lezen van HTML');
+            }
+        }
+        
+        // Download HTML as file
+        function downloadHTML(key) {
+            const rawScript = document.getElementById(`raw-${key}`);
+            if (!rawScript) {
+                alert('Kon HTML niet vinden');
+                return;
+            }
+            
+            try {
+                const html = JSON.parse(rawScript.textContent);
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${key}.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             } catch (e) {
                 console.error('Error parsing HTML:', e);
                 alert('Fout bij lezen van HTML');
