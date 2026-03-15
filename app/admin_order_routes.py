@@ -727,7 +727,14 @@ async def debug_artikelen(order_id: str, verified: bool = Depends(verify_admin_s
         artikelen = cur.fetchall()
         return JSONResponse(content={
             "order_id": order_id,
-            "artikelen": [dict(row) for row in artikelen]
+            "artikelen": [
+                {
+                    "naam": row["naam"],
+                    "aantal": int(row["aantal"]),
+                    "prijs_incl": float(row["prijs_incl"])
+                }
+                for row in artikelen
+            ]
         })
     except Exception as e:
         _LOG.error(f"Fout bij ophalen artikelen: {e}", exc_info=True)
